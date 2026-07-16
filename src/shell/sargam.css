@@ -205,3 +205,112 @@
   padding: 4px 16px;
   color: var(--sr-alert);
 }
+
+/* ---- M2 toolbar + notice strip (2026-07-16) ---- */
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-wordmark { margin-right: 10px; }
+.tb-btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  padding: 4px 12px;
+  border: 1px solid var(--sr-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sr-ink);
+  cursor: pointer;
+}
+.tb-btn:hover { background: var(--sr-paper); }
+.tb-recent-wrap { position: relative; }
+.tb-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  background: var(--sr-paper-raised);
+  border: 1px solid var(--sr-line);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(43, 38, 32, 0.12);
+  z-index: 10;
+  padding: 4px;
+}
+.tb-menu-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--sr-ink-soft);
+}
+.tb-menu-row { display: flex; align-items: center; }
+.tb-menu-item {
+  flex: 1;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--sr-ink);
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-menu-item:hover { background: var(--sr-paper); }
+.tb-menu-x {
+  font: inherit;
+  font-size: 14px;
+  border: none;
+  background: transparent;
+  color: var(--sr-ink-soft);
+  cursor: pointer;
+  padding: 2px 8px;
+}
+.tb-menu-x:hover { color: var(--sr-alert); }
+.tb-file {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--sr-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}
+.tb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sr-dim);
+  background: transparent;
+  flex: none;
+}
+.tb-dot.is-dirty {
+  border-color: var(--sr-warm);
+  background: var(--sr-warm);
+}
+.app-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  font-size: 12.5px;
+  color: var(--sr-accent);
+  border-bottom: 1px solid var(--sr-line);
+  background: var(--sr-paper);
+}
+.app-notice-x {
+  margin-left: auto;
+  font: inherit;
+  border: none;
+  background: transparent;
+  color: var(--sr-ink-soft);
+  cursor: pointer;
+  padding: 0 4px;
+}
