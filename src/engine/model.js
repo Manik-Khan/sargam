@@ -57,6 +57,7 @@ export function fracToNumber(a) {
  * @typedef {Object} Document
  * @property {Object} directives  — {tal, title, raga, sa, tempo, id, created, modified}
  * @property {Section[]} sections
+ * @property {boolean} frontmatter — header was `---`-fenced (§3.1 amended 2026-07-16); serialize preserves the form
  *
  * @typedef {Object} Section
  * @property {string|null} label  — bare-text section label, e.g. 'Sthayi'

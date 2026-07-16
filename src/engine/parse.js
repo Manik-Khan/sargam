@@ -31,7 +31,7 @@ const BOL_MARKS = { da: 'da', ra: 'ra', diri: 'diri', chikari: 'chikari' };
  */
 export function parseDocument(text) {
   const problems = [];
-  const doc = { directives: {}, sections: [] };
+  const doc = { directives: {}, sections: [], frontmatter: false };
   const src = typeof text === 'string' ? text : '';
   const lines = src.split('\n');
 
@@ -40,7 +40,57 @@ export function parseDocument(text) {
   let lastMusicLine = null;
   let missingTalReported = false;
 
-  for (let i = 0; i < lines.length; i++) {
+  const applyDirective = (key, val, lineNo) => {
+    if (key === 'tal') {
+      currentTal = val;
+      if (val !== 'free' && !getTal(val)) {
+        problems.push({ line: lineNo, col: null, msg: `unknown tal '${val}'` });
+      }
+    }
+    // First value wins for document directives (header semantics);
+    // mid-document tal changes live on sections, not here.
+    if (!(key in doc.directives)) doc.directives[key] = val;
+  };
+
+  // Frontmatter (spec §3.1 amended 2026-07-16): only a `---` on line 1
+  // opens a fence; interior lines are directives; a `---` anywhere else in
+  // the document is ordinary text (and still parses as sustains).
+  let startLine = 0;
+  if (lines[0] === '---') {
+    let close = -1;
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i] === '---') {
+        close = i;
+        break;
+      }
+    }
+    if (close === -1) {
+      problems.push({
+        line: 1,
+        col: null,
+        msg: "'---' frontmatter fence is never closed — add a closing '---' line or remove this one",
+      });
+    } else {
+      doc.frontmatter = true;
+      for (let i = 1; i < close; i++) {
+        const t = lines[i].trim();
+        if (t === '') continue;
+        const dm = t.match(DIRECTIVE_RE);
+        if (dm) {
+          applyDirective(dm[1], dm[2].trim(), i + 1);
+        } else {
+          problems.push({
+            line: i + 1,
+            col: null,
+            msg: `line inside frontmatter is not a 'key: value' directive — skipped`,
+          });
+        }
+      }
+      startLine = close + 1;
+    }
+  }
+
+  for (let i = startLine; i < lines.length; i++) {
     const lineNo = i + 1;
     const raw = lines[i];
     const trimmed = raw.trim();
@@ -54,17 +104,7 @@ export function parseDocument(text) {
     // Directive?
     const dm = trimmed.match(DIRECTIVE_RE);
     if (dm) {
-      const key = dm[1];
-      const val = dm[2].trim();
-      if (key === 'tal') {
-        currentTal = val;
-        if (val !== 'free' && !getTal(val)) {
-          problems.push({ line: lineNo, col: null, msg: `unknown tal '${val}'` });
-        }
-      }
-      // First value wins for document directives (header semantics);
-      // mid-document tal changes live on sections, not here.
-      if (!(key in doc.directives)) doc.directives[key] = val;
+      applyDirective(dm[1], dm[2].trim(), lineNo);
       continue;
     }
 

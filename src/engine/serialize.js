@@ -21,14 +21,18 @@ const KNOWN_KEYS = ['title', 'raga', 'tal', 'sa', 'tempo', 'id', 'created', 'mod
 export function serializeDocument(doc) {
   const out = [];
 
-  // Header directives, canonical order, then any unknown keys.
+  // Header directives, canonical order, then any unknown keys. Fenced
+  // (frontmatter) form is preserved when the document uses it (§3.1
+  // amended 2026-07-16).
   const dirs = doc.directives || {};
+  if (doc.frontmatter) out.push('---');
   for (const k of KNOWN_KEYS) {
     if (k in dirs) out.push(`${k}: ${dirs[k]}`);
   }
   for (const k of Object.keys(dirs)) {
     if (!KNOWN_KEYS.includes(k)) out.push(`${k}: ${dirs[k]}`);
   }
+  if (doc.frontmatter) out.push('---');
 
   let runningTal = dirs.tal ?? null;
   for (const section of doc.sections || []) {

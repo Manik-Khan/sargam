@@ -65,7 +65,7 @@ Model → canonical text. Requirement: `parse(serialize(parse(text)))` is stable
 
 ## 3. Notation format
 
-A composition file is plain text: **directives**, **section labels**, **music lines**, **lyric lines**, **bol lines**, separated by structure described below. Default file extension: `.txt`.
+A composition file is plain text: **directives**, **section labels**, **music lines**, **lyric lines**, **bol lines**, separated by structure described below. Default file extension: `.md` (`.txt` remains fully accepted — the format is identical; only the extension changed). *(Amended 2026-07-16, M's call: `.md` makes compositions first-class Obsidian/Codex citizens. Caveat accepted: markdown reading-view renderers will mangle music lines — `|` reads as tables, `_` as italics; source mode and plain editors are unaffected.)*
 
 ### 3.1 Directives
 
@@ -75,7 +75,9 @@ A composition file is plain text: **directives**, **section labels**, **music li
 - `title:`, `raga:` — optional metadata.
 - `sa:` — playback pitch of Sa. Default `C#`.
 - `tempo:` — bpm per matra. Default `60`.
-- `id:`, `created:`, `modified:` — written and maintained automatically by the app on save (the Supabase-shaped identity). Hand-editing them is legal but never necessary.
+- `id:`, `created:`, `modified:` — written and maintained automatically by the app on save (the Supabase-shaped identity). Hand-editing them is legal but never necessary. *(Pinned 2026-07-16: `id:` is `crypto.randomUUID()`; timestamps are ISO 8601 UTC. `modified:` bumps on explicit save only — autosave is crash protection and never mutates the text.)*
+
+**Frontmatter form** *(amended 2026-07-16)*: the header block may be wrapped in `---` fences (YAML-frontmatter style), making the file a first-class Obsidian note whose `title:`/`raga:`/`tal:`/`id:` are queryable by Dataview/Datacore. Only a `---` on **line 1** opens frontmatter; a `---` anywhere else is ordinary text. Inside the fences the directives are exactly the same `key: value` lines — no YAML features beyond that are parsed. The app inserts identity directives inside the fences when they exist, before the closing `---`. Fenced and unfenced headers are both canonical; serialize preserves whichever form the document uses.
 
 ### 3.2 Structure lines
 
@@ -129,7 +131,7 @@ Tokens attach **left to right to matras that begin with a struck note**, skippin
 
 ### 3.8 Bol lines (`>`)
 
-Instrumental stroke marks, typed as words, rendered as the handwriting's symbols (M's correction, 2026-07-16, superseding the earlier `l`/`-`/`v` shorthand): `da` renders as the vertical tick `|` under its note, `ra` as the horizontal tick `—`, `diri` as `^`, `chikari` as `v`. A `.` token is an explicit gap — the note event under it carries no mark, mirroring lyric skips. Tokens attach **per note event** in order — including each note inside clusters — skipping sustains and rests. Da diri diri da with a gap: `> da diri . diri da`.
+Instrumental stroke marks: `l` = da (vertical tick under the note), `-` = ra (horizontal tick; safe collision — `-` only means ra on a `>` line), `v` = diri. Tokens attach **per note event** in order — including each note inside clusters — skipping sustains and rests. Da diri diri da: `> l v v l`.
 
 ### 3.9 Repeats
 
@@ -188,7 +190,8 @@ Transport: play/pause/stop; tempo control; **loop a selected line or section** (
 
 ## 7. Files, persistence, errors
 
-- **Save/open `.txt`** via the browser file picker. Continuous **autosave to browser storage** so a crash or accidental close loses nothing; explicit unsaved-changes indicator; recent-files list.
+- **Save/open `.md`** (and `.txt`) via the browser file picker. Continuous **autosave to browser storage** so a crash or accidental close loses nothing; explicit unsaved-changes indicator; recent-files list.
+- **M2 decisions (settled 2026-07-16):** Save writes the editor text **verbatim** plus a surgical identity-directive edit — never `serialize(parse(text))`, which would reformat the user's layout. Autosave writes the raw text to a single current-document slot (debounced) and never mutates it. Chrome saves in place via the File System Access API; Safari uses the download fallback as a **first-class path** (each save downloads a copy; the UI says so plainly) — Safari matters because it is the eventual mobile path. Recents restore from the autosaved snapshot in v1, not the disk file (persisting FSA handles needs IndexedDB — deferred), and the UI narrates "restored from autosave". New/Open warn on unsaved changes. Fully offline: no network calls exist anywhere in v1.
 - The app maintains `id:`, `created:`, `modified:` header directives automatically — the document identity that maps onto a Postgres row when Supabase sync arrives. **No auth, no network in v1.**
 - **Failures narrate** (house rule): the problems strip speaks for the parser; playback refuses nothing — it plays what parsed and states what it skipped; any disabled control states why.
 

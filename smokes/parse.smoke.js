@@ -538,4 +538,81 @@ export const smokes = [
       assert.equal(c2, c1);
     },
   },
+
+  // ---- frontmatter (spec §3.1 amended 2026-07-16) ----
+  {
+    name: 'frontmatter: fenced header parses — directives captured, flag set, zero problems',
+    fn: () => {
+      const fenced = `---\ntitle: Kahe Ko\nraga: kirwani\ntal: tintal\n---\n\nSthayi\n@7 .d P | mg R m m | P d N~ 'S | .d - P m | R -\n`;
+      const { doc, problems } = parseDocument(fenced);
+      assert.deepEqual(problems, [], JSON.stringify(problems, null, 2));
+      assert.equal(doc.frontmatter, true);
+      assert.equal(doc.directives.raga, 'kirwani');
+      assert.equal(doc.directives.tal, 'tintal');
+      assert.equal(doc.sections.length, 1);
+      assert.equal(doc.sections[0].label, 'Sthayi');
+      assert.equal(doc.sections[0].tal, 'tintal');
+      assert.equal(doc.sections[0].lines[0].matras.length, 16);
+    },
+  },
+  {
+    name: 'frontmatter: unfenced documents parse with frontmatter false',
+    fn: () => {
+      const { doc } = parseDocument(APPENDIX_A);
+      assert.equal(doc.frontmatter, false);
+    },
+  },
+  {
+    name: 'frontmatter: only a --- on line 1 opens a fence; body --- is still sustains',
+    fn: () => {
+      const src = `tal: tintal\n\nSthayi\nS R g m\n---\n`;
+      const { doc, problems } = parseDocument(src);
+      assert.equal(doc.frontmatter, false);
+      assert.deepEqual(problems, []);
+      // the --- line parses as three whole-matra sustains, as before
+      const lines = doc.sections[0].lines;
+      assert.equal(lines.length, 2);
+      assert.equal(lines[1].matras.length, 3);
+      assert.equal(lines[1].matras[0].events[0].type, 'sustain');
+    },
+  },
+  {
+    name: 'frontmatter: unclosed fence narrates a problem, never throws',
+    fn: () => {
+      const { doc, problems } = parseDocument(`---\ntitle: Oops\n`);
+      assert.equal(doc.frontmatter, false);
+      assert.ok(problems.some((p) => p.line === 1 && /never closed/.test(p.msg)));
+    },
+  },
+  {
+    name: 'frontmatter: non-directive line inside fences narrates and is skipped',
+    fn: () => {
+      const src = `---\ntitle: Kahe Ko\nnot a directive line\ntal: tintal\n---\n\nS R g m\n`;
+      const { doc, problems } = parseDocument(src);
+      assert.equal(doc.frontmatter, true);
+      assert.ok(problems.some((p) => p.line === 3 && /frontmatter/.test(p.msg)));
+      assert.equal(doc.directives.tal, 'tintal');
+      assert.equal(doc.sections[0].lines[0].matras.length, 4);
+    },
+  },
+  {
+    name: 'frontmatter: serialize preserves the fenced form; unfenced stays unfenced',
+    fn: () => {
+      const fenced = `---\ntitle: Kahe Ko\ntal: tintal\n---\n\nS R g m\n`;
+      const outFenced = serializeDocument(parseDocument(fenced).doc);
+      assert.ok(outFenced.startsWith('---\ntitle: Kahe Ko\ntal: tintal\n---\n'), outFenced);
+      const outPlain = serializeDocument(parseDocument(APPENDIX_A).doc);
+      assert.ok(outPlain.startsWith('title:'), outPlain.slice(0, 40));
+    },
+  },
+  {
+    name: 'frontmatter: fenced document round-trips (parse→serialize→parse deep-equal)',
+    fn: () => {
+      const fenced = `---\ntitle: Kahe Ko\nraga: kirwani\ntal: tintal\nsa: C#\ntempo: 72\n---\n\nSthayi\n@7 ||: .d P | mg R m m | P d N~ 'S | .d - P m | R - :||\n" ka- he | ko ma- na na- | hi | ma- ne | re\n\nTihai\n(SR gm P)x3\n`;
+      assertRoundTrip(fenced);
+      const p = parseDocument(fenced);
+      assert.equal(parseDocument(serializeDocument(p.doc)).doc.frontmatter, true);
+    },
+  },
 ];
+
