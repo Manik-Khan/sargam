@@ -74,8 +74,15 @@ A composition file is plain text: **directives**, **section labels**, **music li
 - `tal:` — required before the first metered music line. Values: a tal name, or `free` (unmetered — vibhag validation and tick playback off for the following material).
 - `title:`, `raga:` — optional metadata.
 - `sa:` — playback pitch of Sa. Default `C#`.
-- `tempo:` — bpm per matra. Default `60`.
+- `tempo:` — bpm per matra. Default `60`. *(The app's only bpm value. The M2.5 new-document form labels its field "BPM" and writes this key — there is no separate `bpm:` directive.)*
+- `laya:` — *(settled 2026-07-16, M)*. Values: `vilambit`, `madhya`, `drut` — the tempo class. **`laya:` never prefills or derives `tempo:`, and vice versa. They are independent by design:** a composition may have been *taught* at a specific bpm, and that fact is provenance worth recording on its own — not something to reconstruct from a laya class.
+- `composition:` — *(settled 2026-07-16, M)*. Values: `vocal`, `instrumental`.
+- `type:` — **reserved, not yet shipped** *(named 2026-07-16, M)*. A distinct axis from `composition:`: what the *document* is — a composition, an alap, a transcription. `composition:` says how it is played; `type:` says what it is. Values and form inclusion pending M.
+
+All header metadata is **optional and selectable** *(M, 2026-07-16)* — a document carries the directives it needs and no more. (`tal:` retains its §3.1 status: required before the first *metered* music line; omitting it is legal and narrates one diagnostic, and `tal: free` is always available.)
 - `id:`, `created:`, `modified:` — written and maintained automatically by the app on save (the Supabase-shaped identity). Hand-editing them is legal but never necessary. *(Pinned 2026-07-16: `id:` is `crypto.randomUUID()`; timestamps are ISO 8601 UTC. `modified:` bumps on explicit save only — autosave is crash protection and never mutates the text.)*
+
+**New-document form** *(added 2026-07-16, M's design)*: New offers a short form — Raga · Tala · Composition (Vocal/Instrumental) · Laya (Vilambit/Madhya/Drut) · BPM — which writes correct frontmatter, so directive names never have to be memorized. This is §5's editing philosophy applied to the header: the machine maintains the syntax. **Every field is optional** — fill what applies, leave the rest; the form writes only what was filled. **The form is skippable entirely** — a blank-document option sits beside the create button, because the scratchpad is the daily case and a five-field gate is friction on it. Everything the form writes is ordinary text and stays hand-editable. *(Implementation note: `laya:` and `composition:` already parse and round-trip as ordinary directives — the only engine change the form needs is adding them to `serialize.js`'s `KNOWN_KEYS` so canonical order places them deliberately rather than trailing after `tempo:`.)*
 
 **Frontmatter form** *(amended 2026-07-16)*: the header block may be wrapped in `---` fences (YAML-frontmatter style), making the file a first-class Obsidian note whose `title:`/`raga:`/`tal:`/`id:` are queryable by Dataview/Datacore. Only a `---` on **line 1** opens frontmatter; a `---` anywhere else is ordinary text. Inside the fences the directives are exactly the same `key: value` lines — no YAML features beyond that are parsed. The app inserts identity directives inside the fences when they exist, before the closing `---`. Fenced and unfenced headers are both canonical; serialize preserves whichever form the document uses.
 
@@ -152,10 +159,22 @@ Updates on every keystroke; never goes blank.
 - **Octave dots** below/above each note. Register additionally **tints**: mandra cool (blue family), taar warm (red family) — defaults, adjustable later; dots remain load-bearing so print and colorblind reading never depend on color.
 - **Sustains** render as the continuous line: within cells for counted dashes, stretching to the barline for `_`. Dashes render dimmer than notes so held time reads differently from struck time.
 - **Lyrics** sit in a fixed row under their music line, blank through carried syllables. **Bols** render as the small ticks under their note events.
-- **Repeats** render `||: :||` and `( )xN`; with the cursor inside a repeat, the landing report shows inline.
+- **Repeats** render `||: :||` and `( )xN`; with the cursor inside a repeat, the landing report shows inline. *(2026-07-16 — the shipped `render.js` violates this on two counts, fixed in M2.5: it appends the report unconditionally rather than on cursor, and its wording (`x2 lands on matra 8`) names neither the landing note nor the cycle position. §3.9's form is authoritative: `3rd P lands on matra 9 (khali)`. Requires cursor plumbing: textarea `selectionStart` → source line → `renderDocument(doc, opts)`, reusing the `opts.activeCursor` seam.)*
 - **Diagnostics:** unparseable fragments render as dimmed literal text in place; a problems strip below the preview lists issues with line/position ("line 4, vibhag 2 has 5 matras"). The strip is the single voice for all parse feedback.
 - **Playback cursor:** highlights the sounding matra cell, auto-scrolls.
 - **Not in v1:** pixel-faithful handwriting reproduction (this is a clean typeset rendering of the same conventions); print/PDF export (backlog; cheap once rendering is right).
+
+### 4.1 Export view *(added 2026-07-16, M's call — promoted from backlog)*
+
+The artifact you hand to someone, or keep. Export opens the notation **alone** — no toolbar, no editor, no problems strip, identity directives hidden — and invokes the browser print dialog: *Save as PDF* produces the file, a printer produces paper. Same engine output as the preview, so typography needs no second implementation; works offline; works in Safari; no dependencies.
+
+**Header layout (M's design):** the **raga is the main title**. The remaining metadata (tal, composition type, laya, tempo, and the composition's `title:`) runs as a **list down the far right**. `title:` is not retired by this — raga is the organizing axis, `title:` is the piece's name and is what disambiguates the many compositions in one raga (the recent-files list and filenames depend on it).
+
+Image export (PNG/SVG) is a later addition if wanted; print-to-PDF is v1.
+
+### 4.2 Layout toggle *(added 2026-07-16, M's call)*
+
+Two arrangements, switched from the toolbar and remembered across sessions: **side-by-side** (editor left, notation right — the shipped M1 layout) and **notation-on-top** (notation fills the page, editor becomes a strip along the bottom). M's preference is more room for the notation; the editor is consulted less than it is read from.
 
 Approved mock (this conversation, 2026-07-15) is the layout reference: Kirwani sthayi line at `@7` with markers 0/3/+/2, tihai landing sample, cross-beat krintan sample, transport bar, problems strip.
 
@@ -207,7 +226,8 @@ Engine smokes run in node/jsdom with zero React:
 ## 9. Build order (Phase 1 milestones)
 
 1. **M1 — see your music:** scaffold; `model` + `tala` + `parse` + `render`; text pane + live preview; diagnostics strip. (Kirwani file renders correctly.)
-2. **M2 — keep your music:** `files.js` — open/save, autosave, recent, identity directives.
+2. **M2 — keep your music:** `files.js` — open/save, autosave, recent, identity directives. *(Complete 2026-07-16.)*
+2.5. **M2.5 — share your music** *(added 2026-07-16)*: export view (§4.1) + layout toggle (§4.2) + landing-report fix (§4) + new-document form (§3.1). The wave that makes Sargam a complete notation tool before sound arrives.
 3. **M3 — hear your music:** `schedule.js` — melody + tick + cursor; transport; loop; landing reports live.
 4. **M4 — write comfortably:** selection commands (krintan, tihai, slide, octave, repeats) + `/` menu.
 5. **M5 — harden:** remaining tal definitions verified with M; free-section polish; smoke suite to full breadth.
@@ -216,7 +236,7 @@ Phase 2: grid editor (separate design cycle).
 
 ## 10. Deferred / backlog (explicitly out of v1)
 
-True cross-rhythm spans (3:4, 5:4 across beats — model already stores exact fractions so this is additive), theka samples, volta/second-time endings ("2nd x" and "1st line" on the Desh page — spotted, wanted eventually), kan/grace notes (the superscript notes in the handwriting), print/PDF export, Supabase sync, notation themes/pixel-faithful styling, structured (grid) editing.
+True cross-rhythm spans (3:4, 5:4 across beats — model already stores exact fractions so this is additive), theka samples, volta/second-time endings ("2nd x" and "1st line" on the Desh page — spotted, wanted eventually), kan/grace notes (the superscript notes in the handwriting), image (PNG/SVG) export — *print/PDF export left this list 2026-07-16, now M2.5 §4.1* —, Supabase sync, notation themes/pixel-faithful styling, structured (grid) editing.
 
 ---
 
