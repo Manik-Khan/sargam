@@ -403,9 +403,9 @@ export const smokes = [
 
   // ---- bols ----
   {
-    name: 'bols: l - l v l - attach per note event, including inside clusters',
+    name: 'bols: words da ra diri attach per note event, including inside clusters',
     fn: () => {
-      const { doc, problems } = parseDocument('tal: tintal\n\nSR g m P d\n> l - l v l -\n');
+      const { doc, problems } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra da diri da ra\n');
       assert.deepEqual(problems, []);
       const l = doc.sections[0].lines[0];
       assert.deepEqual(l.bols, [
@@ -419,14 +419,33 @@ export const smokes = [
     },
   },
   {
-    name: 'bols: sustains and rests are skipped',
+    name: 'bols: sustains and rests are skipped; chikari is a mark',
     fn: () => {
-      const { doc } = parseDocument('tal: tintal\n\nS - . R\n> l v\n');
+      const { doc } = parseDocument('tal: tintal\n\nS - . R\n> da chikari\n');
       const l = doc.sections[0].lines[0];
       assert.deepEqual(l.bols, [
         { ref: { matraIndex: 0, eventIndex: 0 }, mark: 'da' },
-        { ref: { matraIndex: 3, eventIndex: 0 }, mark: 'diri' },
+        { ref: { matraIndex: 3, eventIndex: 0 }, mark: 'chikari' },
       ]);
+    },
+  },
+  {
+    name: 'bols: . is an explicit gap — the note under it carries no mark',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS R g m\n> da . diri\n');
+      assert.deepEqual(problems, []);
+      const l = doc.sections[0].lines[0];
+      assert.deepEqual(l.bols, [
+        { ref: { matraIndex: 0, eventIndex: 0 }, mark: 'da' },
+        { ref: { matraIndex: 2, eventIndex: 0 }, mark: 'diri' },
+      ]);
+    },
+  },
+  {
+    name: 'bols: old shorthand l is now a diagnostic, not a silent mark',
+    fn: () => {
+      const { problems } = parseDocument('tal: tintal\n\nS R\n> l -\n');
+      assert.ok(problems.some((p) => /bol/.test(p.msg)));
     },
   },
 
@@ -468,6 +487,15 @@ export const smokes = [
     },
   },
   {
+    name: "diagnostics: '|' in an unmetered section narrates instead of vanishing",
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: free\n\nS R | g m\n');
+      assert.equal(doc.sections[0].lines[0].matras.length, 4);
+      assert.equal(problems.length, 1);
+      assert.match(problems[0].msg, /unmetered/);
+    },
+  },
+  {
     name: 'diagnostics: metered music with no tal directive → problem, still parses',
     fn: () => {
       const { doc, problems } = parseDocument('S R g m\n');
@@ -496,6 +524,7 @@ export const smokes = [
         "N~'S",
         '[[dP/mg/RS]] -',
         '(SR gm P)x3',
+        'SR g m P d\n> da ra . diri chikari',
         '@7 ||: .d P | mg R m m | P d N~ \'S | .d - P m | R - :||',
       ];
       for (const f of frags) assertRoundTrip(`tal: tintal\n\n${f}\n`);

@@ -129,7 +129,7 @@ Tokens attach **left to right to matras that begin with a struck note**, skippin
 
 ### 3.8 Bol lines (`>`)
 
-Instrumental stroke marks: `l` = da (vertical tick under the note), `-` = ra (horizontal tick; safe collision — `-` only means ra on a `>` line), `v` = diri. Tokens attach **per note event** in order — including each note inside clusters — skipping sustains and rests. Da diri diri da: `> l v v l`.
+Instrumental stroke marks, typed as words, rendered as the handwriting's symbols (M's correction, 2026-07-16, superseding the earlier `l`/`-`/`v` shorthand): `da` renders as the vertical tick `|` under its note, `ra` as the horizontal tick `—`, `diri` as `^`, `chikari` as `v`. A `.` token is an explicit gap — the note event under it carries no mark, mirroring lyric skips. Tokens attach **per note event** in order — including each note inside clusters — skipping sustains and rests. Da diri diri da with a gap: `> da diri . diri da`.
 
 ### 3.9 Repeats
 

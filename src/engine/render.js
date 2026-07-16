@@ -139,7 +139,9 @@ function renderLine(line, tal, ctx) {
     row.appendChild(el);
   }
 
-  // --- bol ticks (grid row 4), grouped per matra in event order
+  // --- bol ticks (grid row 4), grouped per matra in event order.
+  // Typed as words, rendered as the handwriting's symbols (spec §3.8).
+  const BOL_SYMBOL = { da: '|', ra: '—', diri: '^', chikari: 'v' };
   const bolsByMatra = new Map();
   for (const b of line.bols) {
     if (!bolsByMatra.has(b.ref.matraIndex)) bolsByMatra.set(b.ref.matraIndex, []);
@@ -152,7 +154,7 @@ function renderLine(line, tal, ctx) {
     el.style.gridRow = '4';
     el.style.gridColumn = String(colOf[mi]);
     for (const b of group) {
-      el.appendChild(h('span', 'sr-bol-mark sr-bol-' + b.mark, b.mark));
+      el.appendChild(h('span', 'sr-bol-mark sr-bol-' + b.mark, BOL_SYMBOL[b.mark] ?? b.mark));
     }
     row.appendChild(el);
   }

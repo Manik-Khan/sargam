@@ -271,9 +271,21 @@ function serializeLyrics(line, tal) {
   return '" ' + segs.join(' | ');
 }
 
-const MARK_TO_CHAR = { da: 'l', ra: '-', diri: 'v' };
-
 function serializeBols(line) {
   if (!line.bols || line.bols.length === 0) return null;
-  return '> ' + line.bols.map((b) => MARK_TO_CHAR[b.mark]).join(' ');
+  // Walk note events in order; emit the word at marked events, '.' for gaps
+  // before the last marked event (spec §3.8 amended 2026-07-16).
+  const byKey = new Map(line.bols.map((b) => [`${b.ref.matraIndex}:${b.ref.eventIndex}`, b.mark]));
+  const noteRefs = [];
+  line.matras.forEach((m, mi) => {
+    m.events.forEach((e, ei) => {
+      if (e.type === 'note') noteRefs.push(`${mi}:${ei}`);
+    });
+  });
+  const lastMarked = noteRefs.reduce((acc, key, idx) => (byKey.has(key) ? idx : acc), -1);
+  const tokens = [];
+  for (let i = 0; i <= lastMarked; i++) {
+    tokens.push(byKey.get(noteRefs[i]) ?? '.');
+  }
+  return '> ' + tokens.join(' ');
 }

@@ -19,7 +19,7 @@ import { getTal, wrapMatra, vibhagOfMatra } from './tala.js';
 const NOTE_CHARS = new Set(['S', 'r', 'R', 'g', 'G', 'm', 'M', 'P', 'd', 'D', 'n', 'N']);
 const CLUSTER_RE = /^[SrRgGmMPdDnN.'~-]+$/;
 const DIRECTIVE_RE = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/;
-const BOL_MARKS = { l: 'da', '-': 'ra', v: 'diri' };
+const BOL_MARKS = { da: 'da', ra: 'ra', diri: 'diri', chikari: 'chikari' };
 
 // ---------------------------------------------------------------------------
 // Public entry
@@ -110,7 +110,7 @@ export function parseDocument(text) {
       missingTalReported = true;
     }
     const tal = currentTal && currentTal !== 'free' ? getTal(currentTal) : null;
-    const music = parseMusicLine(trimmed, lineNo, tal, problems);
+    const music = parseMusicLine(trimmed, lineNo, tal, problems, currentTal === 'free');
     currentSection.lines.push(music);
     lastMusicLine = music;
   }
@@ -140,7 +140,7 @@ function looksLikeMusic(trimmed) {
 // Music line
 // ---------------------------------------------------------------------------
 
-function parseMusicLine(text, lineNo, tal, problems) {
+function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
   const line = {
     kind: 'music',
     startMatra: 1,
@@ -315,6 +315,13 @@ function parseMusicLine(text, lineNo, tal, problems) {
   // validated; barless lines are legal scratchpad writing).
   if (tal && bars.length > 0) {
     validateBars(line, bars, tal, lineNo, problems);
+  } else if (isFree && bars.length > 0) {
+    // Failures narrate: a | in an unmetered section does nothing, so say so.
+    problems.push({
+      line: lineNo,
+      col: null,
+      msg: "'|' has no effect here — this section is unmetered (tal: free applies from above). Add a tal: directive above this line to meter it.",
+    });
   }
 
   return line;
@@ -680,14 +687,22 @@ function attachBols(musicLine, text, lineNo, problems) {
   const tokens = text.trim().split(/\s+/).filter(Boolean);
   let t = 0;
   for (const tok of tokens) {
-    const mark = BOL_MARKS[tok];
-    if (!mark) {
-      problems.push({ line: lineNo, col: null, msg: `unrecognized bol mark '${tok}'` });
-      continue;
-    }
     if (t >= noteRefs.length) {
       problems.push({ line: lineNo, col: null, msg: 'more bol marks than note events' });
       break;
+    }
+    if (tok === '.') {
+      t++; // explicit gap: this note event carries no mark (spec §3.8)
+      continue;
+    }
+    const mark = BOL_MARKS[tok];
+    if (!mark) {
+      problems.push({
+        line: lineNo,
+        col: null,
+        msg: `unrecognized bol mark '${tok}' — use da, ra, diri, chikari, or . for a gap`,
+      });
+      continue;
     }
     musicLine.bols.push({ ref: noteRefs[t], mark });
     t++;

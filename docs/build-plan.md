@@ -82,7 +82,7 @@ Line       { kind: 'music',
              spans: [Span],                            // meend, krintan
              phraseRepeats: [PhraseRepeat],
              lyrics: [{matraIndex, text}],             // resolved per spec §3.7
-             bols:   [{ref: EventRef, mark: 'da'|'ra'|'diri'}],  // spec §3.8
+             bols:   [{ref: EventRef, mark: 'da'|'ra'|'diri'|'chikari'}],  // spec §3.8 (amended 2026-07-16)
              passthrough: [{col, text}],               // unparsed fragments, rendered dim
              sourceLine: int }
 Matra      { events: [Event] }                          // event durs sum to exactly 1
