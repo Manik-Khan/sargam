@@ -9,9 +9,12 @@ export default function Toolbar({
   fileName,
   dirty,
   recents,
+  layout,
   onNew,
   onOpen,
   onSave,
+  onExport,
+  onToggleLayout,
   onOpenRecent,
   onRemoveRecent,
 }) {
@@ -78,6 +81,19 @@ export default function Toolbar({
           </div>
         )}
       </span>
+      <button className="tb-btn" onClick={onExport}>Export</button>
+      <button
+        className="tb-btn tb-icon"
+        onClick={onToggleLayout}
+        aria-label={
+          layout === 'stacked'
+            ? 'Layout: notation on top — switch to side by side'
+            : 'Layout: side by side — switch to notation on top'
+        }
+        title={layout === 'stacked' ? 'Notation on top' : 'Side by side'}
+      >
+        {layout === 'stacked' ? '\u2B13' : '\u25EB'}
+      </button>
       <span className="tb-file">
         <span
           className={'tb-dot' + (dirty ? ' is-dirty' : '')}

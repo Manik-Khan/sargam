@@ -5,14 +5,14 @@
 import React, { useEffect, useRef } from 'react';
 import { renderDocument } from '../engine/render.js';
 
-export default function PreviewPane({ doc }) {
+export default function PreviewPane({ doc, activeLine }) {
   const mount = useRef(null);
 
   useEffect(() => {
     if (!mount.current) return;
-    const el = renderDocument(doc);
+    const el = renderDocument(doc, { activeLine });
     mount.current.replaceChildren(el);
-  }, [doc]);
+  }, [doc, activeLine]);
 
   return <div className="app-preview" ref={mount} />;
 }

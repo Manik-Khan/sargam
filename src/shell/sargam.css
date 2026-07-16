@@ -314,3 +314,134 @@
   cursor: pointer;
   padding: 0 4px;
 }
+
+/* ---- M2.5: layout toggle (spec §4.2) ---- */
+/* DOM order is preview-then-editor so the stacked layout is natural;
+   `order` keeps side-by-side as it shipped: editor left, notation right. */
+.app-layout-side { flex-direction: row; }
+.app-layout-side .app-editor { order: 1; }
+.app-layout-side .app-preview { order: 2; }
+
+.app-layout-stacked { flex-direction: column; }
+.app-layout-stacked .app-preview { order: 1; flex: 1; min-height: 0; }
+.app-layout-stacked .app-editor {
+  order: 2;
+  flex: none;
+  height: 30vh;
+  min-height: 90px;
+  resize: vertical;          /* native drag handle — no JS divider needed */
+  border-right: none;
+  border-top: 1px solid var(--sr-line);
+}
+.tb-icon { font-size: 13px; line-height: 1; padding: 4px 9px; }
+
+/* ---- M2.5: new-document form (spec §3.1) ---- */
+.nd-scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(43, 38, 32, 0.28);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 60px 0;
+  overflow: auto;
+}
+.nd-dialog {
+  background: var(--sr-paper-raised);
+  border: 1px solid var(--sr-line);
+  border-radius: 10px;
+  width: 430px;
+  max-width: calc(100vw - 32px);
+  padding: 20px 22px;
+  box-shadow: 0 8px 28px rgba(43, 38, 32, 0.18);
+}
+.nd-h { margin: 0 0 3px; font-size: 16px; font-weight: 600; }
+.nd-sub { margin: 0 0 16px; font-size: 12.5px; color: var(--sr-ink-soft); }
+.nd-field { margin-bottom: 13px; }
+.nd-field > label {
+  display: block; font-size: 12px; color: var(--sr-ink-soft); margin-bottom: 4px;
+}
+.nd-field input,
+.nd-field select {
+  width: 100%; font: inherit; font-size: 13.5px; padding: 6px 9px;
+  border: 1px solid var(--sr-line); border-radius: 6px;
+  background: var(--sr-paper); color: var(--sr-ink);
+}
+.nd-field input::placeholder { color: var(--sr-dim); }
+.nd-row2 { display: flex; gap: 12px; }
+.nd-row2 > * { flex: 1; }
+.nd-seg { display: flex; gap: 6px; }
+.nd-seg button {
+  flex: 1; font: inherit; font-size: 13px; padding: 5px 0;
+  border: 1px solid var(--sr-line); border-radius: 6px;
+  background: var(--sr-paper); color: var(--sr-ink-soft); cursor: pointer;
+}
+.nd-seg button.on {
+  background: var(--sr-ink); border-color: var(--sr-ink); color: var(--sr-paper-raised);
+}
+.nd-preview-cap { font-size: 11px; color: var(--sr-dim); margin: 16px 0 4px; }
+.nd-preview {
+  margin: 0; border: 1px dashed var(--sr-line); border-radius: 6px;
+  background: var(--sr-paper); padding: 9px 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.6; color: var(--sr-ink-soft);
+  white-space: pre-wrap; word-break: break-word;
+}
+.nd-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.nd-primary {
+  background: var(--sr-ink); border-color: var(--sr-ink); color: var(--sr-paper-raised);
+}
+.nd-primary:hover { background: #3a342c; }
+.nd-ghost { margin-left: auto; border-color: transparent; color: var(--sr-ink-soft); }
+
+/* ---- M2.5: export view (spec §4.1) ---- */
+.app-export {
+  position: fixed; inset: 0; z-index: 50;
+  background: #ded9d0; display: flex; flex-direction: column;
+}
+.app-export-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  background: var(--sr-paper-raised);
+  border-bottom: 1px solid var(--sr-line);
+}
+.app-export-title { font-weight: 600; font-size: 15px; margin-right: 6px; }
+.app-export-close { margin-left: auto; }
+.app-export-scroll { flex: 1; overflow: auto; padding: 22px 0 40px; }
+.app-export-paper {
+  background: #fff;
+  width: 780px; max-width: calc(100vw - 32px);
+  margin: 0 auto; padding: 46px 52px 60px;
+  box-shadow: 0 2px 10px rgba(43, 38, 32, 0.14);
+}
+
+/* export page header: raga is the title, metadata lists at the far right */
+.sr-exp-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 40px;
+  border-bottom: 1px solid var(--sr-line);
+  padding-bottom: 14px; margin-bottom: 26px;
+}
+.sr-exp-raga {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 34px; line-height: 1.1; margin: 0; font-weight: 400;
+}
+.sr-exp-title {
+  font-size: 14px; color: var(--sr-ink-soft); margin: 6px 0 0; font-style: italic;
+}
+.sr-exp-meta { text-align: right; font-size: 12.5px; line-height: 1.9; flex: none; }
+.sr-exp-meta-label { color: var(--sr-ink-soft); margin-right: 7px; }
+.sr-exp-meta-value { color: var(--sr-ink); }
+
+/* ---- print: only the paper reaches the page ---- */
+@page { margin: 18mm; }
+@media print {
+  .app-root.is-exporting > *:not(.app-export) { display: none !important; }
+  .app-export { position: static !important; background: none !important; display: block !important; }
+  .app-export-bar { display: none !important; }
+  .app-export-scroll { overflow: visible !important; padding: 0 !important; }
+  .app-export-paper {
+    width: auto !important; max-width: none !important;
+    margin: 0 !important; padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .sr-section { break-inside: avoid; }
+  .sr-line-block { break-inside: avoid; }
+}

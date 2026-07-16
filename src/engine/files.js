@@ -108,6 +108,7 @@ export function ensureIdentity(text, clock) {
 const KEY_CURRENT = 'sargam.current';
 const KEY_RECENTS = 'sargam.recents';
 const KEY_SNAP = (id) => `sargam.snap.${id}`;
+const KEY_PREF = (k) => `sargam.pref.${k}`;
 const MAX_RECENTS = 10;
 
 function readJSON(storage, key) {
@@ -179,7 +180,46 @@ export function createStore(storage, clock) {
       const v = readJSON(storage, KEY_SNAP(id));
       return v && typeof v.text === 'string' ? v.text : null;
     },
+
+    // -- small UI preferences (layout toggle now; M3 transport later) --
+    setPref(key, value) {
+      return writeJSON(storage, KEY_PREF(key), { value });
+    },
+    getPref(key, fallback = null) {
+      const v = readJSON(storage, KEY_PREF(key));
+      return v && 'value' in v ? v.value : fallback;
+    },
   };
+}
+
+// ---------------------------------------------------------------------------
+// New-document text (spec §3.1 form, M2.5)
+// ---------------------------------------------------------------------------
+
+// Canonical directive order for a new document — mirrors serialize.js's
+// KNOWN_KEYS so the form's preview and the app's canonical output agree.
+const NEW_DOC_KEYS = ['title', 'raga', 'tal', 'sa', 'tempo', 'composition', 'type', 'laya'];
+
+/**
+ * Build a new document's text from the form's fields (spec §3.1).
+ * Every field is optional; blanks are dropped rather than emitted empty.
+ * Nothing filled → a blank document (no empty fences).
+ * Fenced (frontmatter) form: new documents are Obsidian-ready by default.
+ *
+ * @param {{title?, raga?, tal?, sa?, tempo?, composition?, type?, laya?}} fields
+ * @returns {string}
+ */
+export function newDocumentText(fields = {}) {
+  const lines = [];
+  for (const k of NEW_DOC_KEYS) {
+    const raw = fields[k];
+    if (raw === undefined || raw === null) continue;
+    const v = String(raw).trim();
+    if (v === '') continue;
+    lines.push(`${k}: ${v}`);
+  }
+  if (lines.length === 0) return '';
+  return ['---', ...lines, '---', '', ''].join('\n');
 }
 
 // ---------------------------------------------------------------------------

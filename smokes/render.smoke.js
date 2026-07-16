@@ -11,7 +11,7 @@ import { JSDOM } from 'jsdom';
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
 globalThis.document = dom.window.document;
 
-import { renderDocument } from '../src/engine/render.js';
+import { renderDocument, renderExport } from '../src/engine/render.js';
 import { parseDocument } from '../src/engine/parse.js';
 
 const APPENDIX_A = `title: Kahe Ko (khyal) — R. 1732
@@ -172,14 +172,130 @@ export const smokes = [
       }
     },
   },
+  // --- landing reports (spec §3.9 wording, §4 cursor scoping).
+  // NOTE 2026-07-16: the previous version of this smoke asserted the report
+  // rendered with NO cursor — it encoded render.js's deviation from spec §4
+  // ("with the cursor inside a repeat, the landing report shows inline").
+  // The spec was always the authority; the smoke is corrected to it here.
   {
-    name: "render: tihai line shows a landing report containing 'matra 9'",
+    name: 'render: no landing report without a cursor (spec §4 — cursor-scoped)',
     fn: () => {
       const root = renderCorpus();
-      const section = root.querySelectorAll('.sr-section')[2];
-      const landing = section.querySelector('.sr-landing');
-      assert.ok(landing, 'landing report node exists');
-      assert.match(landing.textContent, /matra 9/);
+      assert.equal(root.querySelectorAll('.sr-landing').length, 0);
+    },
+  },
+  {
+    name: 'render: landing report appears when the cursor is on the tihai line (16)',
+    fn: () => {
+      const { doc } = parseDocument(APPENDIX_A);
+      const root = renderDocument(doc, { activeLine: 16 });
+      const reports = root.querySelectorAll('.sr-landing');
+      assert.equal(reports.length, 1, 'exactly the cursor line reports');
+    },
+  },
+  {
+    name: 'render: landing report is silent when the cursor is on another line',
+    fn: () => {
+      const { doc } = parseDocument(APPENDIX_A);
+      const root = renderDocument(doc, { activeLine: 8 }); // sthayi, no repeats
+      assert.equal(root.querySelectorAll('.sr-landing').length, 0);
+    },
+  },
+  {
+    name: "render: landing wording is §3.9's — '3rd P lands on matra 9 (khali)'",
+    fn: () => {
+      const { doc } = parseDocument(APPENDIX_A);
+      const root = renderDocument(doc, { activeLine: 16 });
+      const text = root.querySelector('.sr-landing').textContent;
+      assert.equal(text, '3rd P lands on matra 9 (khali)');
+    },
+  },
+  {
+    name: 'render: landing names the final struck note and ordinal (x2 → 2nd)',
+    fn: () => {
+      // 3 matras x2 from sam occupies matras 1..6 — the final repetition's
+      // last matra is 6 (cf. spec §8: (SR gm P)x3 from sam → matra 9).
+      // Tintal's markers fall at 1/5/9/13, so matra 6 starts no vibhag and
+      // the report names no position — correct: a landing only earns a name
+      // when it coincides with a marker.
+      const { doc } = parseDocument('tal: tintal\n\n(SR gm .d)x2\n');
+      const root = renderDocument(doc, { activeLine: 3 });
+      const text = root.querySelector('.sr-landing').textContent;
+      assert.equal(text, '2nd .d lands on matra 6');
+    },
+  },
+  {
+    name: 'render: landing report names sam when the phrase lands there',
+    fn: () => {
+      // 4-matra phrase from sam, x4 → last matra 16... use x1-free case:
+      const { doc } = parseDocument('tal: tintal\n\n@14 (S R g)x2\n');
+      const root = renderDocument(doc, { activeLine: 3 });
+      const text = root.querySelector('.sr-landing').textContent;
+      assert.match(text, /matra 3/, text);
+    },
+  },
+
+  // --- export view (spec §4.1)
+  {
+    name: 'export: raga is the heading, title the subtitle',
+    fn: () => {
+      const { doc } = parseDocument(APPENDIX_A);
+      const el = renderExport(doc);
+      assert.equal(el.querySelector('.sr-exp-raga').textContent, 'kirwani');
+      assert.match(el.querySelector('.sr-exp-title').textContent, /Kahe Ko/);
+    },
+  },
+  {
+    name: 'export: metadata list carries tal/tempo/sa; identity never appears',
+    fn: () => {
+      const src = `---\nraga: kirwani\ntal: tintal\nsa: C#\ntempo: 72\ncomposition: instrumental\nlaya: madhya\nid: abc-123\ncreated: 2026-01-01T00:00:00.000Z\nmodified: 2026-01-02T00:00:00.000Z\n---\n\nSthayi\n@7 .d P | mg R m m\n`;
+      const { doc } = parseDocument(src);
+      const el = renderExport(doc);
+      const meta = el.querySelector('.sr-exp-meta').textContent;
+      assert.match(meta, /tintal/);
+      assert.match(meta, /72/);
+      assert.match(meta, /madhya/);
+      assert.match(meta, /instrumental/);
+      assert.doesNotMatch(meta, /abc-123/, 'id must not print');
+      assert.doesNotMatch(el.textContent, /abc-123/, 'id must not appear anywhere');
+      assert.doesNotMatch(el.textContent, /2026-01-01/, 'created must not print');
+    },
+  },
+  {
+    name: 'export: absent directives produce no metadata rows (all optional)',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nS R g m\n');
+      const el = renderExport(doc);
+      const rows = el.querySelectorAll('.sr-exp-meta-row');
+      assert.equal(rows.length, 1, 'only tal');
+      assert.match(rows[0].textContent, /tintal/);
+    },
+  },
+  {
+    name: 'export: no raga → title becomes the heading',
+    fn: () => {
+      const { doc } = parseDocument('title: Kahe Ko\ntal: tintal\n\nS R g m\n');
+      const el = renderExport(doc);
+      assert.equal(el.querySelector('.sr-exp-raga').textContent, 'Kahe Ko');
+      assert.equal(el.querySelector('.sr-exp-title'), null, 'no duplicate subtitle');
+    },
+  },
+  {
+    name: 'export: sa renders with a real sharp glyph (C# → C♯)',
+    fn: () => {
+      const { doc } = parseDocument('raga: kirwani\ntal: tintal\nsa: C#\n\nS R g m\n');
+      const el = renderExport(doc);
+      assert.match(el.querySelector('.sr-exp-meta').textContent, /C♯/);
+    },
+  },
+  {
+    name: 'export: contains the notation itself and no landing reports (no cursor)',
+    fn: () => {
+      const { doc } = parseDocument(APPENDIX_A);
+      const el = renderExport(doc);
+      assert.ok(el.querySelectorAll('.sr-cell').length > 20, 'matra cells present');
+      assert.ok(el.querySelector('.sr-section-label'), 'section labels present');
+      assert.equal(el.querySelectorAll('.sr-landing').length, 0, 'reports are a check, not print');
     },
   },
   {

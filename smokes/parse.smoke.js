@@ -606,6 +606,18 @@ export const smokes = [
     },
   },
   {
+    name: 'directives: laya/composition emit in canonical order, after tempo',
+    fn: () => {
+      const src = `---\nlaya: madhya\ncomposition: instrumental\nraga: kirwani\ntal: tintal\ntempo: 72\n---\n\nS R g m\n`;
+      const out = serializeDocument(parseDocument(src).doc);
+      assert.equal(
+        out.split('\n').slice(0, 7).join('\n'),
+        '---\nraga: kirwani\ntal: tintal\ntempo: 72\ncomposition: instrumental\nlaya: madhya\n---'
+      );
+      assertRoundTrip(src);
+    },
+  },
+  {
     name: 'frontmatter: fenced document round-trips (parse→serialize→parse deep-equal)',
     fn: () => {
       const fenced = `---\ntitle: Kahe Ko\nraga: kirwani\ntal: tintal\nsa: C#\ntempo: 72\n---\n\nSthayi\n@7 ||: .d P | mg R m m | P d N~ 'S | .d - P m | R - :||\n" ka- he | ko ma- na na- | hi | ma- ne | re\n\nTihai\n(SR gm P)x3\n`;

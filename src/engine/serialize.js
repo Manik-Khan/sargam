@@ -12,7 +12,22 @@
 
 import { getTal, wrapMatra, vibhagOfMatra, markerAtMatra } from './tala.js';
 
-const KNOWN_KEYS = ['title', 'raga', 'tal', 'sa', 'tempo', 'id', 'created', 'modified'];
+// Canonical header order. `composition`/`type`/`laya` added 2026-07-16 (M2.5)
+// after `tempo` and before identity — Appendix A's relative order is
+// untouched, so existing canonical output is byte-stable.
+const KNOWN_KEYS = [
+  'title',
+  'raga',
+  'tal',
+  'sa',
+  'tempo',
+  'composition',
+  'type',
+  'laya',
+  'id',
+  'created',
+  'modified',
+];
 
 /**
  * @param {Document} doc

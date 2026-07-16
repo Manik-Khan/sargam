@@ -19,7 +19,10 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
  * @param {Document} doc  parsed model (parse.js)
- * @param {{activeCursor?: {sectionIndex:number, lineIndex:number, matraIndex:number}}} [opts]
+ * @param {{activeCursor?: {sectionIndex:number, lineIndex:number, matraIndex:number},
+ *          activeLine?: number}} [opts]
+ *   activeLine — 1-based SOURCE line the text cursor sits on; landing reports
+ *   render only for that line (spec §4). activeCursor is the M3 playback seam.
  * @returns {HTMLElement} detached element; the caller mounts it
  */
 export function renderDocument(doc, opts = {}) {
@@ -28,6 +31,66 @@ export function renderDocument(doc, opts = {}) {
     el.appendChild(renderSection(doc.sections[si], si, opts));
   }
   return el;
+}
+
+// ---------------------------------------------------------------------------
+// Export view (spec §4.1) — the print artifact.
+// Raga is the title; the rest of the metadata lists down the far right;
+// identity directives never print. No cursor is passed, so landing reports
+// (a check, not notation) do not appear.
+// ---------------------------------------------------------------------------
+
+const EXPORT_META = [
+  ['tal', 'Tal'],
+  ['laya', 'Laya'],
+  ['tempo', 'Tempo'],
+  ['composition', 'Composition'],
+  ['type', 'Type'],
+  ['sa', 'Sa'],
+];
+
+/** C# → C♯, Bb → B♭; anything not a plain note name passes through. */
+function prettyPitch(v) {
+  const m = /^([A-Ga-g])([#b])$/.exec(String(v).trim());
+  if (!m) return v;
+  return m[1].toUpperCase() + (m[2] === '#' ? '♯' : '♭');
+}
+
+/**
+ * @param {Document} doc  parsed model
+ * @returns {HTMLElement} detached export page; the caller mounts and prints it
+ */
+export function renderExport(doc) {
+  const dirs = doc.directives || {};
+  const page = h('div', 'sr-export');
+
+  const head = h('div', 'sr-exp-head');
+  const left = h('div', 'sr-exp-headings');
+  // Raga is the heading; with no raga, the composition's title takes the
+  // slot rather than leaving the page untitled (and then isn't repeated).
+  const heading = dirs.raga || dirs.title || null;
+  if (heading) left.appendChild(h('h1', 'sr-exp-raga', heading));
+  if (dirs.raga && dirs.title) left.appendChild(h('p', 'sr-exp-title', dirs.title));
+  head.appendChild(left);
+
+  const meta = h('div', 'sr-exp-meta');
+  for (const [key, label] of EXPORT_META) {
+    if (!(key in dirs) || String(dirs[key]).trim() === '') continue;
+    let value = dirs[key];
+    if (key === 'sa') value = prettyPitch(value);
+    if (key === 'tempo') value = `${value} bpm`;
+    const row = h('div', 'sr-exp-meta-row');
+    row.appendChild(h('span', 'sr-exp-meta-label', label));
+    row.appendChild(h('span', 'sr-exp-meta-value', String(value)));
+    meta.appendChild(row);
+  }
+  head.appendChild(meta);
+  page.appendChild(head);
+
+  // The notation is the same engine output as the preview — no cursor, so
+  // no landing reports; no second typographic implementation to drift.
+  page.appendChild(renderDocument(doc));
+  return page;
 }
 
 function renderSection(section, sectionIndex, opts) {
@@ -159,13 +222,19 @@ function renderLine(line, tal, ctx) {
     row.appendChild(el);
   }
 
-  // --- landing reports (derived; spec §3.6)
-  if (tal) {
+  // --- landing reports (derived; spec §3.9 wording, §4 cursor scoping).
+  // Shown only while the cursor is on this line — it is a check you run,
+  // not part of the notation. Scoping is line-level (spec says "inside a
+  // repeat"; column→matra mapping isn't plumbed, and a line is the unit
+  // the writer is thinking in).
+  if (tal && ctx.activeLine !== undefined && ctx.activeLine === line.sourceLine) {
     for (const pr of line.phraseRepeats) {
       const startAbs = wrapMatra(tal, line.startMatra + pr.fromMatra);
       const l = landing(tal, startAbs, pr.toMatra - pr.fromMatra + 1, pr.times);
       const where = l.isSam ? 'sam' : l.isKhali ? 'khali' : l.marker ? `marker ${l.marker}` : null;
-      const text = `x${pr.times} lands on matra ${l.matra}${where ? ` (${where})` : ''}`;
+      const note = lastStruckNote(line, pr);
+      const subject = note ? `${ordinal(pr.times)} ${note}` : `${ordinal(pr.times)} repetition`;
+      const text = `${subject} lands on matra ${l.matra}${where ? ` (${where})` : ''}`;
       block.appendChild(h('div', 'sr-landing', text));
     }
   }
@@ -188,6 +257,31 @@ function renderLine(line, tal, ctx) {
 /** True if a barline falls after 0-based matra index k (derived from tal). */
 function boundaryAfter(line, k, tal) {
   return markerAtMatra(tal, line.startMatra + k + 1) !== null;
+}
+
+/** 1 → '1st', 2 → '2nd', 3 → '3rd', 11 → '11th' … */
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/** Typed form of a note event: octave prefix + letter ('.d', "'S", 'P'). */
+function noteAtom(ev) {
+  const o = ev.octave || 0;
+  const prefix = o < 0 ? '.'.repeat(-o) : o > 0 ? "'".repeat(o) : '';
+  return prefix + ev.ch;
+}
+
+/** The last struck note of a phrase repeat — the note the report names. */
+function lastStruckNote(line, pr) {
+  for (let m = Math.min(pr.toMatra, line.matras.length - 1); m >= pr.fromMatra; m--) {
+    const evs = line.matras[m]?.events || [];
+    for (let e = evs.length - 1; e >= 0; e--) {
+      if (evs[e].type === 'note') return noteAtom(evs[e]);
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

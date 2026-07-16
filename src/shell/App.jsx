@@ -12,6 +12,8 @@ import { makeClock, makeEnv, openViaInput } from './platform.js';
 import EditorPane from './EditorPane.jsx';
 import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
+import NewDocDialog from './NewDocDialog.jsx';
+import ExportView from './ExportView.jsx';
 import './sargam.css';
 
 const STARTER = `title: Kahe Ko (khyal) — R. 1732
@@ -40,10 +42,6 @@ Alap
 ~PS.NRS.N.D N
 `;
 
-const NEW_DOC = `tal: tintal
-
-`;
-
 const clock = makeClock();
 
 export default function App() {
@@ -68,6 +66,10 @@ export default function App() {
     return null;
   });
   const [recents, setRecents] = useState(() => store.listRecents());
+  const [activeLine, setActiveLine] = useState(0);
+  const [showNew, setShowNew] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [layout, setLayout] = useState(() => store.getPref('layout', 'side'));
 
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const dirty = text !== lastSaved;
@@ -140,11 +142,23 @@ export default function App() {
 
   const doNew = () => {
     if (!confirmDiscard()) return;
-    setText(NEW_DOC);
+    setShowNew(true);
+  };
+
+  // The form (or "Blank document") hands back the text it wrote.
+  const createDoc = (newText) => {
+    setShowNew(false);
+    setText(newText);
     setFileName(null);
     setHandle(null);
-    setLastSaved(NEW_DOC);
+    setLastSaved(newText);
     setNotice(null);
+  };
+
+  const toggleLayout = () => {
+    const next = layout === 'side' ? 'stacked' : 'side';
+    setLayout(next);
+    store.setPref('layout', next);
   };
 
   const openRecent = (entry) => {
@@ -179,14 +193,19 @@ export default function App() {
   });
 
   return (
-    <div className="app-root">
+    <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
+      {showExport && <ExportView doc={doc} onClose={() => setShowExport(false)} />}
+      {showNew && <NewDocDialog onCreate={createDoc} onCancel={() => setShowNew(false)} />}
       <Toolbar
         fileName={fileName || doc.directives.title || null}
         dirty={dirty}
         recents={recents}
+        layout={layout}
         onNew={doNew}
         onOpen={doOpen}
         onSave={doSave}
+        onExport={() => setShowExport(true)}
+        onToggleLayout={toggleLayout}
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
       />
@@ -202,9 +221,9 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className="app-panes">
-        <EditorPane text={text} onChange={setText} />
-        <PreviewPane doc={doc} />
+      <div className={'app-panes app-layout-' + layout}>
+        <PreviewPane doc={doc} activeLine={activeLine} />
+        <EditorPane text={text} onChange={setText} onCursorLine={setActiveLine} />
       </div>
       <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>
         {problems.length === 0 ? (

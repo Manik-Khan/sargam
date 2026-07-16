@@ -2,7 +2,8 @@
 // Engine rule: files.js is plain JS, no React, no DOM. Browser surfaces are injected,
 // so every smoke here runs in bare node with mocks.
 import assert from 'node:assert/strict';
-import { ensureIdentity, createStore, createFileIO } from '../src/engine/files.js';
+import { ensureIdentity, createStore, createFileIO, newDocumentText } from '../src/engine/files.js';
+import { parseDocument } from '../src/engine/parse.js';
 
 // ---------- fixtures ----------
 
@@ -362,6 +363,99 @@ export const smokes = [
       const io = createFileIO({ fsa: null, download: (name, text) => { dl = { name, text }; } });
       await io.save('S R g m', { handle: null });
       assert.equal(dl.name, 'untitled.md');
+    },
+  },
+
+  // ---------- newDocumentText (spec §3.1 form, M2.5) ----------
+
+  {
+    name: 'newDoc: all fields → fenced frontmatter in canonical order',
+    fn() {
+      const text = newDocumentText({
+        raga: 'Kirwani',
+        tal: 'tintal',
+        tempo: '72',
+        composition: 'instrumental',
+        laya: 'madhya',
+      });
+      assert.equal(
+        text,
+        '---\nraga: Kirwani\ntal: tintal\ntempo: 72\ncomposition: instrumental\nlaya: madhya\n---\n\n'
+      );
+    },
+  },
+  {
+    name: 'newDoc: omitted fields are absent — every field is optional',
+    fn() {
+      const text = newDocumentText({ raga: 'Kirwani', tal: 'free' });
+      assert.equal(text, '---\nraga: Kirwani\ntal: free\n---\n\n');
+    },
+  },
+  {
+    name: 'newDoc: blank/whitespace values are dropped, not emitted empty',
+    fn() {
+      const text = newDocumentText({ raga: '  ', tal: 'tintal', tempo: '' });
+      assert.equal(text, '---\ntal: tintal\n---\n\n');
+    },
+  },
+  {
+    name: 'newDoc: nothing filled → a blank document, no empty fences',
+    fn() {
+      assert.equal(newDocumentText({}), '');
+      assert.equal(newDocumentText({ raga: '', laya: null }), '');
+    },
+  },
+  {
+    name: 'newDoc: output parses clean with the directives intact',
+    fn() {
+      const text = newDocumentText({
+        raga: 'Kirwani',
+        tal: 'tintal',
+        tempo: '72',
+        composition: 'instrumental',
+        laya: 'madhya',
+      });
+      const { doc, problems } = parseDocument(text);
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+      assert.equal(doc.frontmatter, true);
+      assert.equal(doc.directives.raga, 'Kirwani');
+      assert.equal(doc.directives.laya, 'madhya');
+      assert.equal(doc.directives.composition, 'instrumental');
+      assert.equal(doc.directives.tempo, '72');
+    },
+  },
+  {
+    name: 'newDoc: identity can be added to the form output without disturbing it',
+    fn() {
+      const text = newDocumentText({ raga: 'Kirwani', tal: 'tintal' });
+      const { text: withId } = ensureIdentity(text, CLOCK);
+      const lines = withId.split('\n');
+      assert.equal(lines[0], '---');
+      assert.equal(lines[3], 'id: 00000000-0000-4000-8000-000000000001');
+      assert.equal(lines[5], 'modified: 2026-07-16T18:00:00.000Z');
+      assert.equal(lines[6], '---');
+      assert.deepEqual(parseDocument(withId).problems, []);
+    },
+  },
+
+  // ---------- prefs (layout toggle persistence; M3 will reuse) ----------
+
+  {
+    name: 'store: setPref/getPref round-trips, with a fallback when unset',
+    fn() {
+      const store = createStore(mockStorage(), CLOCK);
+      assert.equal(store.getPref('layout', 'side'), 'side');
+      store.setPref('layout', 'stacked');
+      assert.equal(store.getPref('layout', 'side'), 'stacked');
+    },
+  },
+  {
+    name: 'store: corrupt pref value falls back, never throws',
+    fn() {
+      const storage = mockStorage();
+      storage.setItem('sargam.pref.layout', '{oops');
+      const store = createStore(storage, CLOCK);
+      assert.equal(store.getPref('layout', 'side'), 'side');
     },
   },
 ];
