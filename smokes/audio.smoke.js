@@ -22,9 +22,26 @@ function mockCtx() {
   const ctx = {
     currentTime: 0,
     state: 'running',
+    sampleRate: 8000, // small: keeps DSP renders fast under test
     destination: {},
     resume() {},
     createGain: () => ({ gain: mkParam(), connect() {} }),
+    createBuffer: (ch, len) => ({
+      length: len,
+      getChannelData: () => new Float32Array(len),
+    }),
+    createBufferSource: () => {
+      const src = {
+        buffer: null,
+        playbackRate: mkParam(),
+        connect() {},
+        start(at) {
+          started.push({ at, kind: 'buffer' });
+        },
+        stop() {},
+      };
+      return src;
+    },
     createOscillator: () => {
       const osc = {
         type: 'sine',

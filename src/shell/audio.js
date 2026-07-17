@@ -15,6 +15,8 @@ const TICK_MS = 25; // driver timer period
 
 const noop = () => {};
 
+import { renderPluck, renderTick } from './dsp.js';
+
 /**
  * @param {{
  *   createContext: () => AudioContext-like,
@@ -66,49 +68,80 @@ export function createPlayer(env) {
     return startedAt + (ev.t - offset);
   }
 
-  // ---- voices (Wave C tunables) ----
+  // ---- voices (Wave C: Karplus-Strong pluck; every constant is M's-ear
+  // territory). Buffers render deterministically in dsp.js and are cached
+  // per pitch; falls back to an oscillator if the context lacks buffers.
+
+  const PLUCK_S = 2.5; // rendered ring length; note-off is the gain fade
+  const pluckCache = new Map();
+  const tickCache = new Map();
+
+  function pluckBuffer(freq) {
+    const key = Math.round(freq * 10);
+    let buf = pluckCache.get(key);
+    if (!buf) {
+      const data = renderPluck({ freq, dur: PLUCK_S, sampleRate: ctx.sampleRate || 44100 });
+      buf = ctx.createBuffer(1, data.length, ctx.sampleRate || 44100);
+      buf.copyToChannel ? buf.copyToChannel(data, 0) : buf.getChannelData(0).set(data);
+      pluckCache.set(key, buf);
+    }
+    return buf;
+  }
 
   function playNote(ev, at) {
+    if (!ctx.createBuffer || !ctx.createBufferSource) return playNoteOsc(ev, at);
+    const g = ctx.createGain();
+    g.connect(masterGains.melody);
+    const src = ctx.createBufferSource();
+    src.buffer = pluckBuffer(ev.freq);
+    src.connect(g);
+    const dur = Math.max(0.03, ev.dur);
+    const level = ev.grace ? 0.55 : 0.9;
+    g.gain.setValueAtTime(level, at);
+    // let the string ring through the note, then fade at note-off
+    g.gain.setTargetAtTime(0.0001, at + dur, 0.06);
+    if (ev.glideFrom) {
+      // meend on a pluck: strike, then bend — playbackRate ramps from the
+      // source pitch's ratio up to 1, which is how a sarod meend works.
+      const ratio = ev.glideFrom / ev.freq;
+      src.playbackRate.setValueAtTime(ratio, at);
+      src.playbackRate.setTargetAtTime(1, at, Math.min(0.14, dur * 0.45));
+    }
+    src.start(at);
+    src.stop(at + dur + 0.4);
+  }
+
+  function playNoteOsc(ev, at) {
     const g = ctx.createGain();
     g.connect(masterGains.melody);
     const osc = ctx.createOscillator();
     osc.type = 'triangle';
     osc.connect(g);
     const dur = Math.max(0.03, ev.dur);
-    // pluck envelope: fast attack, exponential-ish decay across the note
-    const peak = ev.grace ? 0.5 : 0.85;
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.linearRampToValueAtTime(peak, at + 0.008);
+    g.gain.linearRampToValueAtTime(ev.grace ? 0.5 : 0.85, at + 0.008);
     g.gain.setTargetAtTime(0.0001, at + 0.008, Math.max(0.05, dur * 0.35));
-    if (ev.glideFrom) {
-      // meend: a shaped glide from the source pitch into this note
-      osc.frequency.setValueAtTime(ev.glideFrom, at);
-      osc.frequency.setTargetAtTime(ev.freq, at, Math.min(0.12, dur * 0.4));
-    } else {
-      osc.frequency.setValueAtTime(ev.freq, at);
-    }
+    osc.frequency.setValueAtTime(ev.freq, at);
     osc.start(at);
     osc.stop(at + dur + 0.25);
   }
 
   function playTick(ev, at) {
+    if (!ctx.createBuffer || !ctx.createBufferSource) return;
+    let buf = tickCache.get(ev.accent);
+    if (!buf) {
+      const data = renderTick(ev.accent, ctx.sampleRate || 44100);
+      buf = ctx.createBuffer(1, data.length, ctx.sampleRate || 44100);
+      buf.copyToChannel ? buf.copyToChannel(data, 0) : buf.getChannelData(0).set(data);
+      tickCache.set(ev.accent, buf);
+    }
     const g = ctx.createGain();
     g.connect(masterGains.tick);
-    const osc = ctx.createOscillator();
-    osc.connect(g);
-    const accents = {
-      sam: { freq: 1200, gain: 0.5, dur: 0.05, type: 'square' },
-      khali: { freq: 420, gain: 0.28, dur: 0.06, type: 'sine' },
-      vibhag: { freq: 880, gain: 0.35, dur: 0.04, type: 'square' },
-      plain: { freq: 660, gain: 0.18, dur: 0.025, type: 'sine' },
-    };
-    const a = accents[ev.accent] || accents.plain;
-    osc.type = a.type;
-    osc.frequency.setValueAtTime(a.freq, at);
-    g.gain.setValueAtTime(a.gain, at);
-    g.gain.setTargetAtTime(0.0001, at + 0.005, a.dur);
-    osc.start(at);
-    osc.stop(at + a.dur + 0.1);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(g);
+    g.gain.setValueAtTime(1, at);
+    src.start(at);
   }
 
   // ---- the lookahead driver ----
