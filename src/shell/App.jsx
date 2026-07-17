@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
-import { scheduleDocument } from '../engine/schedule.js';
+import { scheduleDocument, timeFor } from '../engine/schedule.js';
 import { createPlayer } from './audio.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
@@ -171,6 +171,20 @@ export default function App() {
   const doLoopMode = (m) => {
     setLoopMode(m);
     if (playing) player.setLoop(m === 'off' ? null : rangeFor(m));
+  };
+
+  // Click in the notation: move the play position (and the working line —
+  // loop and landing reports follow the same cursor).
+  const doSeek = (sourceLine, matraIndex) => {
+    setActiveLine(sourceLine);
+    const t = timeFor(schedule, sourceLine, matraIndex);
+    setPosition(t);
+    if (playing) {
+      player.pause();
+      const range = loopMode === 'off' ? null : rangeFor(loopMode);
+      player.setLoop(range);
+      player.play({ from: t });
+    }
   };
 
   const doTrackMute = (track, v) => {
@@ -344,7 +358,7 @@ export default function App() {
         onTrackMute={doTrackMute}
       />
       <div className={'app-panes app-layout-' + layout}>
-        <PreviewPane doc={doc} activeLine={activeLine} activeCursor={playCursor} />
+        <PreviewPane doc={doc} activeLine={activeLine} activeCursor={playCursor} onSeek={doSeek} />
         <EditorPane text={text} onChange={setText} onCursorLine={setActiveLine} />
       </div>
       <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>

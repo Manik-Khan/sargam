@@ -252,3 +252,20 @@ export function scheduleDocument(doc, opts = {}) {
   events.sort((a, b) => a.t - b.t);
   return { events, duration: t, lineStarts };
 }
+
+/**
+ * The onset time of a given matra of a given source line — the seam for
+ * click-to-position in the rendered notation (M, 2026-07-16: "you can't
+ * seem to choose from the output file"). Falls back to the line start,
+ * then to 0, so a click never lands nowhere.
+ */
+export function timeFor(schedule, sourceLine, matraIndex) {
+  let lineStart = null;
+  for (const ev of schedule.events) {
+    if (ev.kind !== 'cursor' || ev.sourceLine !== sourceLine) continue;
+    if (lineStart === null) lineStart = ev.t;
+    if (ev.matraIndex === matraIndex) return ev.t;
+  }
+  if (lineStart !== null) return lineStart;
+  return 0;
+}

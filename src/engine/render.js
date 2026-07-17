@@ -144,6 +144,10 @@ function renderSection(section, sectionIndex, opts) {
 
 function renderLine(line, tal, ctx) {
   const block = h('div', 'sr-line-block');
+  // click-to-position seam: the shell maps clicks back to the source line
+  if (line.sourceLine !== undefined) {
+    block.setAttribute('data-source-line', String(line.sourceLine));
+  }
   const row = h('div', 'sr-row' + (tal ? '' : ' sr-free'));
   block.appendChild(row);
 

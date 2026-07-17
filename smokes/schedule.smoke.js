@@ -4,7 +4,7 @@
 // tala.js), cursor events, and a line-start map for play-from-cursor.
 // No audio here — sound is the shell's job; correctness lives in node.
 import assert from 'node:assert/strict';
-import { scheduleDocument, parseSa, degreeFreq } from '../src/engine/schedule.js';
+import { scheduleDocument, parseSa, degreeFreq, timeFor } from '../src/engine/schedule.js';
 import { parseDocument } from '../src/engine/parse.js';
 
 const close = (a, b, msg) =>
@@ -293,6 +293,23 @@ export const smokes = [
       const ns = notes(s);
       assert.ok(ns[0].t >= 0);
       for (const e of ns) assert.ok(e.t >= 0);
+    },
+  },
+{
+    name: 'timeFor: maps (sourceLine, matraIndex) to the matra onset time',
+    fn() {
+      const s = sched('tal: tintal\ntempo: 60\n\nS R g m\nP d n N\n');
+      close(timeFor(s, 4, 2), 2, 'line 4 matra 2');
+      close(timeFor(s, 5, 0), 4, 'second line starts at 4s');
+      close(timeFor(s, 5, 3), 7);
+    },
+  },
+  {
+    name: 'timeFor: unknown targets fall back to the line start, then 0',
+    fn() {
+      const s = sched('tal: tintal\ntempo: 60\n\nS R g m\n');
+      close(timeFor(s, 4, 99), 0, 'bad matra → line start');
+      close(timeFor(s, 42, 0), 0, 'unknown line → 0');
     },
   },
 ];

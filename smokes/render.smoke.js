@@ -521,4 +521,14 @@ export const smokes = [
       assert.ok(cell.querySelector('.sr-underarc'));
     },
   },
+{
+    name: 'click seam: every line block carries data-source-line',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nS R g m\nP d n N\n');
+      const blocks = renderDocument(doc).querySelectorAll('.sr-line-block');
+      assert.equal(blocks.length, 2);
+      assert.equal(blocks[0].getAttribute('data-source-line'), '3');
+      assert.equal(blocks[1].getAttribute('data-source-line'), '4');
+    },
+  },
 ];

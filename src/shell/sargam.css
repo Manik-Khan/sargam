@@ -524,3 +524,7 @@
   box-shadow: 0 0 0 2px #d8c9a3;
 }
 @media print { .transport { display: none !important; } }
+
+/* click-to-position affordance (preview only — never the export page) */
+.app-preview .sr-cell { cursor: pointer; }
+.app-preview .sr-cell:hover { background: #f6f1e4; border-radius: 6px; }
