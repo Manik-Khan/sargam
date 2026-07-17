@@ -473,3 +473,13 @@
   .sr-section { break-inside: avoid; }
   .sr-line-block { break-inside: avoid; }
 }
+
+/* ---- kan / grace notes (M's grammar, 2026-07-16) ---- */
+/* Small and raised before the full-sized destination, as the handwriting
+   has it. transform (not margin) so layout heights stay identical and the
+   alignment invariant holds. Octave dots inherit the reduced size. */
+.sr-ev.sr-grace {
+  font-size: 0.55em;
+  transform: translateY(-0.7em);
+}
+.sr-arc-kan svg path { stroke: var(--sr-ink); stroke-width: 1.1; }

@@ -170,12 +170,19 @@ function renderLine(line, tal, ctx) {
     const fromCol = colOf[span.from.matraIndex];
     const toCol = colOf[span.to.matraIndex];
     if (fromCol === undefined || toCol === undefined) continue;
-    const wrap = h('div', span.type === 'meend' ? 'sr-arc sr-arc-meend' : 'sr-arc sr-arc-krintan');
+    const wrap = h(
+      'div',
+      span.type === 'meend'
+        ? 'sr-arc sr-arc-meend'
+        : span.type === 'kan'
+          ? 'sr-arc sr-arc-kan'
+          : 'sr-arc sr-arc-krintan'
+    );
     wrap.setAttribute('data-from-matra', String(span.from.matraIndex));
     wrap.setAttribute('data-to-matra', String(span.to.matraIndex));
     wrap.style.gridRow = '1';
     wrap.style.gridColumn = `${fromCol} / ${toCol + 1}`; // into the destination
-    wrap.appendChild(span.type === 'meend' ? meendSvg() : krintanSvg());
+    wrap.appendChild(span.type === 'krintan' ? krintanSvg() : meendSvg());
     row.appendChild(wrap);
   }
 
@@ -367,7 +374,7 @@ function renderEvent(e) {
       ? 'sr-ev sr-rest sr-dim'
       : e.type === 'sustain'
         ? 'sr-ev sr-sustain sr-dim'
-        : 'sr-ev sr-note' + reg;
+        : 'sr-ev sr-note' + reg + (e.grace ? ' sr-grace' : '');
   const ev = h('span', cls);
 
   const above = h('span', 'sr-dots sr-dots-above');

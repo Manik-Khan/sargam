@@ -73,7 +73,7 @@ A composition file is plain text: **directives**, **section labels**, **music li
 
 - `tal:` — required before the first metered music line. Values: a tal name, or `free` (unmetered — vibhag validation and tick playback off for the following material).
 - `title:`, `raga:` — optional metadata.
-- `sa:` — playback pitch of Sa. Default `C#`.
+- `sa:` — playback pitch of Sa. Default `C#`. *(Amended 2026-07-16: accepts an optional octave — `C`, `C#`, `A3`, `Bb2`; a bare letter sits at octave 3, landing the anchors where the instruments live (M): sarod `C` → C3 ≈ 131 Hz, sitar `D` → D3, vocal classes `A` → A3 = 220 Hz — A3 chosen in M's classes to sit between male and female ranges. The default remains C# pending M's ruling on changing it.)*
 - `tempo:` — bpm per matra. Default `60`. *(The app's only bpm value. The M2.5 new-document form labels its field "BPM" and writes this key — there is no separate `bpm:` directive.)*
 - `laya:` — *(settled 2026-07-16, M)*. Values: `vilambit`, `madhya`, `drut` — the tempo class. **`laya:` never prefills or derives `tempo:`, and vice versa. They are independent by design:** a composition may have been *taught* at a specific bpm, and that fact is provenance worth recording on its own — not something to reconstruct from a laya class.
 - `composition:` — *(settled 2026-07-16, M)*. Values: `vocal`, `instrumental`.
@@ -128,7 +128,8 @@ All header metadata is **optional and selectable** *(M, 2026-07-16)* — a docum
 
 ### 3.6 Ornaments and annotations (rhythm-transparent)
 
-- **`~` — slide/meend.** Marks connection; never affects timing. Within or prefixing a cluster (`~SR`, `S~R`): the slide arc covers the cluster. At a token edge with a space (`N~ 'S` or `N ~'S`): the arc spans across the matra boundary into the neighboring note. Chains freely (`d~P~m`). Renders as the over-arc, extending to the destination note when the connection says so — the distinction between "slide ends, next note freshly articulated" (`...D N`) and "slide lands the note" (`...D~ N`) is carried by one character.
+- **`~` — slide/meend.** Marks connection; never affects timing. **Prefixing** a cluster (`~SR`, `~mg`): the slide arc covers the (fully-timed, evenly-split) cluster — this is the canonical spelling of the within-matra meend. At a token edge with a space (`N~ 'S` or `N ~'S`): the arc spans across the matra boundary into the neighboring note, both notes fully timed. The distinction between "slide ends, next note freshly articulated" (`...D N`) and "slide lands the note" (`...D~ N`) is carried by one character.
+- **`{ }` — kan/grace ornament** *(M's grammar, 2026-07-16 — promoted from the backlog)*. What's inside the braces is the grace run; the note (or cluster) immediately after the closing brace is the **destination and owns the beat**: `{'S}n` (one grace), `{dP}m` (double grace), `{P'SN'R'SN'S}N` (a long slid run into N). Graces render small and raised before the full-sized destination with the connecting curve, exactly as the handwriting has them; octave prefixes work inside the braces; spaces inside are allowed and ignored. Playback: the run is *slid*, not articulated — graces steal a small sliver off the destination's front (capped at half the beat), and the grid never moves. `{run}` with no destination narrates a problem. **Internal cluster tildes are shorthand for the same thing**: `'S~n` and `d~P~m` are kans — the note after the *last* internal tilde is the destination; everything before is grace. Shorthand parses in; braces serialize out (one canonical spelling). *Superseded meaning*: before this amendment an internal tilde meant a within-matra meend of fully-timed notes (`N~'S` = two half-notes); that meaning now belongs exclusively to the leading form (`~N'S`), and serialize emits the leading form for exactly this reason. Old files using internal tildes now read as kans — which is what M's own files meant by them.
 - **`[[ ... ]]` — krintan.** A span annotation that may contain `/`, spaces, and `|` — krintans legally cross beats and barlines: `[[dP/mg/RS]]`. Renders as the square over-bracket across the full span.
 - Neither is typically typed by hand — see §5 (selection commands) — but both are ordinary text and always hand-editable.
 
@@ -236,7 +237,7 @@ Phase 2: grid editor (separate design cycle).
 
 ## 10. Deferred / backlog (explicitly out of v1)
 
-True cross-rhythm spans (3:4, 5:4 across beats — model already stores exact fractions so this is additive), theka samples, volta/second-time endings ("2nd x" and "1st line" on the Desh page — spotted, wanted eventually), kan/grace notes (the superscript notes in the handwriting), image (PNG/SVG) export — *print/PDF export left this list 2026-07-16, now M2.5 §4.1* —, Supabase sync, notation themes/pixel-faithful styling, structured (grid) editing.
+True cross-rhythm spans (3:4, 5:4 across beats — model already stores exact fractions so this is additive), theka samples, volta/second-time endings ("2nd x" and "1st line" on the Desh page — spotted, wanted eventually), *kan/grace notes left this list 2026-07-16 — now §3 `{ }` ornaments* —, image (PNG/SVG) export — *print/PDF export left this list 2026-07-16, now M2.5 §4.1* —, Supabase sync, notation themes/pixel-faithful styling, structured (grid) editing.
 
 ---
 

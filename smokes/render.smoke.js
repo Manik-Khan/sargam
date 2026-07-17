@@ -467,4 +467,35 @@ export const smokes = [
       assert.match(el.querySelector('.sr-exp-title').textContent, /Kahe Ko/);
     },
   },
+// --- kan rendering (M's grammar, 2026-07-16): graces draw small and
+  // raised before the full-sized destination, with the connecting curve.
+  {
+    name: 'kan render: grace events carry sr-grace; destination does not',
+    fn: () => {
+      const { doc } = parseDocument("tal: tintal\n\n{'S}n R g m\n");
+      const cell = renderDocument(doc).querySelector('.sr-cell');
+      const evs = cell.querySelectorAll('.sr-ev');
+      assert.ok(evs[0].classList.contains('sr-grace'));
+      assert.ok(!evs[1].classList.contains('sr-grace'));
+      assert.equal(evs[0].querySelector('.sr-ch').textContent, 'S');
+      assert.ok(evs[0].querySelector('.sr-dot-above'), 'grace keeps its octave dot');
+      assert.equal(evs[1].querySelector('.sr-ch').textContent, 'n');
+    },
+  },
+  {
+    name: 'kan render: the connecting curve draws (kan span arc)',
+    fn: () => {
+      const { doc } = parseDocument("tal: tintal\n\n{'S}n R g m\n");
+      assert.ok(renderDocument(doc).querySelector('.sr-arc-kan'), 'kan arc present');
+    },
+  },
+  {
+    name: 'kan render: grace events keep the three-lane alignment invariant',
+    fn: () => {
+      const { doc } = parseDocument("tal: tintal\n\n{dP}m {'S}n R g\n");
+      for (const ev of renderDocument(doc).querySelectorAll('.sr-ev')) {
+        assert.equal(ev.children.length, 3, ev.textContent);
+      }
+    },
+  },
 ];

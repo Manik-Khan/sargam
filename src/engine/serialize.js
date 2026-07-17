@@ -205,12 +205,19 @@ function lcm(a, b) {
 
 function matraToken(line, k) {
   const matraIndex = k;
-  const evs = line.matras[k].events;
+  const all = line.matras[k].events;
+  // Graces (kan) serialize as the canonical brace form: {graces}dest.
+  // The tilde shorthand parses IN but braces come OUT — one canonical
+  // spelling, and the curve is encoded by the braces, not a span mark.
+  const graces = all.filter((e) => e.grace);
+  const evs = all.filter((e) => !e.grace);
+  const gracePrefix = graces.length ? `{${graces.map(noteAtom).join('')}}` : '';
 
   // Single whole-matra event.
   if (evs.length === 1 && evs[0].dur.num === evs[0].dur.den) {
     const e = evs[0];
-    if (e.type === 'note') return withinMatraTilde(line, matraIndex, [noteAtom(e)], [0]);
+    if (e.type === 'note')
+      return gracePrefix + withinMatraTilde(line, matraIndex, [noteAtom(e)], [0]);
     if (e.type === 'rest') return '.';
     return '-';
   }
@@ -227,7 +234,7 @@ function matraToken(line, k) {
       entries.push(e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-');
       for (let s = 1; s < slots[i]; s++) entries.push('-');
     });
-    return `[${entries.join(' ')}]`;
+    return gracePrefix + `[${entries.join(' ')}]`;
   }
 
   // Cluster form: atoms with merged `-` extensions.
@@ -235,15 +242,20 @@ function matraToken(line, k) {
     const base = e.type === 'note' ? noteAtom(e) : '-'.repeat(slots[i]);
     return e.type === 'note' ? base + '-'.repeat(slots[i] - 1) : base;
   });
-  return withinMatraTilde(
-    line,
-    matraIndex,
-    atoms,
-    evs.map((_, i) => i)
+  return (
+    gracePrefix +
+    withinMatraTilde(
+      line,
+      matraIndex,
+      atoms,
+      evs.map((_, i) => graces.length + i)
+    )
   );
 }
 
-/** Insert `~` after the from-event's atom for meend spans within this matra. */
+/** Prefix `~` for meend spans within this matra. The old after-atom form
+ *  (P~S) would reparse as a KAN under the 2026-07-16 ornament grammar, so
+ *  the leading form is the only spelling that round-trips: ~PS. */
 function withinMatraTilde(line, matraIndex, atoms, eventIndexOfAtom) {
   const span = line.spans.find(
     (s) =>
@@ -252,11 +264,8 @@ function withinMatraTilde(line, matraIndex, atoms, eventIndexOfAtom) {
       s.to.matraIndex === matraIndex
   );
   if (!span) return atoms.join('');
-  const at = eventIndexOfAtom.indexOf(span.from.eventIndex);
-  if (at === -1) return atoms.join('');
-  const parts = atoms.slice();
-  parts[at] = parts[at] + '~';
-  return parts.join('');
+  if (!eventIndexOfAtom.includes(span.from.eventIndex)) return atoms.join('');
+  return '~' + atoms.join('');
 }
 
 // ---------------------------------------------------------------------------

@@ -163,7 +163,7 @@ export function parseDocument(text) {
 // ---------------------------------------------------------------------------
 
 function looksLikeMusic(trimmed) {
-  const flat = trimmed.replace(/\[\[|\]\]|[\[\]()|]/g, ' ');
+  const flat = trimmed.replace(/\[\[|\]\]|[\[\](){}|]/g, ' ');
   for (const tok of flat.split(/[\s/]+/)) {
     if (!tok) continue;
     if (/^@\d+$/.test(tok)) return true;
@@ -330,6 +330,48 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
       continue;
     }
 
+    // `{graces}X` — the ornament (M's grammar, 2026-07-16). The braces hold
+    // the grace run; the cluster immediately after the closing brace is the
+    // destination and owns the beat. Spaces and / inside the braces are
+    // allowed and ignored — it is one ornament either way.
+    if (c === '{') {
+      const close = body.indexOf('}', i + 1);
+      if (close === -1) {
+        problems.push({ line: lineNo, col: i + 1, msg: '{ without closing }' });
+        i++;
+        continue;
+      }
+      const inner = body.slice(i + 1, close).replace(/[\s/]+/g, '');
+      // Destination: the plain-token run right after the closing brace.
+      let j = close + 1;
+      while (j < n && !' \t/|[](){}'.includes(body[j])) j++;
+      const destTok = body.slice(close + 1, j);
+      if (inner === '') {
+        problems.push({ line: lineNo, col: i + 1, msg: 'empty ornament { }' });
+        i = close + 1;
+        continue;
+      }
+      if (destTok === '' || !CLUSTER_RE.test(destTok)) {
+        problems.push({
+          line: lineNo,
+          col: i + 1,
+          msg: 'ornament has no destination note — the note the graces land on goes right after the }',
+        });
+        i = j > close + 1 ? j : close + 1;
+        continue;
+      }
+      const graceAtoms = clusterAtoms(inner, i + 1, clusterCtx);
+      const destAtoms = clusterAtoms(destTok, close + 2, clusterCtx);
+      if (graceAtoms && destAtoms) {
+        const combined = [...graceAtoms, ...destAtoms];
+        combined._tilde = destAtoms._tilde; // trailing tilde still crosses matras
+        const events = weightAndBuild(combined, graceAtoms.length, i + 1, clusterCtx);
+        if (events && events.length > 0) line.matras.push({ events });
+      }
+      i = j;
+      continue;
+    }
+
     if (c === '(') {
       if (phraseFrom !== null) {
         problems.push({
@@ -374,7 +416,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
 
     // Plain token: run of non-structural chars.
     let j = i;
-    while (j < n && !' \t/|[]()'.includes(body[j])) j++;
+    while (j < n && !' \t/|[](){}'.includes(body[j])) j++;
     if (j === i) {
       // A structural character reached the token reader without any branch
       // above consuming it — a stray ']' or ')'. Narrate it and step over.
@@ -593,9 +635,43 @@ function buildSlottedMatra(inner, col, ctx) {
 function buildClusterEvents(tok, col, ctx) {
   const atoms = clusterAtoms(tok, col, ctx);
   if (!atoms) return null;
-  const total = atoms.reduce((a, x) => a + x.w, 0);
-  const weighted = atoms.map((a) => ({ ...a, num: a.w, den: total }));
+  return weightAndBuild(atoms, atoms._tilde?.kanBoundary ?? -1, col, ctx);
+}
+
+/**
+ * Shared atom pipeline for cluster and brace forms. Atoms before
+ * `kanBoundary` are the grace run (no metric time, spec: the destination
+ * owns the beat); atoms from the boundary split the beat as usual.
+ */
+function weightAndBuild(atoms, kanBoundary, col, ctx) {
+  const { lineNo, problems } = ctx;
+  if (kanBoundary <= 0) {
+    const total = atoms.reduce((a, x) => a + x.w, 0);
+    const weighted = atoms.map((a) => ({ ...a, num: a.w, den: total }));
+    weighted._tilde = atoms._tilde;
+    return atomsToEvents(weighted, ctx);
+  }
+  const graces = atoms.slice(0, kanBoundary);
+  const timed = atoms.slice(kanBoundary);
+  if (graces.some((a) => a.type !== 'note')) {
+    problems.push({
+      line: lineNo,
+      col: col + 1,
+      msg: 'a - has no meaning in a grace run — graces carry no time to extend',
+    });
+    return null;
+  }
+  if (!timed.some((a) => a.type === 'note')) {
+    problems.push({ line: lineNo, col: col + 1, msg: 'ornament has no destination note' });
+    return null;
+  }
+  const total = timed.reduce((a, x) => a + x.w, 0);
+  const weighted = [
+    ...graces.map((a) => ({ ...a, grace: true, num: 0, den: 1 })),
+    ...timed.map((a) => ({ ...a, num: a.w, den: total })),
+  ];
   weighted._tilde = atoms._tilde;
+  weighted._kanGraces = graces.length;
   return atomsToEvents(weighted, ctx);
 }
 
@@ -608,15 +684,16 @@ function clusterAtoms(tok, col, ctx) {
   const atoms = [];
   let octave = 0;
   let leadingTilde = false;
-  let sawTilde = false;
+  let sawTilde = false; // retained for leading-covering meend semantics
   let trailingTilde = false;
+  let kanBoundary = -1; // atoms index after the LAST internal tilde (kan)
 
   for (let i = 0; i < tok.length; i++) {
     const c = tok[i];
     if (c === '~') {
       if (atoms.filter((a) => a.type === 'note').length === 0) leadingTilde = true;
       else if (i === tok.length - 1) trailingTilde = true;
-      else sawTilde = true;
+      else kanBoundary = atoms.length; // kan: notes so far are grace (M's grammar)
       continue;
     }
     if (c === "'") {
@@ -651,7 +728,7 @@ function clusterAtoms(tok, col, ctx) {
     return null;
   }
 
-  atoms._tilde = { leadingTilde, sawTilde, trailingTilde };
+  atoms._tilde = { leadingTilde, sawTilde, trailingTilde, kanBoundary };
   return atoms;
 }
 
@@ -664,8 +741,13 @@ function atomsToEvents(atoms, ctx) {
     const dur = fracReduce(frac(a.num, a.den));
     if (a.type === 'note') {
       const ref = { matraIndex, eventIndex: events.length };
-      events.push({ type: 'note', dur, ch: a.ch, octave: a.octave });
-      ctx.notePlaced(ref); // resolves any pending cross-token meend
+      const ev = { type: 'note', dur, ch: a.ch, octave: a.octave };
+      if (a.grace) ev.grace = true;
+      events.push(ev);
+      // Graces never resolve a pending cross-matra meend — a slide written
+      // before an ornament lands on the ornament's destination, not its
+      // decoration.
+      if (!a.grace) ctx.notePlaced(ref);
     } else if (a.type === 'rest') {
       events.push({ type: 'rest', dur });
     } else if (events.length > 0) {
@@ -674,6 +756,19 @@ function atomsToEvents(atoms, ctx) {
       last.dur = fracAdd(last.dur, dur);
     } else {
       events.push({ type: 'sustain', dur });
+    }
+  }
+
+  // Kan span: the connecting curve from the first grace to the destination
+  // (the first timed note after the grace run).
+  if (atoms._kanGraces > 0) {
+    const destIdx = events.findIndex((e) => e.type === 'note' && !e.grace);
+    if (destIdx !== -1) {
+      line.spans.push({
+        type: 'kan',
+        from: { matraIndex, eventIndex: 0 },
+        to: { matraIndex, eventIndex: destIdx },
+      });
     }
   }
 

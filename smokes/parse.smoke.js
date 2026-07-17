@@ -313,15 +313,20 @@ export const smokes = [
     },
   },
   {
-    name: "meend: N~'S unspaced → one matra, 2 events, span within it",
+    name: "kan (was meend pre-2026-07-16): N~'S unspaced is a kan — grace N into 'S",
     fn: () => {
+      // SUPERSEDED BEHAVIOR NOTE: this smoke previously asserted N~'S was a
+      // within-matra meend of two half-notes. M's ornament grammar
+      // (2026-07-16) redefines the internal tilde as the kan — that ruling
+      // is exactly what 'S~n was always meant to be. The old spelling for
+      // the within-matra meend is the leading tilde: ~N'S.
       const l = line("N~'S").line;
       assert.equal(l.matras.length, 1);
       assert.equal(l.matras[0].events.length, 2);
-      const meends = l.spans.filter((s) => s.type === 'meend');
-      assert.equal(meends.length, 1);
-      assert.deepEqual(meends[0].from, { matraIndex: 0, eventIndex: 0 });
-      assert.deepEqual(meends[0].to, { matraIndex: 0, eventIndex: 1 });
+      assert.equal(l.matras[0].events[0].grace, true);
+      assert.deepEqual(l.matras[0].events[1].dur, { num: 1, den: 1 });
+      const kans = l.spans.filter((s) => s.type === 'kan');
+      assert.equal(kans.length, 1);
     },
   },
   {
@@ -717,6 +722,174 @@ export const smokes = [
     fn: () => {
       const { problems } = parseDocument(APPENDIX_A);
       assert.deepEqual(problems, [], JSON.stringify(problems));
+    },
+  },
+  // --- kan / grace notes (spec §3 ornaments; M's grammar, 2026-07-16).
+  // {graces}X — braces hold the grace run, the note after owns the beat.
+  // Internal cluster tildes are shorthand: 'S~n and d~P~m are kans too;
+  // the note after the LAST internal tilde is the destination. Leading
+  // tilde (~mg: meend arc over an even cluster) and trailing tilde
+  // (N~ <space>: cross-matra meend) keep their existing meanings.
+  {
+    name: "kan: {'S}n — one grace, destination owns the whole beat",
+    fn: () => {
+      const { doc, problems } = parseDocument("tal: tintal\n\n{'S}n R g m\n");
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+      const line = doc.sections[0].lines[0];
+      assert.equal(line.matras.length, 4, 'four matras — graces cost no time');
+      const evs = line.matras[0].events;
+      assert.equal(evs.length, 2);
+      assert.equal(evs[0].grace, true);
+      assert.equal(evs[0].ch, 'S');
+      assert.equal(evs[0].octave, 1, "the ' octave prefix works inside braces");
+      assert.deepEqual(evs[0].dur, { num: 0, den: 1 }, 'grace carries no metric time');
+      assert.equal(evs[1].ch, 'n');
+      assert.equal(evs[1].grace, undefined);
+      assert.deepEqual(evs[1].dur, { num: 1, den: 1 }, 'destination owns the beat');
+      const kan = line.spans.find((s) => s.type === 'kan');
+      assert.ok(kan, 'kan span for the curve');
+      assert.deepEqual(kan.from, { matraIndex: 0, eventIndex: 0 });
+      assert.deepEqual(kan.to, { matraIndex: 0, eventIndex: 1 });
+    },
+  },
+  {
+    name: 'kan: long run {P\'SN\'R\'SN\'S}N parses — seven graces into N',
+    fn: () => {
+      const { doc, problems } = parseDocument("tal: free\n\n{P'SN'R'SN'S}N\n");
+      assert.deepEqual(problems, []);
+      const evs = doc.sections[0].lines[0].matras[0].events;
+      assert.equal(evs.filter((e) => e.grace).length, 7);
+      assert.deepEqual(evs.filter((e) => e.grace).map((e) => e.ch).join(''), 'PSNRSNS');
+      assert.deepEqual(evs.filter((e) => e.grace).map((e) => e.octave), [0, 1, 0, 1, 1, 0, 1]);
+      assert.equal(evs[evs.length - 1].ch, 'N');
+      assert.deepEqual(evs[evs.length - 1].dur, { num: 1, den: 1 });
+    },
+  },
+  {
+    name: 'kan: spaces inside braces are allowed and ignored',
+    fn: () => {
+      const a = parseDocument('tal: tintal\n\n{dP}m R g m\n');
+      const b = parseDocument('tal: tintal\n\n{d P}m R g m\n');
+      assert.deepEqual(b.problems, []);
+      assert.deepEqual(
+        b.doc.sections[0].lines[0].matras[0].events,
+        a.doc.sections[0].lines[0].matras[0].events
+      );
+    },
+  },
+  {
+    name: 'kan: internal tilde is shorthand — d~P~m equals {dP}m',
+    fn: () => {
+      const brace = parseDocument('tal: tintal\n\n{dP}m R g m\n').doc.sections[0].lines[0];
+      const tilde = parseDocument('tal: tintal\n\nd~P~m R g m\n').doc.sections[0].lines[0];
+      assert.deepEqual(tilde.matras[0].events, brace.matras[0].events);
+      assert.deepEqual(
+        tilde.spans.find((s) => s.type === 'kan'),
+        brace.spans.find((s) => s.type === 'kan')
+      );
+    },
+  },
+  {
+    name: "kan: 'S~n is a kan — grace taar-S into a full-beat n (M's case)",
+    fn: () => {
+      const { doc, problems } = parseDocument("tal: tintal\n\n'S~n R g m\n");
+      assert.deepEqual(problems, []);
+      const evs = doc.sections[0].lines[0].matras[0].events;
+      assert.equal(evs[0].grace, true);
+      assert.equal(evs[0].ch, 'S');
+      assert.equal(evs[0].octave, 1);
+      assert.equal(evs[1].ch, 'n');
+      assert.deepEqual(evs[1].dur, { num: 1, den: 1 });
+    },
+  },
+  {
+    name: 'kan: destination cluster subdivides the rest of the beat ({d}Pm)',
+    fn: () => {
+      const evs = parseDocument('tal: tintal\n\n{d}Pm R g m\n').doc.sections[0].lines[0].matras[0]
+        .events;
+      assert.equal(evs[0].grace, true);
+      assert.deepEqual(evs[1].dur, { num: 1, den: 2 });
+      assert.deepEqual(evs[2].dur, { num: 1, den: 2 });
+    },
+  },
+  {
+    name: 'kan: leading and trailing tildes keep their meend meanings',
+    fn: () => {
+      // leading: even split + arc over the cluster, NOT a kan
+      const lead = parseDocument('tal: tintal\n\n~mg R g m\n').doc.sections[0].lines[0];
+      assert.deepEqual(lead.matras[0].events.map((e) => e.dur), [
+        { num: 1, den: 2 },
+        { num: 1, den: 2 },
+      ]);
+      assert.ok(lead.spans.some((s) => s.type === 'meend'));
+      assert.ok(!lead.spans.some((s) => s.type === 'kan'));
+      // trailing + space: two full matras, meend across
+      const cross = parseDocument('tal: tintal\n\nm~ g R g\n').doc.sections[0].lines[0];
+      assert.equal(cross.matras.length, 4);
+      assert.ok(
+        cross.spans.some(
+          (s) => s.type === 'meend' && s.from.matraIndex === 0 && s.to.matraIndex === 1
+        )
+      );
+    },
+  },
+  {
+    name: 'kan: {run} with no destination narrates, makes no matra',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS {dP} R g\n');
+      assert.equal(doc.sections[0].lines[0].matras.length, 3, 'S R g only');
+      assert.ok(problems.some((p) => /no destination/.test(p.msg)), JSON.stringify(problems));
+    },
+  },
+  {
+    name: 'kan: { without closing } narrates instead of hanging',
+    fn: () => {
+      const { problems } = parseDocument('tal: tintal\n\nS {dP\n');
+      assert.ok(problems.some((p) => /\{/.test(p.msg)), JSON.stringify(problems));
+    },
+  },
+  {
+    name: 'kan: every keystroke prefix of a braced line parses (no freeze)',
+    fn: () => {
+      const full = "| S - - | {P'SN'R'SN'S}N - | m~ g |";
+      for (let k = 1; k <= full.length; k++) {
+        const { doc } = parseDocument(`tal: rupak\n\n${full.slice(0, k)}\n`);
+        assert.ok(doc, `prefix ${k}`);
+      }
+    },
+  },
+  {
+    name: 'kan: brace form round-trips through serialize',
+    fn: () => {
+      assertRoundTrip("tal: tintal\n\n{'S}n R g m\n");
+      assertRoundTrip("tal: free\n\n{P'SN'R'SN'S}N\n");
+      assertRoundTrip('tal: tintal\n\n{d}Pm R g m\n');
+    },
+  },
+  {
+    name: 'kan: tilde shorthand serializes to the canonical brace form',
+    fn: () => {
+      const out = serializeDocument(parseDocument("tal: tintal\n\n'S~n R g m\n").doc);
+      assert.match(out, /\{'S\}n/, out);
+    },
+  },
+  {
+    name: 'meend: within-matra meend serializes as LEADING tilde (kan-safe)',
+    fn: () => {
+      // The old canonical form P~S would now reparse as a kan — the leading
+      // form is the only spelling that survives the new grammar unchanged.
+      const out = serializeDocument(parseDocument('tal: free\n\n~PS.N\n').doc);
+      assert.match(out, /~PS\.N/, out);
+      assert.doesNotMatch(out, /P~S/, out);
+      assertRoundTrip('tal: free\n\n~PS.N\n');
+    },
+  },
+  {
+    name: 'kan: Appendix A corpus is untouched by the ornament grammar',
+    fn: () => {
+      const { problems } = parseDocument(APPENDIX_A);
+      assert.deepEqual(problems, []);
+      assertRoundTrip(APPENDIX_A);
     },
   },
   {
