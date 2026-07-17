@@ -834,11 +834,16 @@ export const smokes = [
     },
   },
   {
-    name: 'kan: {run} with no destination narrates, makes no matra',
+    name: 'kan: {run} followed by a note attaches forward (superseded: was a problem)',
     fn: () => {
+      // SUPERSEDED 2026-07-16 (M's cross-beat ruling): a spaced {run} now
+      // attaches to the NEXT note rather than erroring. The genuine orphan
+      // — a run at line end — still narrates (see the xbeat smokes).
       const { doc, problems } = parseDocument('tal: tintal\n\nS {dP} R g\n');
-      assert.equal(doc.sections[0].lines[0].matras.length, 3, 'S R g only');
-      assert.ok(problems.some((p) => /no destination/.test(p.msg)), JSON.stringify(problems));
+      assert.deepEqual(problems, []);
+      const line = doc.sections[0].lines[0];
+      assert.equal(line.matras.length, 3, 'S, R, g — braces still cost no matra');
+      assert.equal(line.matras[1].events.filter((e) => e.grace && e.preBeat).length, 2);
     },
   },
   {
@@ -911,6 +916,55 @@ export const smokes = [
       assertRoundTrip(fenced);
       const p = parseDocument(fenced);
       assert.equal(parseDocument(serializeDocument(p.doc)).doc.frontmatter, true);
+    },
+  },
+// --- cross-beat ornament (M, 2026-07-16 second ruling): `{run} X` with a
+  // space attaches the graces FORWARD to the next note — they sound before
+  // its beat (stealing from the previous note's tail), unlike `{run}X`
+  // which steals from the destination's front. Same beat is not required.
+  {
+    name: 'kan xbeat: {dP} m — graces attach forward, matra count honest',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS {dP} m R g\n');
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+      const line = doc.sections[0].lines[0];
+      assert.equal(line.matras.length, 4, 'S, m, R, g — braces cost no matra');
+      const m = line.matras[1].events;
+      assert.equal(m.filter((e) => e.grace).length, 2);
+      assert.ok(m.filter((e) => e.grace).every((e) => e.preBeat === true));
+      assert.equal(m[2].ch, 'm');
+      assert.deepEqual(m[2].dur, { num: 1, den: 1 }, 'destination still owns its beat');
+      assert.ok(line.spans.some((x) => x.type === 'kan'));
+    },
+  },
+  {
+    name: 'kan xbeat: graces attach across a barline',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS R g {dP} | m P d n\n');
+      assert.deepEqual(problems.filter((p) => !/vibhag/.test(p.msg)), []);
+      const line = doc.sections[0].lines[0];
+      const m = line.matras[3].events;
+      assert.equal(m.filter((e) => e.grace && e.preBeat).length, 2);
+      assert.equal(m[2].ch, 'm');
+    },
+  },
+  {
+    name: 'kan xbeat: pending graces at line end narrate',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS R g {dP}\n');
+      assert.equal(doc.sections[0].lines[0].matras.length, 3);
+      assert.ok(problems.some((p) => /no destination/.test(p.msg)), JSON.stringify(problems));
+    },
+  },
+  {
+    name: 'kan xbeat: spaced and attached forms round-trip distinctly',
+    fn: () => {
+      assertRoundTrip('tal: tintal\n\nS {dP} m R g\n');
+      const spaced = serializeDocument(parseDocument('tal: tintal\n\nS {dP} m R g\n').doc);
+      assert.match(spaced, /\{dP\} m/, spaced);
+      const attached = serializeDocument(parseDocument('tal: tintal\n\nS {dP}m R g\n').doc);
+      assert.match(attached, /\{dP\}m/, attached);
+      assert.doesNotMatch(attached, /\{dP\} m/, attached);
     },
   },
 ];

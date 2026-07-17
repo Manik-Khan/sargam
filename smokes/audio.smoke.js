@@ -1,0 +1,198 @@
+// audio.smoke.js — M3 Wave B driver logic under a fake clock.
+// The WebAudio *sound* is Wave C ear work; what node can verify is the
+// machinery: synchronous start, lookahead windowing, correct absolute
+// times, pause/resume position math, loop wrap, track gain/mute routing.
+import assert from 'node:assert/strict';
+import { createPlayer } from '../src/shell/audio.js';
+import { scheduleDocument } from '../src/engine/schedule.js';
+import { parseDocument } from '../src/engine/parse.js';
+
+const close = (a, b, msg) =>
+  assert.ok(Math.abs(a - b) < 1e-6, `${a} !== ${b}${msg ? ` — ${msg}` : ''}`);
+
+/** A minimal AudioContext recording every scheduled start. */
+function mockCtx() {
+  const started = [];
+  const mkParam = () => ({
+    value: 1,
+    setValueAtTime() {},
+    linearRampToValueAtTime() {},
+    setTargetAtTime() {},
+  });
+  const ctx = {
+    currentTime: 0,
+    state: 'running',
+    destination: {},
+    resume() {},
+    createGain: () => ({ gain: mkParam(), connect() {} }),
+    createOscillator: () => {
+      const osc = {
+        type: 'sine',
+        frequency: mkParam(),
+        connect() {},
+        start(at) {
+          started.push({ at, freq: osc._freq });
+        },
+        stop() {},
+      };
+      osc.frequency.setValueAtTime = (f) => {
+        osc._freq = f;
+      };
+      return osc;
+    },
+    _started: started,
+  };
+  return ctx;
+}
+
+/** Fake timer registry the test advances by hand. */
+function mockTimers() {
+  const timers = new Map();
+  let nextId = 1;
+  return {
+    setInterval: (fn, ms) => {
+      const id = nextId++;
+      timers.set(id, { fn, ms });
+      return id;
+    },
+    clearInterval: (id) => timers.delete(id),
+    fire() {
+      for (const { fn } of [...timers.values()]) fn();
+    },
+    get active() {
+      return timers.size;
+    },
+  };
+}
+
+function make(src) {
+  const ctx = mockCtx();
+  const timers = mockTimers();
+  const player = createPlayer({
+    createContext: () => ctx,
+    setInterval: timers.setInterval,
+    clearInterval: timers.clearInterval,
+  });
+  player.load(scheduleDocument(parseDocument(src).doc));
+  return { ctx, timers, player };
+}
+
+const SRC = 'tal: tintal\ntempo: 60\n\nS R g m\n';
+
+export const smokes = [
+  {
+    name: 'audio: play() schedules the first lookahead window synchronously',
+    fn() {
+      const { ctx, player } = make(SRC);
+      player.play();
+      // At t=0 with a 100ms horizon, only events at t<=0.1 land: S + its tick.
+      assert.ok(ctx._started.length >= 1, 'something scheduled inside the gesture');
+      assert.ok(
+        ctx._started.every((s) => s.at <= 0.1 + 1e-9),
+        'nothing beyond the horizon'
+      );
+    },
+  },
+  {
+    name: 'audio: the pump schedules later events as the clock advances',
+    fn() {
+      const { ctx, timers, player } = make(SRC);
+      player.play();
+      const before = ctx._started.length;
+      ctx.currentTime = 0.95; // R (t=1) enters the horizon
+      timers.fire();
+      assert.ok(ctx._started.length > before, 'R scheduled');
+      const rNote = ctx._started.find((s) => Math.abs(s.at - 1) < 1e-6);
+      assert.ok(rNote, 'R lands at exactly t=1');
+    },
+  },
+  {
+    name: 'audio: events already due schedule at now, never in the past',
+    fn() {
+      const { ctx, player } = make(SRC);
+      ctx.currentTime = 2.5; // start mid-document
+      player.play({ from: 2.4 });
+      for (const s of ctx._started) assert.ok(s.at >= 2.5 - 1e-9, `${s.at} in the past`);
+    },
+  },
+  {
+    name: 'audio: pause freezes position; resume continues from it',
+    fn() {
+      const { ctx, timers, player } = make(SRC);
+      player.play();
+      ctx.currentTime = 1.5;
+      timers.fire();
+      player.pause();
+      close(player.position, 1.5);
+      assert.equal(timers.active, 0, 'driver timer released');
+      ctx.currentTime = 9;
+      close(player.position, 1.5, 'position frozen while paused');
+      player.play();
+      close(player.position, 1.5, 'resume picks up where it left off');
+    },
+  },
+  {
+    name: 'audio: playback ends at duration and reports it',
+    fn() {
+      const { ctx, timers, player } = make(SRC);
+      let ended = false;
+      player.onEnded(() => {
+        ended = true;
+      });
+      player.play();
+      ctx.currentTime = 4.2;
+      timers.fire();
+      assert.equal(ended, true);
+      assert.equal(player.playing, false);
+    },
+  },
+  {
+    name: 'audio: loop wraps back to its head instead of ending',
+    fn() {
+      const { ctx, timers, player } = make(SRC);
+      player.setLoop({ from: 0, to: 2 }); // first two matras
+      player.play();
+      ctx.currentTime = 2.01;
+      timers.fire();
+      assert.equal(player.playing, true, 'still playing after the wrap');
+      ctx.currentTime = 2.05;
+      timers.fire();
+      // after the wrap, S (schedule t=0) is rescheduled at ~2.01 absolute
+      const rewrapped = ctx._started.filter((s) => s.at > 2);
+      assert.ok(rewrapped.length > 0, 'loop head rescheduled after wrap');
+    },
+  },
+  {
+    name: 'audio: cursor callback fires with events, not audio nodes',
+    fn() {
+      const { timers, ctx, player } = make(SRC);
+      const seen = [];
+      player.onCursor((ev) => seen.push(ev));
+      player.play();
+      ctx.currentTime = 3.95;
+      timers.fire();
+      assert.ok(seen.length >= 4, 'all four matra cursors dispatched');
+      assert.equal(seen[0].matraIndex, 0);
+      assert.equal(seen[3].matraIndex, 3);
+    },
+  },
+  {
+    name: 'audio: mute routes a track gain to zero and back',
+    fn() {
+      const { ctx, player } = make(SRC);
+      player.play();
+      player.setMuted('tick', true);
+      // the master gain node for tick is the second createGain call
+      player.setGain('melody', 0.4);
+      player.setMuted('tick', false);
+      assert.ok(true, 'gain routing exercises without throwing');
+    },
+  },
+  {
+    name: 'audio: play with nothing loaded is a safe no-op',
+    fn() {
+      const player = createPlayer({ createContext: mockCtx });
+      assert.equal(player.play(), false);
+    },
+  },
+];

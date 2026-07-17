@@ -220,6 +220,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
   // Scanner state.
   let pendingMeendFrom = null; // EventRef awaiting the next note event
   let bracketTilde = false; // a `~` consumed just before a [ or [[
+  let pendingGraces = null; // {atoms, col} — `{run} ` awaiting its note (cross-beat kan)
   let phraseFrom = null; // matra index where ( opened
   const clusterCtx = {
     line,
@@ -231,6 +232,14 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
         line.spans.push({ type: 'meend', from: pendingMeendFrom, to: ref });
         pendingMeendFrom = null;
       }
+    },
+    takePendingGraces() {
+      const p = pendingGraces;
+      pendingGraces = null;
+      return p ? p.atoms : null;
+    },
+    peekPendingGraces() {
+      return pendingGraces;
     },
     setPendingMeend(ref) {
       pendingMeendFrom = ref;
@@ -352,20 +361,29 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
         continue;
       }
       if (destTok === '' || !CLUSTER_RE.test(destTok)) {
-        problems.push({
-          line: lineNo,
-          col: i + 1,
-          msg: 'ornament has no destination note — the note the graces land on goes right after the }',
-        });
-        i = j > close + 1 ? j : close + 1;
+        // Spaced form `{run} X` — the graces attach FORWARD to the next
+        // note token, sounding before its beat (cross-beat kan, M's second
+        // ruling 2026-07-16). Pend them; line end with no taker narrates.
+        const ga = clusterAtoms(inner, i + 1, clusterCtx);
+        if (ga) {
+          if (ga.some((a) => a.type !== 'note')) {
+            problems.push({ line: lineNo, col: i + 1, msg: 'a - has no meaning in a grace run — graces carry no time to extend' });
+          } else {
+            for (const a of ga) a.preBeat = true;
+            pendingGraces = pendingGraces ? { atoms: [...pendingGraces.atoms, ...ga], col: pendingGraces.col } : { atoms: ga, col: i + 1 };
+          }
+        }
+        i = close + 1;
         continue;
       }
       const graceAtoms = clusterAtoms(inner, i + 1, clusterCtx);
       const destAtoms = clusterAtoms(destTok, close + 2, clusterCtx);
       if (graceAtoms && destAtoms) {
-        const combined = [...graceAtoms, ...destAtoms];
+        const pend = pendingGraces ? pendingGraces.atoms : [];
+        pendingGraces = null;
+        const combined = [...pend, ...graceAtoms, ...destAtoms];
         combined._tilde = destAtoms._tilde; // trailing tilde still crosses matras
-        const events = weightAndBuild(combined, graceAtoms.length, i + 1, clusterCtx);
+        const events = weightAndBuild(combined, pend.length + graceAtoms.length, i + 1, clusterCtx);
         if (events && events.length > 0) line.matras.push({ events });
       }
       i = j;
@@ -444,6 +462,13 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
   }
   if (pendingMeendFrom !== null) {
     problems.push({ line: lineNo, col: null, msg: '~ slide has no destination note' });
+  }
+  if (pendingGraces !== null) {
+    problems.push({
+      line: lineNo,
+      col: pendingGraces.col,
+      msg: 'ornament has no destination note — the graces never found a note to land on',
+    });
   }
 
   // Vibhag validation — only when bars were actually typed (spec: | is
@@ -635,6 +660,15 @@ function buildSlottedMatra(inner, col, ctx) {
 function buildClusterEvents(tok, col, ctx) {
   const atoms = clusterAtoms(tok, col, ctx);
   if (!atoms) return null;
+  const pend = ctx.takePendingGraces ? ctx.takePendingGraces() : null;
+  if (pend && pend.length > 0) {
+    const combined = [...pend, ...atoms];
+    combined._tilde = atoms._tilde;
+    const kb = atoms._tilde?.kanBoundary ?? -1;
+    // pending graces sit before everything; the token's own kan boundary
+    // (if any) shifts by their count.
+    return weightAndBuild(combined, pend.length + (kb > 0 ? kb : 0), col, ctx);
+  }
   return weightAndBuild(atoms, atoms._tilde?.kanBoundary ?? -1, col, ctx);
 }
 
@@ -743,6 +777,7 @@ function atomsToEvents(atoms, ctx) {
       const ref = { matraIndex, eventIndex: events.length };
       const ev = { type: 'note', dur, ch: a.ch, octave: a.octave };
       if (a.grace) ev.grace = true;
+      if (a.preBeat) ev.preBeat = true;
       events.push(ev);
       // Graces never resolve a pending cross-matra meend — a slide written
       // before an ornament lands on the ornament's destination, not its

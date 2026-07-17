@@ -354,7 +354,10 @@ function renderCell(line, k, tal, prefix, suffix) {
   // isn't subdivided — because cells bottom-align: an optional lane made
   // plain matras shorter, dropping their glyph and their marker below
   // their neighbours' (M, 2026-07-16). Same idiom as the marker lane.
-  cell.appendChild(evs.length > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
+  // Under-arc = rhythmic subdivision of TIMED notes only (M, 2026-07-16);
+  // graces never trigger it. {dP}m: curve only. {d}Pm: curve + arc.
+  const timedCount = evs.filter((e) => !e.grace).length;
+  cell.appendChild(timedCount > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
 
   return cell;
 }

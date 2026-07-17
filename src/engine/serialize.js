@@ -209,9 +209,12 @@ function matraToken(line, k) {
   // Graces (kan) serialize as the canonical brace form: {graces}dest.
   // The tilde shorthand parses IN but braces come OUT — one canonical
   // spelling, and the curve is encoded by the braces, not a span mark.
-  const graces = all.filter((e) => e.grace);
+  const pre = all.filter((e) => e.grace && e.preBeat);
+  const graces = all.filter((e) => e.grace && !e.preBeat);
   const evs = all.filter((e) => !e.grace);
-  const gracePrefix = graces.length ? `{${graces.map(noteAtom).join('')}}` : '';
+  // Spaced form = cross-beat (sounds before the beat); attached = same-beat.
+  const spacedPrefix = pre.length ? `{${pre.map(noteAtom).join('')}} ` : '';
+  const gracePrefix = spacedPrefix + (graces.length ? `{${graces.map(noteAtom).join('')}}` : '');
 
   // Single whole-matra event.
   if (evs.length === 1 && evs[0].dur.num === evs[0].dur.den) {
@@ -248,7 +251,7 @@ function matraToken(line, k) {
       line,
       matraIndex,
       atoms,
-      evs.map((_, i) => graces.length + i)
+      evs.map((_, i) => pre.length + graces.length + i)
     )
   );
 }

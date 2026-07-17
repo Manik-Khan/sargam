@@ -148,17 +148,45 @@ export function scheduleDocument(doc, opts = {}) {
             return;
           }
 
-          // Kan slivers: graces steal from the FRONT of the first timed
-          // note; the grid never moves.
-          const graces = evs.filter((e) => e.grace);
-          let sliver = 0;
-          if (graces.length > 0) {
-            sliver = Math.min(GRACE_FRACTION, GRACE_CAP / graces.length) * spm;
+          // Kan slivers. Same-beat graces ({dP}m) steal from the FRONT of
+          // the destination; pre-beat graces ({dP} m) sound BEFORE the beat,
+          // trimming whatever rings — the destination keeps its whole beat.
+          // Either way, the grid never moves.
+          const preGraces = evs.filter((e) => e.grace && e.preBeat);
+          const sameGraces = evs.filter((e) => e.grace && !e.preBeat);
+          const sliverOf = (n) => (n > 0 ? Math.min(GRACE_FRACTION, GRACE_CAP / n) * spm : 0);
+          const preSliver = sliverOf(preGraces.length);
+          const sliver = sliverOf(sameGraces.length);
+
+          if (preGraces.length > 0) {
+            const total = preGraces.length * preSliver;
+            let start = Math.max(0, matraStart - total);
+            if (ringing && ringing.t + ringing.dur > start) {
+              ringing.dur = Math.max(0, start - ringing.t);
+            }
+            const actualSliver = (matraStart - start) / preGraces.length || 0;
+            preGraces.forEach((e, gi) => {
+              const eventIndex = evs.indexOf(e);
+              const ev = {
+                kind: 'note',
+                t: start + gi * actualSliver,
+                dur: actualSliver,
+                ch: e.ch,
+                semitone: SEMITONES[e.ch],
+                octave: e.octave || 0,
+                freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
+                grace: true,
+                preBeat: true,
+              };
+              events.push(ev);
+              placed.set(`${matraIndex}:${eventIndex}`, ev);
+            });
           }
 
           let cursor = matraStart;
-          let graceTotal = graces.length * sliver;
+          let graceTotal = sameGraces.length * sliver;
           evs.forEach((e, eventIndex) => {
+            if (e.grace && e.preBeat) return; // already placed above
             const frac = e.dur.num / e.dur.den;
             if (e.type === 'note' && e.grace) {
               const ev = {

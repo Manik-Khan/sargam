@@ -498,4 +498,27 @@ export const smokes = [
       }
     },
   },
+// --- under-arc rule (M, 2026-07-16): the under-arc means rhythmic
+  // subdivision of TIMED notes, never the ornament. The writer chooses the
+  // look by the spelling: {dP}m curve only; {d}Pm curve + under-arc; dPm
+  // under-arc only.
+  {
+    name: 'under-arc: {dP}m — destination owns the beat, NO under-arc, kan curve yes',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\n{dP}m R g m\n');
+      const root = renderDocument(doc);
+      const cell = root.querySelector('.sr-cell');
+      assert.equal(cell.querySelector('.sr-underarc'), null, 'no subdivision, no arc');
+      assert.ok(cell.querySelector('.sr-arc-slot'), 'lane still reserved (alignment)');
+      assert.ok(root.querySelector('.sr-arc-kan'));
+    },
+  },
+  {
+    name: 'under-arc: {d}Pm — timed notes subdivide, under-arc returns',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\n{d}Pm R g m\n');
+      const cell = renderDocument(doc).querySelector('.sr-cell');
+      assert.ok(cell.querySelector('.sr-underarc'));
+    },
+  },
 ];

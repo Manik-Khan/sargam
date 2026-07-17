@@ -269,4 +269,30 @@ export const smokes = [
       close(s.duration, 0);
     },
   },
+{
+    name: 'kan xbeat: {dP} m — graces sound BEFORE the beat, trimming the ringing note',
+    fn() {
+      const s = sched('tal: tintal\ntempo: 60\n\nS {dP} m R\n');
+      const ns = notes(s);
+      // S, d(grace), P(grace), m, R
+      assert.equal(ns.length, 5);
+      const [S, d, P, m] = ns;
+      const sliver = 1 / 12;
+      close(S.dur, 1 - 2 * sliver, 'S is trimmed to make room');
+      close(d.t, 1 - 2 * sliver, 'graces start before the beat');
+      close(P.t, 1 - sliver);
+      assert.equal(d.preBeat, true);
+      close(m.t, 1, 'destination lands ON its beat');
+      close(m.dur, 1, 'destination keeps its whole beat — nothing stolen');
+    },
+  },
+  {
+    name: 'kan xbeat: pre-beat graces at line start clamp at zero, no negative time',
+    fn() {
+      const s = sched('tal: free\ntempo: 60\n\n{dP} m\n');
+      const ns = notes(s);
+      assert.ok(ns[0].t >= 0);
+      for (const e of ns) assert.ok(e.t >= 0);
+    },
+  },
 ];

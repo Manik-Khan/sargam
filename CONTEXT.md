@@ -2,9 +2,9 @@
 
 Read this with `docs/design-spec.md` and `docs/build-plan.md` at session start. The spec is the requirements authority; the plan pins code contracts; this file says where things stand.
 
-## State: M1 · M2 · M2.5 COMPLETE (incl. alignment/tilde/hang/property waves, eyeballed live) · KAN SHIPPED · M3 WAVE A (schedule engine) SHIPPED — Wave B (audio shell) NEXT
+## State: M1 · M2 · M2.5 COMPLETE · KAN COMPLETE (incl. cross-beat + under-arc rule) · M3 WAVE A SHIPPED · WAVE B AUDIO DRIVER SHIPPED — transport UI awaiting M's mock approval, then wiring
 
-**Suite: 202 passed, 0 failed** (27 tala + 84 parse/serialize + 34 render + 35 files + 22 schedule). `npm run smoke` is the gate. Shell verified by Vite build + jsdom mount check (boot, dirty dot, autosave slot, restore-on-reload).
+**Suite: 219 passed, 0 failed** (27 tala + 89 parse/serialize + 36 render + 35 files + 24 schedule + 9 audio driver). HONESTY NOTE: the 9 audio smokes were written after audio.js in the same wave — never watched red (ritual deviation, disclosed to M 2026-07-16). `npm run smoke` is the gate. Shell verified by Vite build + jsdom mount check (boot, dirty dot, autosave slot, restore-on-reload).
 
 **Live: https://sargam-notation.netlify.app** — Netlify builds `Manik-Khan/sargam` main (`npm run build` → `dist`), auto-deploys on every GitHub upload, same rhythm as ToK. `sargam.manikkhan.com` is the eventual custom-domain move.
 
@@ -26,13 +26,15 @@ The wave that makes Sargam a complete *notation* tool before playback. All four 
 
 ## Kan/ornament grammar (M, 2026-07-16 — spec §3 amended, SHIPPED)
 
+**Cross-beat + under-arc (M's second ruling, same day):** `{run} X` with a SPACE attaches the graces FORWARD to the next note (even across `|`) — they sound BEFORE its beat, trimming the ringing note's tail; the destination keeps its whole beat (`preBeat: true` on the events; spaced form serializes back spaced). Orphan at line end narrates. **Under-arc = rhythmic subdivision of TIMED notes only** — graces never trigger it: `{dP}m` curve only · `{d}Pm` curve + under-arc · `dPm` under-arc only. The writer chooses the look by the spelling.
+
 `{graces}X` — braces hold the grace run, the note after owns the beat: `{'S}n`, `{dP}m`, `{P'SN'R'SN'S}N`. Internal cluster tildes are shorthand for the same (`'S~n`, `d~P~m` — note after the LAST tilde is the destination). Graces render small+raised with the connecting curve; playback slides the run, graces steal ≤ half the beat off the destination's front (1/12 matra each), grid never moves. **Semantic change, M-ruled:** internal tilde WAS within-matra meend; that meaning now belongs only to the leading form `~N'S`, and serialize emits leading form (the old canonical `P~S` would reparse as a kan). Orphan `{run}` narrates. Braces inside `[ ]`/`[[ ]]` unsupported v1 (narrates as unrecognized). Kan span type: `'kan'` (renders via the meend arc path, class `sr-arc-kan`).
 
 ## M3 Wave A — schedule.js (SHIPPED, engine only)
 
 `scheduleDocument(doc, {tempo?}) → {events, duration, lineStarts}`. Events sorted by t: `note` (t/dur seconds from exact fractions, ch/semitone/octave/freq, grace?, glideFrom? for meend), `tick` (accent sam|khali|vibhag|plain from tala.js data, none in free), `cursor` (per played matra, carries sourceLine). Repeats unroll (`||: :||` ×2, `(…)xN`); whole-matra sustains extend the ringing note; rests silence it. `parseSa`: letter+accidental+optional octave, bare letter = octave 3 (sarod `C`→C3≈131Hz, sitar `D`, vocal `A3`=220 — M's anchors); default stays `C#` pending M. `SEMITONES` table confirmed by M: S0 r1 R2 g3 G4 m5 M6 P7 d8 D9 n10 N11. Grace sliver constants in schedule.js (`GRACE_FRACTION` 1/12, `GRACE_CAP` 1/2) — ear-pass tunables.
 
-**Wave B (NEXT, needs transport mock → M approval first):** WebAudio voices + lookahead scheduler (~25ms/~100ms) in the shell (`platform.js` pattern), synchronous start on gesture (Bardic), transport UI (play/pause/stop, tempo, loop line/section, play-from-cursor via `lineStarts`), track toggles (melody/tick), cursor highlight via `opts.activeCursor` (render seam exists). Then Wave C: the ear pass (timbre, tick sounds, glide shaping, kan feel) — judged by M, never "good enough for verification."
+**Wave B state:** `src/shell/audio.js` SHIPPED — `createPlayer(env)`: injected context/timers (smoked with a fake clock), lookahead pump (25ms/100ms), synchronous `play()` on gesture, pause/resume position math, `setLoop({from,to})` wrap, per-track gain/mute (melody/tick), `onCursor`/`onEnded`. Voices are STARTING POINTS for Wave C (triangle pluck; glideFrom → setTargetAtTime ramp; tick accents sam 1200sq / khali 420sin / vibhag 880sq / plain 660sin). **Transport UI: mocked (mock-transport.html, staged 2026-07-16), NOT built — waiting on M's approval.** Mock behavior spec: strip under toolbar, always visible; Space play/pause; playback starts from text cursor's line; loop off/line/section (cursor-scoped); BPM field is TRANSPORT-ONLY and never writes `tempo:` (the directive is provenance, M's laya principle); melody/tick mute checkboxes; free sections tick-silent. After approval: wire App.jsx (player + transport + cursor highlight via `opts.activeCursor` — render seam exists, cursor events carry section/line/matra indices). Then Wave C ear pass — judged by M, never "good enough for verification."
 
 ## Settled by M, 2026-07-16 (was open — now binding)
 
