@@ -39,7 +39,7 @@ Sargam is a **working instrument**: type notation → see it rendered in the han
 - **M5 — harden:** verify the remaining tal definitions WITH M (data-only edits in `src/engine/tala.js`), free-section polish, broaden smokes.
 - **Grid editor:** Phase 2, own design cycle; the playback cursor machinery it needs now exists.
 - **Backlog with scan evidence (spec §10):** render phrase repeats as the hand's square-bracket + `2x`; landing rendered as the tiny `(+)` above the landing note (as on the 1982 page — M has hand-computed these in margins for decades); khali as `°`; cross-rhythm ("stretch tihai evenly 3/7" — the model's exact fractions were built for it); volta endings; sampled voices; Supabase sync; image export.
-- **Open rulings (M's, whenever):** the laya ladder wording (spec §3.1 has a PROPOSED 7-rung spectrum marked as inference — correct it, then update the New-doc form's options to match); whether `type:` (composition/alap/transcription) joins the form; whether the default `sa:` moves from C# to C.
+- **Open rulings (M's, whenever):** the laya ladder wording (spec §3.1 has a PROPOSED 7-rung spectrum marked as inference — correct it, then update the New-doc form's options to match); whether `type:` (composition/alap/transcription) joins the form; ~~whether the default `sa:` moves from C# to C~~ — RULED: default is C (M, 2026-07-16, "I have the key as C"); `DEFAULT_SA` exported from schedule.js, imported by western.js and render.js; "Key (Sa)" field in the New Doc form with the three anchors. NOTE the trap that surfaced it: `key: C` in the frontmatter prints on export (provenance tier) but does NOT drive pitch — only `sa:` does.
 
 ## The settled rulings (all M's, 2026-07-16 unless noted — binding on any future collaborator)
 

@@ -18,7 +18,7 @@
 //
 // Engine rules: plain JS, no React, no DOM, never throws.
 
-import { parseSa, SEMITONES } from './schedule.js';
+import { parseSa, SEMITONES, DEFAULT_SA } from './schedule.js';
 import { getTal } from './tala.js';
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
@@ -32,7 +32,7 @@ const midiOfLetter = (letter, octave) => 12 * (octave + 1) + NATURAL[letter];
 
 /** Sa's letter and octave from its directive string ('C', 'A3', 'Bb2'). */
 function saLetter(saValue) {
-  const m = /^\s*([A-Ga-g])([#b]?)(\d)?\s*$/.exec(String(saValue ?? 'C#'));
+  const m = /^\s*([A-Ga-g])([#b]?)(\d)?\s*$/.exec(String(saValue ?? DEFAULT_SA));
   if (!m) return { letter: 'C', octave: 3 };
   return { letter: m[1].toUpperCase(), octave: m[3] !== undefined ? Number(m[3]) : 3 };
 }
@@ -167,7 +167,7 @@ function denomOf(x) {
  */
 export function documentToMusicXML(doc) {
   const dirs = doc?.directives || {};
-  const saValue = dirs.sa || 'C#';
+  const saValue = dirs.sa || DEFAULT_SA;
   const { events, meterMatras, total } = flatten(doc);
 
   // divisions per quarter (= per matra) must make every duration an integer

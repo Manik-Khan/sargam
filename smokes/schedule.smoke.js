@@ -35,10 +35,20 @@ export const smokes = [
     },
   },
   {
-    name: 'pitch: unparseable sa narrates via fallback to the default C#',
+    name: "pitch: the default sa is C — the sarod's key (M's ruling, 2026-07-16)",
+    fn() {
+      // SUPERSEDED: the default was C# (spec's original), kept "pending M's
+      // ruling". M ruled by expectation on the live site: "I have the key
+      // as C". Sarod C is the app's home key.
+      close(parseSa(undefined).freq, parseSa('C').freq);
+      close(parseSa(undefined).freq, 130.8127826502993);
+    },
+  },
+  {
+    name: 'pitch: unparseable sa narrates via fallback to the default (C)',
     fn() {
       const bad = parseSa('purple');
-      close(bad.freq, parseSa('C#').freq);
+      close(bad.freq, parseSa('C').freq);
       assert.equal(bad.problem !== undefined, true);
     },
   },

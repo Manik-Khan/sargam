@@ -14,6 +14,7 @@ const COMPOSITIONS = ['vocal', 'instrumental'];
 export default function NewDocDialog({ onCreate, onCancel }) {
   const [raga, setRaga] = useState('');
   const [tal, setTal] = useState('tintal');
+  const [sa, setSa] = useState(null);
   const [tempo, setTempo] = useState('');
   const [composition, setComposition] = useState(null);
   const [laya, setLaya] = useState(null);
@@ -29,8 +30,8 @@ export default function NewDocDialog({ onCreate, onCancel }) {
   }, [onCancel]);
 
   const text = useMemo(
-    () => newDocumentText({ raga, tal, tempo, composition, laya }),
-    [raga, tal, tempo, composition, laya]
+    () => newDocumentText({ raga, tal, sa, tempo, composition, laya }),
+    [raga, tal, sa, tempo, composition, laya]
   );
 
   // Tal names, aliases folded out (aliases point at the same object).
@@ -101,6 +102,27 @@ export default function NewDocDialog({ onCreate, onCancel }) {
                 onClick={() => toggle(composition, c, setComposition)}
               >
                 {c[0].toUpperCase() + c.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="nd-field">
+          <label>Key (Sa)</label>
+          <div className="nd-seg">
+            {[
+              ['C', 'C — sarod'],
+              ['D', 'D — sitar'],
+              ['A', 'A — vocal'],
+            ].map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                className={sa === v ? 'on' : ''}
+                aria-pressed={sa === v}
+                onClick={() => toggle(sa, v, setSa)}
+              >
+                {label}
               </button>
             ))}
           </div>

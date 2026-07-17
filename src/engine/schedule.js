@@ -23,7 +23,9 @@ export const SEMITONES = Object.freeze({
 });
 
 const LETTER_SEMIS = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-const DEFAULT_SA = 'C#'; // spec §3.1 default
+// The sarod's key. Was C# from the original spec, held "pending M's
+// ruling"; M ruled 2026-07-16 on the live site: "I have the key as C".
+export const DEFAULT_SA = 'C';
 
 /**
  * Parse a `sa:` value: a letter with optional accidental and octave —

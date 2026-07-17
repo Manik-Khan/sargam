@@ -15,6 +15,7 @@
 
 import { getTal, wrapMatra, markerAtMatra, landing } from './tala.js';
 import { spellDegree } from './western.js';
+import { DEFAULT_SA } from './schedule.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -33,7 +34,7 @@ export function renderDocument(doc, opts = {}) {
   const ctx = {
     ...opts,
     noteNames: opts.noteNames === 'western' ? 'western' : 'sargam',
-    sa: doc?.directives?.sa || 'C#',
+    sa: doc?.directives?.sa || DEFAULT_SA,
   };
   for (let si = 0; si < (doc.sections || []).length; si++) {
     el.appendChild(renderSection(doc.sections[si], si, ctx));
