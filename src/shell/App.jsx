@@ -464,32 +464,41 @@ export default function App() {
           onClose={() => setShowDictate(false)}
         />
       )}
-      <iframe
-        title="Vilambit — practice player"
-        src="vilambit.html"
-        className={'app-vilambit' + (view === 'vilambit' ? '' : ' app-hidden')}
-      />
-      <div
-        className={
-          'app-panes app-layout-' + layout + (view === 'vilambit' ? ' app-hidden' : '')
-        }
-      >
-        <PreviewPane
-          doc={doc}
-          activeLine={activeLine}
-          activeCursor={playCursor}
-          noteNames={noteNames}
-          onSeek={doSeek}
+      {/* Both views live on one stage, both always mounted at full size.
+          The inactive one is veiled (visibility), never display:none —
+          Vilambit measures its own width at startup and must keep playing
+          while you notate on the other tab. `allow="autoplay"` is
+          REQUIRED: it drives a <video> through createMediaElementSource,
+          and a frame without that permission simply cannot start it. */}
+      <div className="app-stage">
+        <iframe
+          title="Vilambit — practice player"
+          src="vilambit.html"
+          allow="autoplay; fullscreen; encrypted-media; clipboard-read; clipboard-write"
+          className={'app-vilambit' + (view === 'vilambit' ? '' : ' app-veiled')}
         />
-        <div className="app-editor-col">
-          <CommandBar onApply={doCommand} />
-          <EditorPane
-            text={text}
-            onChange={setText}
-            onCursorLine={setActiveLine}
-            onCursorPos={setCursorPos}
-            editorRef={editorRef}
+        <div
+          className={
+            'app-panes app-layout-' + layout + (view === 'vilambit' ? ' app-veiled' : '')
+          }
+        >
+          <PreviewPane
+            doc={doc}
+            activeLine={activeLine}
+            activeCursor={playCursor}
+            noteNames={noteNames}
+            onSeek={doSeek}
           />
+          <div className="app-editor-col">
+            <CommandBar onApply={doCommand} />
+            <EditorPane
+              text={text}
+              onChange={setText}
+              onCursorLine={setActiveLine}
+              onCursorPos={setCursorPos}
+              editorRef={editorRef}
+            />
+          </div>
         </div>
       </div>
       <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>

@@ -196,7 +196,6 @@
   flex: 1;
   resize: none;
   border: none;
-  border-right: 1px solid var(--sr-line);
   outline: none;
   padding: 16px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -336,18 +335,28 @@
 /* ---- M2.5: layout toggle (spec §4.2) ---- */
 /* DOM order is preview-then-editor so the stacked layout is natural;
    `order` keeps side-by-side as it shipped: editor left, notation right. */
+/* The layout rules target the editor COLUMN (command bar + textarea), not
+   the textarea itself — since M4 the textarea is no longer a direct child
+   of .app-panes, so order/flex/height applied to it did nothing and the
+   column collapsed (M, 2026-07-16). */
 .app-layout-side { flex-direction: row; }
-.app-layout-side .app-editor { order: 1; }
+.app-layout-side .app-editor-col {
+  order: 1;
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid var(--sr-line);
+}
 .app-layout-side .app-preview { order: 2; }
 
 .app-layout-stacked { flex-direction: column; }
 .app-layout-stacked .app-preview { order: 1; flex: 1; min-height: 0; }
-.app-layout-stacked .app-editor {
+.app-layout-stacked .app-editor-col {
   order: 2;
   flex: none;
   height: 30vh;
   min-height: 90px;
   resize: vertical;          /* native drag handle — no JS divider needed */
+  overflow: hidden;          /* required for resize to render its grip */
   border-right: none;
   border-top: 1px solid var(--sr-line);
 }
@@ -568,7 +577,7 @@
 
 /* ---- M4: command bar + legend (M, 2026-07-16) ---- */
 .app-editor-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.app-editor-col .app-editor { flex: 1; min-height: 0; }
+.app-editor-col .app-editor { flex: 1; min-height: 0; height: auto; width: 100%; }
 .cmdbar {
   display: flex; gap: 4px; flex-wrap: wrap;
   padding: 5px 8px;
@@ -602,9 +611,20 @@
 @media print { .legend, .cmdbar { display: none !important; } }
 
 /* ---- Vilambit tab (M, 2026-07-16 — the transcription workflow) ----
-   The iframe is ALWAYS mounted; .app-hidden hides it without unloading,
-   so the recording keeps looping while you notate on the other tab. */
-.app-vilambit { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--sr-paper); }
-.app-hidden { display: none !important; }
+   Both views are ALWAYS mounted and ALWAYS FULL SIZE, stacked on one
+   stage; the inactive one is veiled with `visibility`, never `display:
+   none`. Two reasons, both learned the hard way (M, 2026-07-16):
+     1. Vilambit measures clientWidth/getBoundingClientRect at startup —
+        inside a display:none frame those are 0 and its waveform never
+        initializes, so it looked "blocked" when it had simply been born
+        with no dimensions.
+     2. visibility:hidden keeps media playing; display:none does not
+        reliably — and the whole point is that the recording keeps looping
+        while you notate on the other tab. */
+.app-stage { position: relative; flex: 1; min-height: 0; }
+.app-stage > .app-panes,
+.app-stage > .app-vilambit { position: absolute; inset: 0; }
+.app-vilambit { width: 100%; height: 100%; border: 0; background: var(--sr-paper); }
+.app-veiled { visibility: hidden; pointer-events: none; }
 .tb-tabs { display: flex; gap: 2px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--sr-line); }
 @media print { .app-vilambit, .tb-tabs { display: none !important; } }
