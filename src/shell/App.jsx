@@ -301,7 +301,15 @@ export default function App() {
   // Dictation inserts at the text cursor — the notation it writes is
   // ordinary Sargam text, editable by hand like everything else.
   const doDictateInsert = (snippet) => {
-    const pos = Math.min(cursorPos, text.length);
+    // Read the LIVE caret from the textarea — browsers keep selectionStart
+    // even while focus is on the dictate field. The tracked state was
+    // stale until the first click, so inserts landed at position 0, inside
+    // the frontmatter ("it input a different line" — M, 2026-07-16).
+    const live = editorRef.current ? editorRef.current.selectionStart : null;
+    let pos = Math.min(live ?? cursorPos, text.length);
+    // Never inserted a caret at all? Append at the end on its own line
+    // rather than silently corrupting the header.
+    if (pos === 0 && text.length > 0) pos = text.length;
     const before = text.slice(0, pos);
     const after = text.slice(pos);
     const pad = before && !/\s$/.test(before) ? ' ' : '';

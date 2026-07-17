@@ -76,6 +76,10 @@ const OCTAVES = {
 /** Manglings a general-purpose recognizer is likely to return for these
  *  syllables. SPECULATIVE — untested against a real recognizer; extend from
  *  live data rather than trusting this list. */
+// An alias may expand to MULTIPLE words ('sorry' → 'sa re'). The first
+// entries under FIELD DATA are real recognizer output from M's own mic
+// test (2026-07-16: "sa re ga ma pa" came back as "sorry I got my fire") —
+// keep extending this table from what the recognizer actually returns.
 const ALIASES = {
   knee: 'ni',
   nee: 'ni',
@@ -97,7 +101,47 @@ const ALIASES = {
   the: 'dha',
   komul: 'komal',
   kamal: 'komal',
+  // FIELD DATA (M, 2026-07-16)
+  sorry: 'sa re',
+  got: 'ga',
+  my: 'ma',
+  fire: 'pa',
+  i: '',
+  // spoken letter-names
+  ess: 'sa',
+  es: 'sa',
+  are: 're',
+  ar: 're',
+  gee: 'ga',
+  jee: 'ga',
+  em: 'ma',
+  pea: 'pa',
+  pee: 'pa',
+  dee: 'dha',
+  en: 'ni',
+  // number words — recognizers nail digits, so 1..7 are the reliable
+  // spoken channel: Sa=1 Re=2 Ga=3 Ma=4 Pa=5 Dha=6 Ni=7
+  one: 'sa',
+  two: 're',
+  three: 'ga',
+  four: 'ma',
+  five: 'pa',
+  six: 'dha',
+  seven: 'ni',
+  1: 'sa',
+  2: 're',
+  3: 'ga',
+  4: 'ma',
+  5: 'pa',
+  6: 'dha',
+  7: 'ni',
 };
+
+// Voice has no case: in caseless mode a bare letter maps to its syllable
+// and the raga decides the form (M's raga-defaults insight, applied to
+// letters). Typed mode keeps case meaningful — except s and p, which have
+// no komal form and forgive lowercase in both modes.
+const LETTER_SYLLABLE = { s: 'sa', r: 're', g: 'ga', m: 'ma', p: 'pa', d: 'dha', n: 'ni' };
 
 // ---------------------------------------------------------------------------
 // Parsing
@@ -111,7 +155,7 @@ const ALIASES = {
 // lowercasing that syllables need.
 const LETTER_RE = /^[SrRgGmMPdDnN]$/;
 
-const clean = (w) => w.replace(/[^A-Za-z]/g, '');
+const clean = (w) => w.replace(/[^A-Za-z0-9]/g, '');
 const normalize = (w) => {
   const lower = clean(w).toLowerCase();
   return ALIASES[lower] || lower;
@@ -150,10 +194,18 @@ export function spokenToAtoms(input, opts = {}) {
     }
   }
 
-  const raw = String(input || '')
-    .split(/\s+/)
-    .map(clean)
-    .filter(Boolean);
+  // Alias expansion pass first — an alias may expand to several words.
+  const raw = [];
+  for (const w of String(input || '').split(/\s+/)) {
+    const c = clean(w);
+    if (!c) continue;
+    const lower = c.toLowerCase();
+    if (lower in ALIASES) {
+      for (const part of ALIASES[lower].split(/\s+/)) if (part) raw.push(part);
+    } else {
+      raw.push(c);
+    }
+  }
 
   const atoms = [];
   let mod = null;
@@ -161,12 +213,26 @@ export function spokenToAtoms(input, opts = {}) {
   let pendingWord = null;
 
   for (const rawWord of raw) {
-    if (LETTER_RE.test(rawWord)) {
-      atoms.push(applyOctave(rawWord, octave));
-      mod = null;
-      octave = 0;
-      pendingWord = null;
-      continue;
+    if (rawWord.length === 1 && /[A-Za-z]/.test(rawWord)) {
+      const lower = rawWord.toLowerCase();
+      if (opts.caselessLetters && LETTER_SYLLABLE[lower]) {
+        // voice: letter → syllable; raga + modifiers decide the form
+        const letter = pickForm(LETTER_SYLLABLE[lower], mod, scale);
+        atoms.push(applyOctave(letter, octave));
+        mod = null;
+        octave = 0;
+        pendingWord = null;
+        continue;
+      }
+      const typedForm =
+        rawWord === 's' ? 'S' : rawWord === 'p' ? 'P' : LETTER_RE.test(rawWord) ? rawWord : null;
+      if (typedForm) {
+        atoms.push(applyOctave(typedForm, octave));
+        mod = null;
+        octave = 0;
+        pendingWord = null;
+        continue;
+      }
     }
     const w = normalize(rawWord);
     if (!w) continue;

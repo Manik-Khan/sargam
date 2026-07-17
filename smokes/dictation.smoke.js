@@ -169,4 +169,50 @@ export const smokes = [
       assert.deepEqual(RAGA_SCALES.bhairavi, { re: 'r', ga: 'g', ma: 'm', dha: 'd', ni: 'n' });
     },
   },
+// --- field fixes (M's mic test, 2026-07-16: "sa re ga ma pa" came back
+  // as "sorry I got my fire"; spoken letters arrive lowercase; digits are
+  // what recognizers actually nail).
+  {
+    name: "voice letters: caseless mode maps letters to syllables, raga decides the form",
+    fn() {
+      // spoken "s r g m p" arrives lowercase; case carries no information
+      // in voice, so the raga does the deciding — M's own insight.
+      assert.deepEqual(atoms('s r g m p', { caselessLetters: true }), ['S', 'R', 'G', 'm', 'P']);
+      assert.deepEqual(atoms('s r g m p', { caselessLetters: true, raga: 'bhairavi' }), [
+        'S', 'r', 'g', 'm', 'P',
+      ]);
+      assert.deepEqual(atoms('shuddh r', { caselessLetters: true, raga: 'bhairavi' }), ['R']);
+    },
+  },
+  {
+    name: 'typed letters: lowercase s and p forgive to S and P (no komal form exists)',
+    fn() {
+      assert.deepEqual(atoms('s r g m p'), ['S', 'r', 'g', 'm', 'P'], 'typed r stays komal');
+    },
+  },
+  {
+    name: "numbers: 1-7 and the words map to degrees (recognizers nail digits)",
+    fn() {
+      assert.deepEqual(atoms('1 2 3 4 5 6 7'), ['S', 'R', 'G', 'm', 'P', 'D', 'N']);
+      assert.deepEqual(atoms('one two three four five six seven'), ['S', 'R', 'G', 'm', 'P', 'D', 'N']);
+      assert.deepEqual(atoms('1 2 3', { raga: 'bhairavi' }), ['S', 'r', 'g'], 'raga defaults apply');
+      assert.deepEqual(atoms('low 7 1'), ['.N', 'S'], 'octave words compose with digits');
+      assert.deepEqual(atoms('komal 2'), ['r'], 'modifiers compose with digits');
+    },
+  },
+  {
+    name: "field aliases: M's actual mangling 'sorry I got my fire' recovers sa re ga ma pa",
+    fn() {
+      // Real recognizer output from M's test. 'sorry' expands to TWO
+      // syllables; 'I' is noise and skipped without complaint.
+      const r = spokenToAtoms('sorry I got my fire');
+      assert.deepEqual(r.atoms, ['S', 'R', 'G', 'm', 'P']);
+    },
+  },
+  {
+    name: 'field aliases: spoken letter-names (ess, are, gee, em, pea, dee, en) map through',
+    fn() {
+      assert.deepEqual(atoms('ess are gee em pea dee en'), ['S', 'R', 'G', 'm', 'P', 'D', 'N']);
+    },
+  },
 ];

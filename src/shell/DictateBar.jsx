@@ -24,6 +24,7 @@ export default function DictateBar({ raga, onInsert, onClose }) {
   const [words, setWords] = useState('');
   const [joined, setJoined] = useState(false);
   const [listening, setListening] = useState(false);
+  const [micUsed, setMicUsed] = useState(false); // spoken input has no case
   const [micNote, setMicNote] = useState(null);
   const inputRef = useRef(null);
   const recRef = useRef(null);
@@ -33,7 +34,10 @@ export default function DictateBar({ raga, onInsert, onClose }) {
     return () => recRef.current?.stop?.();
   }, []);
 
-  const { atoms, problems } = useMemo(() => spokenToAtoms(words, { raga }), [words, raga]);
+  const { atoms, problems } = useMemo(
+    () => spokenToAtoms(words, { raga, caselessLetters: micUsed }),
+    [words, raga, micUsed]
+  );
   const out = atomsToText(atoms, { separator: joined ? '' : ' ' });
 
   const toggleMic = () => {
@@ -51,6 +55,7 @@ export default function DictateBar({ raga, onInsert, onClose }) {
     rec.onresult = (e) => {
       let heard = '';
       for (let i = e.resultIndex; i < e.results.length; i++) heard += e.results[i][0].transcript + ' ';
+      setMicUsed(true);
       setWords((w) => (w ? w + ' ' : '') + heard.trim());
     };
     rec.onerror = (e) => {
@@ -70,6 +75,7 @@ export default function DictateBar({ raga, onInsert, onClose }) {
   const insert = () => {
     if (out) onInsert(out);
     setWords('');
+    setMicUsed(false);
   };
 
   return (
@@ -79,7 +85,7 @@ export default function DictateBar({ raga, onInsert, onClose }) {
         ref={inputRef}
         className="dict-input"
         value={words}
-        placeholder="sa ga ma pa · low ni · komal re · shuddh re · high sa"
+        placeholder="sa ga ma pa · 1 2 3 4 · low ni · komal re · high sa"
         onChange={(e) => setWords(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();
