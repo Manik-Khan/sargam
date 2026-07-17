@@ -2,6 +2,10 @@
 
 **What this is:** a complete D&D-session-style handoff for Sargam — M's web app for writing, rendering, and hearing Hindustani classical notation. Written so that *anyone* can pick the project up cold: M working alone, a future AI assistant, a human collaborator. Read this with `docs/design-spec.md` (the requirements authority) and `docs/build-plan.md` (code contracts). If you are an AI assistant: the working rules at the bottom are binding; M is the authority on the tradition — never improvise raga/tala/notation semantics, ask him.
 
+## Vilambit is inside Sargam (the last feature, 2026-07-16)
+
+`public/vilambit.html` — M's practice player (slow-without-pitch-change, Signalsmith Stretch WASM, A-B loop, markers, BPM detection; fully self-contained, zero external URLs) — ships verbatim into `dist/` and renders in the **Vilambit tab** (toolbar, next to Notation). The iframe is **always mounted, hidden with CSS, never unmounted**: the mount check asserts node identity survives tab switches, which is the mechanism guaranteeing **the recording keeps looping while you notate** on the other tab. Sargam's Space play/pause is guarded off while the Vilambit tab is up (the frame has its own keys). To update Vilambit: replace `public/vilambit.html` with a newer export — no other file changes. This is the transcription workflow the docs called "Vilambit and Sargam merged": loop the phrase there, write it here.
+
 ## Where things stand: M1 · M2 · M2.5 · KAN · M3 (Waves A+B+C) ALL SHIPPED
 
 Sargam is a **working instrument**: type notation → see it rendered in the hand's own conventions → press Space and hear it, with tal ticks, loop-a-line practice, click-to-position, kan ornaments that slide, meends that bend, export to PDF, save/autosave, and a Netlify deployment.

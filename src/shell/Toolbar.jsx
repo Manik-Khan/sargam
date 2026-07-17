@@ -19,6 +19,8 @@ export default function Toolbar({
   onToggleNoteNames,
   onDictate,
   onLegend,
+  view,
+  onView,
   onToggleLayout,
   onOpenRecent,
   onRemoveRecent,
@@ -115,6 +117,23 @@ export default function Toolbar({
       <button className="tb-btn" onClick={onLegend} title="What every command means">
         Key
       </button>
+      <span className="tb-tabs" role="tablist" aria-label="Workspace">
+        {[
+          ['notation', 'Notation'],
+          ['vilambit', 'Vilambit'],
+        ].map(([v, label]) => (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={view === v}
+            className={'tb-btn' + (view === v ? ' tb-on' : '')}
+            onClick={() => onView(v)}
+            title={v === 'vilambit' ? 'Loop a recording and notate — audio keeps playing on the other tab' : 'The notation editor'}
+          >
+            {label}
+          </button>
+        ))}
+      </span>
       <span className="tb-file">
         <span
           className={'tb-dot' + (dirty ? ' is-dirty' : '')}

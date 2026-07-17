@@ -600,3 +600,11 @@
 }
 .legend-row span { color: var(--sr-ink); }
 @media print { .legend, .cmdbar { display: none !important; } }
+
+/* ---- Vilambit tab (M, 2026-07-16 — the transcription workflow) ----
+   The iframe is ALWAYS mounted; .app-hidden hides it without unloading,
+   so the recording keeps looping while you notate on the other tab. */
+.app-vilambit { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--sr-paper); }
+.app-hidden { display: none !important; }
+.tb-tabs { display: flex; gap: 2px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--sr-line); }
+@media print { .app-vilambit, .tb-tabs { display: none !important; } }

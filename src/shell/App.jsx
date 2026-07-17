@@ -80,6 +80,11 @@ export default function App() {
   const [noteNames, setNoteNames] = useState(() => store.getPref('noteNames', 'sargam'));
   const [showDictate, setShowDictate] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
+  // 'notation' | 'vilambit' — Vilambit (M's practice player, slow-without-
+  // pitch-change) lives in an ALWAYS-MOUNTED iframe, hidden with CSS when
+  // on the notation tab, never unmounted: the recording keeps looping
+  // while you notate (M, 2026-07-16 — the transcription workflow).
+  const [view, setView] = useState('notation');
   const [cursorPos, setCursorPos] = useState(0);
   const editorRef = useRef(null);
 
@@ -391,7 +396,7 @@ export default function App() {
         doSave();
         return;
       }
-      if (e.key === ' ' && !/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)) {
+      if (e.key === ' ' && view === 'notation' && !/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)) {
         e.preventDefault();
         doPlayPause();
       }
@@ -420,6 +425,8 @@ export default function App() {
         onToggleNoteNames={toggleNoteNames}
         onDictate={() => setShowDictate((v) => !v)}
         onLegend={() => setShowLegend((v) => !v)}
+        view={view}
+        onView={setView}
         onToggleLayout={toggleLayout}
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
@@ -449,7 +456,7 @@ export default function App() {
         onLoopMode={doLoopMode}
         onTrackMute={doTrackMute}
       />
-      {showLegend && <Legend onClose={() => setShowLegend(false)} />}
+      {showLegend && view === 'notation' && <Legend onClose={() => setShowLegend(false)} />}
       {showDictate && (
         <DictateBar
           raga={doc.directives.raga}
@@ -457,7 +464,16 @@ export default function App() {
           onClose={() => setShowDictate(false)}
         />
       )}
-      <div className={'app-panes app-layout-' + layout}>
+      <iframe
+        title="Vilambit — practice player"
+        src="vilambit.html"
+        className={'app-vilambit' + (view === 'vilambit' ? '' : ' app-hidden')}
+      />
+      <div
+        className={
+          'app-panes app-layout-' + layout + (view === 'vilambit' ? ' app-hidden' : '')
+        }
+      >
         <PreviewPane
           doc={doc}
           activeLine={activeLine}
