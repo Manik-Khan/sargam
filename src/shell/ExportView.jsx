@@ -9,12 +9,12 @@
 import React, { useEffect, useRef } from 'react';
 import { renderExport } from '../engine/render.js';
 
-export default function ExportView({ doc, onClose }) {
+export default function ExportView({ doc, noteNames, onClose }) {
   const mount = useRef(null);
 
   useEffect(() => {
-    if (mount.current) mount.current.replaceChildren(renderExport(doc));
-  }, [doc]);
+    if (mount.current) mount.current.replaceChildren(renderExport(doc, { noteNames }));
+  }, [doc, noteNames]);
 
   useEffect(() => {
     const esc = (e) => {

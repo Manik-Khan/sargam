@@ -531,4 +531,66 @@ export const smokes = [
       assert.equal(blocks[1].getAttribute('data-source-line'), '4');
     },
   },
+// --- Western note-name toggle (M, 2026-07-16). Display only: the TEXT
+  // stays sargam always. Same grid, same octave dots, same arcs — only the
+  // letter changes. A reading aid, not a different notation system.
+  {
+    name: 'western names: sa C — S R g m read as C D E-flat F',
+    fn: () => {
+      const { doc } = parseDocument('sa: C\ntal: tintal\n\nS R g m\n');
+      const root = renderDocument(doc, { noteNames: 'western' });
+      const chs = [...root.querySelectorAll('.sr-ch')].map((e) => e.textContent);
+      assert.deepEqual(chs, ['C', 'D', 'E\u266d', 'F']);
+    },
+  },
+  {
+    name: 'western names: sa D — the same komal ga reads F natural',
+    fn: () => {
+      const { doc } = parseDocument('sa: D\ntal: tintal\n\nS g M N\n');
+      const chs = [...renderDocument(doc, { noteNames: 'western' }).querySelectorAll('.sr-ch')].map(
+        (e) => e.textContent
+      );
+      assert.deepEqual(chs, ['D', 'F', 'G\u266f', 'C\u266f']);
+    },
+  },
+  {
+    name: 'western names: default stays sargam — nothing changes unasked',
+    fn: () => {
+      const { doc } = parseDocument('sa: C\ntal: tintal\n\nS R g m\n');
+      const chs = [...renderDocument(doc).querySelectorAll('.sr-ch')].map((e) => e.textContent);
+      assert.deepEqual(chs, ['S', 'R', 'g', 'm']);
+    },
+  },
+  {
+    name: 'western names: octave dots and register tints survive the swap',
+    fn: () => {
+      const { doc } = parseDocument("sa: C\ntal: tintal\n\n.d P N 'S\n");
+      const root = renderDocument(doc, { noteNames: 'western' });
+      const cells = root.querySelectorAll('.sr-cell');
+      assert.ok(cells[0].querySelector('.sr-dot-below'), 'mandra dot kept');
+      assert.ok(cells[0].querySelector('.sr-reg-cool'), 'mandra tint kept');
+      assert.ok(cells[3].querySelector('.sr-dot-above'), 'taar dot kept');
+      assert.equal(cells[0].querySelector('.sr-ch').textContent, 'A\u266d');
+    },
+  },
+  {
+    name: 'western names: rests, sustains and graces are unaffected',
+    fn: () => {
+      const { doc } = parseDocument("sa: C\ntal: tintal\n\nS - . {'S}n\n");
+      const root = renderDocument(doc, { noteNames: 'western' });
+      assert.equal(root.querySelector('.sr-sustain .sr-ch').textContent, '\u2014');
+      assert.equal(root.querySelector('.sr-rest .sr-ch').textContent, '\u00b7');
+      assert.equal(root.querySelector('.sr-grace .sr-ch').textContent, 'C', 'grace spells too');
+    },
+  },
+  {
+    name: 'western names: the export page honors the setting',
+    fn: () => {
+      const { doc } = parseDocument('sa: C\nraga: kirwani\ntal: tintal\n\nS g\n');
+      const chs = [...renderExport(doc, { noteNames: 'western' }).querySelectorAll('.sr-ch')].map(
+        (e) => e.textContent
+      );
+      assert.deepEqual(chs, ['C', 'E\u266d']);
+    },
+  },
 ];

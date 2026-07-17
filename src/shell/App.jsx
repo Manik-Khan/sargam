@@ -9,9 +9,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
+import { documentToMusicXML } from '../engine/western.js';
 import { createPlayer } from './audio.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
+import DictateBar from './DictateBar.jsx';
 import EditorPane from './EditorPane.jsx';
 import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
@@ -73,6 +75,10 @@ export default function App() {
   const [showNew, setShowNew] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [layout, setLayout] = useState(() => store.getPref('layout', 'side'));
+  const [noteNames, setNoteNames] = useState(() => store.getPref('noteNames', 'sargam'));
+  const [showDictate, setShowDictate] = useState(false);
+  const [cursorPos, setCursorPos] = useState(0);
+  const editorRef = useRef(null);
 
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const dirty = text !== lastSaved;
@@ -175,6 +181,19 @@ export default function App() {
 
   // Click in the notation: move the play position (and the working line —
   // loop and landing reports follow the same cursor).
+  // MusicXML: the notation on a Western staff, in any notation program.
+  // Uses the same download shim as the Safari save path.
+  const doExportXML = () => {
+    try {
+      const xml = documentToMusicXML(doc);
+      const base = (fileName || doc.directives.raga || 'sargam').replace(/\.(md|txt)$/i, '');
+      makeEnv().download(`${base}.musicxml`, xml);
+      setNotice(`Exported ${base}.musicxml — opens in MuseScore, Sibelius, Dorico or Finale.`);
+    } catch (err) {
+      setNotice(`MusicXML export failed: ${err && err.message ? err.message : err}`);
+    }
+  };
+
   const doSeek = (sourceLine, matraIndex) => {
     setActiveLine(sourceLine);
     const t = timeFor(schedule, sourceLine, matraIndex);
@@ -273,6 +292,39 @@ export default function App() {
     setNotice(null);
   };
 
+  const toggleNoteNames = () => {
+    const next = noteNames === 'sargam' ? 'western' : 'sargam';
+    setNoteNames(next);
+    store.setPref('noteNames', next);
+  };
+
+  // Dictation inserts at the text cursor — the notation it writes is
+  // ordinary Sargam text, editable by hand like everything else.
+  const doDictateInsert = (snippet) => {
+    const pos = Math.min(cursorPos, text.length);
+    const before = text.slice(0, pos);
+    const after = text.slice(pos);
+    const pad = before && !/\s$/.test(before) ? ' ' : '';
+    const next = before + pad + snippet + after;
+    setText(next);
+    const caret = pos + pad.length + snippet.length;
+    setCursorPos(caret);
+    // Restore the caret after React commits. Guarded: the insert itself
+    // must never depend on rAF existing (nothing here may throw).
+    const restore = () => {
+      const el = editorRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(caret, caret);
+      }
+    };
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+      window.requestAnimationFrame(restore);
+    } else {
+      setTimeout(restore, 0);
+    }
+  };
+
   const toggleLayout = () => {
     const next = layout === 'side' ? 'stacked' : 'side';
     setLayout(next);
@@ -317,7 +369,9 @@ export default function App() {
 
   return (
     <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
-      {showExport && <ExportView doc={doc} onClose={() => setShowExport(false)} />}
+      {showExport && (
+        <ExportView doc={doc} noteNames={noteNames} onClose={() => setShowExport(false)} />
+      )}
       {showNew && <NewDocDialog onCreate={createDoc} onCancel={() => setShowNew(false)} />}
       <Toolbar
         fileName={fileName || doc.directives.title || null}
@@ -328,6 +382,10 @@ export default function App() {
         onOpen={doOpen}
         onSave={doSave}
         onExport={() => setShowExport(true)}
+        onExportXML={doExportXML}
+        noteNames={noteNames}
+        onToggleNoteNames={toggleNoteNames}
+        onDictate={() => setShowDictate((v) => !v)}
         onToggleLayout={toggleLayout}
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
@@ -357,9 +415,28 @@ export default function App() {
         onLoopMode={doLoopMode}
         onTrackMute={doTrackMute}
       />
+      {showDictate && (
+        <DictateBar
+          raga={doc.directives.raga}
+          onInsert={doDictateInsert}
+          onClose={() => setShowDictate(false)}
+        />
+      )}
       <div className={'app-panes app-layout-' + layout}>
-        <PreviewPane doc={doc} activeLine={activeLine} activeCursor={playCursor} onSeek={doSeek} />
-        <EditorPane text={text} onChange={setText} onCursorLine={setActiveLine} />
+        <PreviewPane
+          doc={doc}
+          activeLine={activeLine}
+          activeCursor={playCursor}
+          noteNames={noteNames}
+          onSeek={doSeek}
+        />
+        <EditorPane
+          text={text}
+          onChange={setText}
+          onCursorLine={setActiveLine}
+          onCursorPos={setCursorPos}
+          editorRef={editorRef}
+        />
       </div>
       <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>
         {problems.length === 0 ? (

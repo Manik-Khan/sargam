@@ -6,7 +6,7 @@
 
 import React, { useCallback, useRef } from 'react';
 
-export default function EditorPane({ text, onChange, onCursorLine }) {
+export default function EditorPane({ text, onChange, onCursorLine, onCursorPos, editorRef }) {
   const lastLine = useRef(0);
 
   const report = useCallback(
@@ -15,16 +15,18 @@ export default function EditorPane({ text, onChange, onCursorLine }) {
       const upto = el.value.slice(0, el.selectionStart);
       let line = 1;
       for (let i = 0; i < upto.length; i++) if (upto.charCodeAt(i) === 10) line++;
+      if (onCursorPos) onCursorPos(el.selectionStart);
       if (line !== lastLine.current) {
         lastLine.current = line;
         onCursorLine(line);
       }
     },
-    [onCursorLine]
+    [onCursorLine, onCursorPos]
   );
 
   return (
     <textarea
+      ref={editorRef}
       className="app-editor"
       value={text}
       onChange={(e) => {

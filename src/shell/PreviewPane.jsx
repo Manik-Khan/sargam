@@ -5,14 +5,14 @@
 import React, { useEffect, useRef } from 'react';
 import { renderDocument } from '../engine/render.js';
 
-export default function PreviewPane({ doc, activeLine, activeCursor, onSeek }) {
+export default function PreviewPane({ doc, activeLine, activeCursor, noteNames, onSeek }) {
   const mount = useRef(null);
 
   useEffect(() => {
     if (!mount.current) return;
-    const el = renderDocument(doc, { activeLine, activeCursor });
+    const el = renderDocument(doc, { activeLine, activeCursor, noteNames });
     mount.current.replaceChildren(el);
-  }, [doc, activeLine, activeCursor]);
+  }, [doc, activeLine, activeCursor, noteNames]);
 
   // Click a matra in the notation to put the playhead there (M,
   // 2026-07-16). Delegated, so the per-keystroke re-render stays cheap.

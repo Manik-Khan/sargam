@@ -14,6 +14,7 @@
 // under-arcs from subdivision, landing reports from tala.landing.
 
 import { getTal, wrapMatra, markerAtMatra, landing } from './tala.js';
+import { spellDegree } from './western.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -27,10 +28,28 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  */
 export function renderDocument(doc, opts = {}) {
   const el = h('div', 'sargam-render');
+  // Western note names are a DISPLAY swap only — the text stays sargam.
+  // Same grid, same octave dots, same arcs; only the letter changes.
+  const ctx = {
+    ...opts,
+    noteNames: opts.noteNames === 'western' ? 'western' : 'sargam',
+    sa: doc?.directives?.sa || 'C#',
+  };
   for (let si = 0; si < (doc.sections || []).length; si++) {
-    el.appendChild(renderSection(doc.sections[si], si, opts));
+    el.appendChild(renderSection(doc.sections[si], si, ctx));
   }
   return el;
+}
+
+const ACCIDENTAL = { 2: '\u266f\u266f', 1: '\u266f', 0: '', '-1': '\u266d', '-2': '\u266d\u266d' };
+
+/** The character a note event shows: its sargam letter, or its Western
+ *  name when the reader asked for that. Octave stays in the dots either
+ *  way — the layout is the same page. */
+function chOf(e, ctx) {
+  if (!ctx || ctx.noteNames !== 'western') return e.ch;
+  const p = spellDegree(ctx.sa, e.ch, 0);
+  return p.step + (ACCIDENTAL[String(p.alter)] ?? '');
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +100,7 @@ function metaRow(label, value) {
  * @param {Document} doc  parsed model
  * @returns {HTMLElement} detached export page; the caller mounts and prints it
  */
-export function renderExport(doc) {
+export function renderExport(doc, opts = {}) {
   const dirs = doc.directives || {};
   const has = (k) => k in dirs && String(dirs[k]).trim() !== '';
   const page = h('div', 'sr-export');
@@ -122,7 +141,7 @@ export function renderExport(doc) {
 
   // The notation is the same engine output as the preview — no cursor, so
   // no landing reports; no second typographic implementation to drift.
-  page.appendChild(renderDocument(doc));
+  page.appendChild(renderDocument(doc, opts));
   return page;
 }
 
@@ -207,7 +226,7 @@ function renderLine(line, tal, ctx) {
   }
 
   for (let k = 0; k < line.matras.length; k++) {
-    const cell = renderCell(line, k, tal, prefixOf.get(k), suffixOf.get(k));
+    const cell = renderCell(line, k, tal, prefixOf.get(k), suffixOf.get(k), ctx);
     cell.style.gridRow = '2';
     cell.style.gridColumn = String(colOf[k]);
     row.appendChild(cell);
@@ -332,7 +351,7 @@ function lastStruckNote(line, pr) {
 // One matra → cell
 // ---------------------------------------------------------------------------
 
-function renderCell(line, k, tal, prefix, suffix) {
+function renderCell(line, k, tal, prefix, suffix, ctx) {
   const matra = line.matras[k];
   const evs = matra.events;
   const allSustain = evs.every((e) => e.type === 'sustain');
@@ -349,7 +368,7 @@ function renderCell(line, k, tal, prefix, suffix) {
   // Glyphs.
   const glyphs = h('div', 'sr-glyphs');
   if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph', prefix));
-  for (const e of evs) glyphs.appendChild(renderEvent(e));
+  for (const e of evs) glyphs.appendChild(renderEvent(e, ctx));
   if (suffix) glyphs.appendChild(h('span', 'sr-phrase-glyph', suffix));
   cell.appendChild(glyphs);
 
@@ -372,7 +391,7 @@ function renderCell(line, k, tal, prefix, suffix) {
 // a plain madhya note sat lower than a mandra or subdivided neighbour and
 // dragged its marker down with it (M, 2026-07-16). Reserved lanes make
 // every cell the same height, so glyphs and markers line up across a row.
-function renderEvent(e) {
+function renderEvent(e, ctx) {
   const isNote = e.type === 'note';
   const o = isNote ? e.octave || 0 : 0;
   const reg = o < 0 ? ' sr-reg-cool' : o > 0 ? ' sr-reg-warm' : '';
@@ -388,7 +407,9 @@ function renderEvent(e) {
   for (let i = 0; i < Math.max(0, o); i++) above.appendChild(h('span', 'sr-dot sr-dot-above', '•'));
   ev.appendChild(above);
 
-  ev.appendChild(h('span', 'sr-ch', e.type === 'rest' ? '·' : e.type === 'sustain' ? '—' : e.ch));
+  ev.appendChild(
+    h('span', 'sr-ch', e.type === 'rest' ? '·' : e.type === 'sustain' ? '—' : chOf(e, ctx))
+  );
 
   const below = h('span', 'sr-dots sr-dots-below');
   for (let i = 0; i < Math.max(0, -o); i++) below.appendChild(h('span', 'sr-dot sr-dot-below', '•'));

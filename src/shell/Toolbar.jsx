@@ -14,6 +14,10 @@ export default function Toolbar({
   onOpen,
   onSave,
   onExport,
+  onExportXML,
+  noteNames,
+  onToggleNoteNames,
+  onDictate,
   onToggleLayout,
   onOpenRecent,
   onRemoveRecent,
@@ -82,6 +86,9 @@ export default function Toolbar({
         )}
       </span>
       <button className="tb-btn" onClick={onExport}>Export</button>
+      <button className="tb-btn" onClick={onExportXML} title="MusicXML — opens in MuseScore, Sibelius, Dorico, Finale">
+        Staff ↗
+      </button>
       <button
         className="tb-btn tb-icon"
         onClick={onToggleLayout}
@@ -93,6 +100,16 @@ export default function Toolbar({
         title={layout === 'stacked' ? 'Notation on top' : 'Side by side'}
       >
         {layout === 'stacked' ? '\u2B13' : '\u25EB'}
+      </button>
+      <button
+        className={'tb-btn' + (noteNames === 'western' ? ' tb-on' : '')}
+        onClick={onToggleNoteNames}
+        title={noteNames === 'western' ? 'Showing C D E — click for sargam' : 'Showing S R G — click for C D E'}
+      >
+        {noteNames === 'western' ? 'CDE' : 'SRG'}
+      </button>
+      <button className="tb-btn" onClick={onDictate} title="Type or say sargam syllables">
+        Dictate
       </button>
       <span className="tb-file">
         <span

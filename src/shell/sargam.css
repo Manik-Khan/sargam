@@ -528,3 +528,33 @@
 /* click-to-position affordance (preview only — never the export page) */
 .app-preview .sr-cell { cursor: pointer; }
 .app-preview .sr-cell:hover { background: #f6f1e4; border-radius: 6px; }
+
+/* ---- note-name toggle + dictation bar (M, 2026-07-16) ---- */
+.tb-btn.tb-on { background: var(--sr-ink); border-color: var(--sr-ink); color: var(--sr-paper-raised); }
+.dict {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+  background: var(--sr-paper-raised);
+  border-bottom: 1px solid var(--sr-line);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.dict-label { font-size: 11.5px; color: var(--sr-ink-soft); }
+.dict-input {
+  flex: 1; min-width: 220px; font: inherit; font-size: 13px; padding: 4px 8px;
+  border: 1px solid var(--sr-line); border-radius: 6px;
+  background: var(--sr-paper); color: var(--sr-ink);
+}
+.dict-input::placeholder { color: var(--sr-dim); }
+.dict-mic.on { background: var(--sr-warm); border-color: var(--sr-warm); color: #fff; }
+.dict-arrow { color: var(--sr-dim); }
+.dict-out {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px; color: var(--sr-accent);
+  min-width: 90px; padding: 3px 8px;
+  background: var(--sr-paper); border: 1px dashed var(--sr-line); border-radius: 6px;
+}
+.dict-primary { background: var(--sr-ink); border-color: var(--sr-ink); color: var(--sr-paper-raised); }
+.dict-primary:disabled { opacity: 0.4; cursor: default; }
+.dict-problem { flex-basis: 100%; font-size: 11.5px; color: var(--sr-accent); }
+@media print { .dict { display: none !important; } }
