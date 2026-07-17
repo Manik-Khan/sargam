@@ -70,3 +70,10 @@ export function openViaInput() {
     input.click();
   });
 }
+
+/** Audio env for createPlayer: the real AudioContext, lazily. */
+export function makeAudioEnv() {
+  return {
+    createContext: () => new (window.AudioContext || window.webkitAudioContext)(),
+  };
+}

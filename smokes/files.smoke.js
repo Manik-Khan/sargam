@@ -2,7 +2,7 @@
 // Engine rule: files.js is plain JS, no React, no DOM. Browser surfaces are injected,
 // so every smoke here runs in bare node with mocks.
 import assert from 'node:assert/strict';
-import { ensureIdentity, createStore, createFileIO, newDocumentText } from '../src/engine/files.js';
+import { ensureIdentity, createStore, createFileIO, newDocumentText, setDirective } from '../src/engine/files.js';
 import { parseDocument } from '../src/engine/parse.js';
 
 // ---------- fixtures ----------
@@ -456,6 +456,48 @@ export const smokes = [
       storage.setItem('sargam.pref.layout', '{oops');
       const store = createStore(storage, CLOCK);
       assert.equal(store.getPref('layout', 'side'), 'side');
+    },
+  },
+// --- setDirective (M3 Wave B): the transport's BPM knob writes tempo:
+  // surgically — text is the source of truth, so the knob edits the text.
+  {
+    name: 'setDirective: replaces an existing value, body byte-identical',
+    fn() {
+      const src = 'title: X\ntempo: 60\n\nS R g m\n';
+      const { text, changed } = setDirective(src, 'tempo', '84');
+      assert.equal(changed, true);
+      assert.equal(text, 'title: X\ntempo: 84\n\nS R g m\n');
+    },
+  },
+  {
+    name: 'setDirective: inserts when absent, at the end of the header',
+    fn() {
+      const { text } = setDirective('title: X\n\nS R g m\n', 'tempo', '72');
+      assert.equal(text, 'title: X\ntempo: 72\n\nS R g m\n');
+    },
+  },
+  {
+    name: 'setDirective: works inside frontmatter fences',
+    fn() {
+      const src = '---\nraga: kirwani\n---\n\nS R\n';
+      const { text } = setDirective(src, 'tempo', '96');
+      assert.equal(text, '---\nraga: kirwani\ntempo: 96\n---\n\nS R\n');
+    },
+  },
+  {
+    name: 'setDirective: same value is a no-op (changed false, byte-identical)',
+    fn() {
+      const src = 'tempo: 60\n\nS R\n';
+      const r = setDirective(src, 'tempo', '60');
+      assert.equal(r.changed, false);
+      assert.equal(r.text, src);
+    },
+  },
+  {
+    name: 'setDirective: headerless document gains a header',
+    fn() {
+      const { text } = setDirective('S R g m\n', 'tempo', '72');
+      assert.equal(text, 'tempo: 72\n\nS R g m\n');
     },
   },
 ];

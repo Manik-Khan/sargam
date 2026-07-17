@@ -75,7 +75,8 @@ A composition file is plain text: **directives**, **section labels**, **music li
 - `title:`, `raga:` — optional metadata.
 - `sa:` — playback pitch of Sa. Default `C#`. *(Amended 2026-07-16: accepts an optional octave — `C`, `C#`, `A3`, `Bb2`; a bare letter sits at octave 3, landing the anchors where the instruments live (M): sarod `C` → C3 ≈ 131 Hz, sitar `D` → D3, vocal classes `A` → A3 = 220 Hz — A3 chosen in M's classes to sit between male and female ranges. The default remains C# pending M's ruling on changing it.)*
 - `tempo:` — bpm per matra. Default `60`. *(The app's only bpm value. The M2.5 new-document form labels its field "BPM" and writes this key — there is no separate `bpm:` directive.)*
-- `laya:` — *(settled 2026-07-16, M)*. Values: `vilambit`, `madhya`, `drut` — the tempo class. **`laya:` never prefills or derives `tempo:`, and vice versa. They are independent by design:** a composition may have been *taught* at a specific bpm, and that fact is provenance worth recording on its own — not something to reconstruct from a laya class.
+- `laya:` — *(revised by M, 2026-07-16 evening)*. **The tradition's word for speed — the full spectrum, not a number.** Proposed ladder pending M's confirmation/edit: `ati vilambit` · `vilambit` · `madhya vilambit` · `madhya` · `madhya drut` · `drut` · `ati drut` — the middle rungs are Claude's inference from M's "includes medium fast, etc." and await M's exact wording. Free text is always legal. `laya:` and `tempo:` remain independent — no prefilling either way.
+- *(Division of labor, M's ruling: `laya:` carries the tradition's speed word; `tempo:` carries the literal playback number. The transport's BPM field reads and WRITES `tempo:` — editing the knob edits the text, because text is the source of truth.)*
 - `composition:` — *(settled 2026-07-16, M)*. Values: `vocal`, `instrumental`.
 - `type:` — **reserved, not yet shipped** *(named 2026-07-16, M)*. A distinct axis from `composition:`: what the *document* is — a composition, an alap, a transcription. `composition:` says how it is played; `type:` says what it is. Values and form inclusion pending M.
 
@@ -206,7 +207,7 @@ Tracks, independently toggleable with per-track gain:
 
 Ornament playback per the performance corollary: meend = a genuine pitch glide shaped between the connected notes (frequency ramp with a curve, not a linear zip); krintan = its notes in rhythm in v1, with articulated realization (attack shaping) as an early follow-up — it should *sound like something*, even if the something is an interpretation. Free sections: melody only, nominal pace. Ornament sound quality is an evolving track of work, judged by M's ear, never by "good enough for verification."
 
-Transport: play/pause/stop; tempo control; **loop a selected line or section** (the practice case); play-from-cursor.
+Transport *(shipped 2026-07-16; mock approved with one redline)*: play/pause (Space)/stop; position/duration; **BPM field = the `tempo:` directive** (edits write the text surgically via `setDirective`; a doc with no `tempo:` gains one on first edit); loop off/line/section scoped to the text cursor's line; melody/tick mutes; live cursor highlight driven by the same event list as the sound. Free sections tick-silent.
 
 ## 7. Files, persistence, errors
 

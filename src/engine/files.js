@@ -101,6 +101,41 @@ export function ensureIdentity(text, clock) {
   return { text: out.join('\n'), changed, id };
 }
 
+
+/**
+ * Surgically set one header directive — replace in place if present,
+ * append at the end of the header (inside frontmatter fences when the
+ * document uses them) if absent. Body stays byte-identical. Built for the
+ * transport's BPM knob (M, 2026-07-16: `tempo:` IS the playback speed;
+ * `laya:` carries the tradition's word) — but generic over any key.
+ *
+ * @returns {{text: string, changed: boolean}}
+ */
+export function setDirective(text, key, value) {
+  const lines = text.split('\n');
+  const header = findHeader(lines);
+  const want = `${key}: ${value}`;
+
+  for (let i = header.start; i < header.end; i++) {
+    const m = lines[i].match(DIRECTIVE_RE);
+    if (m && m[1] === key) {
+      if (lines[i] === want) return { text, changed: false };
+      const out = lines.slice();
+      out[i] = want;
+      return { text: out.join('\n'), changed: true };
+    }
+  }
+
+  const out = lines.slice();
+  if (header.kind === 'unfenced' && header.end === 0) {
+    const sep = out.length > 0 && out[0] !== '' ? [''] : [];
+    out.splice(0, 0, want, ...sep);
+  } else {
+    out.splice(header.end, 0, want);
+  }
+  return { text: out.join('\n'), changed: true };
+}
+
 // ---------------------------------------------------------------------------
 // Store — autosave slot, recents, per-id snapshots
 // ---------------------------------------------------------------------------

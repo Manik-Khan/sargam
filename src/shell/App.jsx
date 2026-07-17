@@ -7,8 +7,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
-import { ensureIdentity, createStore, createFileIO } from '../engine/files.js';
-import { makeClock, makeEnv, openViaInput } from './platform.js';
+import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
+import { scheduleDocument } from '../engine/schedule.js';
+import { createPlayer } from './audio.js';
+import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
+import Transport from './Transport.jsx';
 import EditorPane from './EditorPane.jsx';
 import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
@@ -73,6 +76,107 @@ export default function App() {
 
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const dirty = text !== lastSaved;
+
+  // ---- playback (M3) ----
+  const player = useMemo(() => createPlayer(makeAudioEnv()), []);
+  const schedule = useMemo(() => scheduleDocument(doc), [doc]);
+  const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [playCursor, setPlayCursor] = useState(null);
+  const [loopMode, setLoopMode] = useState('off');
+  const [mutes, setMutes] = useState({ melody: false, tick: false });
+  const bpm = Number(doc.directives.tempo) || 60;
+
+  useEffect(() => {
+    // Text edits reshape time; stop rather than play a stale schedule.
+    player.load(schedule);
+    setPlaying(false);
+    setPlayCursor(null);
+    setPosition(0);
+  }, [schedule, player]);
+
+  useEffect(() => {
+    player.onCursor((ev) =>
+      setPlayCursor({ sectionIndex: ev.sectionIndex, lineIndex: ev.lineIndex, matraIndex: ev.matraIndex })
+    );
+    player.onEnded(() => {
+      setPlaying(false);
+      setPlayCursor(null);
+    });
+  }, [player]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => setPosition(player.position), 200);
+    return () => clearInterval(id);
+  }, [playing, player]);
+
+  // The loop range and start point come from the text cursor's line — the
+  // same machinery the landing report rides.
+  const rangeFor = (mode) => {
+    const starts = schedule.lineStarts;
+    if (starts.length === 0) return null;
+    let idx = starts.findIndex((l) => l.sourceLine === activeLine);
+    if (idx === -1) {
+      idx = 0;
+      for (let i = 0; i < starts.length; i++) if (starts[i].sourceLine <= activeLine) idx = i;
+    }
+    const cur = starts[idx];
+    if (mode === 'line') {
+      const next = starts[idx + 1];
+      return { from: cur.t, to: next ? next.t : schedule.duration };
+    }
+    if (mode === 'section') {
+      let a = idx;
+      while (a > 0 && starts[a - 1].sectionIndex === cur.sectionIndex) a--;
+      let b = idx;
+      while (b + 1 < starts.length && starts[b + 1].sectionIndex === cur.sectionIndex) b++;
+      const next = starts[b + 1];
+      return { from: starts[a].t, to: next ? next.t : schedule.duration };
+    }
+    return null;
+  };
+
+  const doPlayPause = () => {
+    if (playing) {
+      player.pause();
+      setPlaying(false);
+      setPosition(player.position);
+      return;
+    }
+    const range = loopMode === 'off' ? null : rangeFor(loopMode);
+    player.setLoop(range);
+    const from =
+      position > 0 && (!range || (position >= range.from && position < range.to))
+        ? position
+        : range
+          ? range.from
+          : (rangeFor('line')?.from ?? 0);
+    if (player.play({ from })) setPlaying(true);
+  };
+
+  const doStop = () => {
+    player.stop();
+    setPlaying(false);
+    setPlayCursor(null);
+    setPosition(0);
+  };
+
+  const doBpm = (v) => {
+    // The knob writes the directive — text is the source of truth (M).
+    const r = setDirective(text, 'tempo', String(v));
+    if (r.changed) setText(r.text);
+  };
+
+  const doLoopMode = (m) => {
+    setLoopMode(m);
+    if (playing) player.setLoop(m === 'off' ? null : rangeFor(m));
+  };
+
+  const doTrackMute = (track, v) => {
+    setMutes((prev) => ({ ...prev, [track]: v }));
+    player.setMuted(track, v);
+  };
 
   // Debounced autosave: raw text only, never mutated (M2 decision).
   const autosaveTimer = useRef(null);
@@ -180,12 +284,17 @@ export default function App() {
     setRecents(store.listRecents());
   };
 
-  // Cmd+S / Ctrl+S.
+  // Cmd+S / Ctrl+S; Space = play/pause when not typing in a field.
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         doSave();
+        return;
+      }
+      if (e.key === ' ' && !/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)) {
+        e.preventDefault();
+        doPlayPause();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -221,8 +330,21 @@ export default function App() {
           </button>
         </div>
       )}
+      <Transport
+        playing={playing}
+        position={position}
+        duration={schedule.duration}
+        bpm={bpm}
+        loopMode={loopMode}
+        tracks={mutes}
+        onPlayPause={doPlayPause}
+        onStop={doStop}
+        onBpm={doBpm}
+        onLoopMode={doLoopMode}
+        onTrackMute={doTrackMute}
+      />
       <div className={'app-panes app-layout-' + layout}>
-        <PreviewPane doc={doc} activeLine={activeLine} />
+        <PreviewPane doc={doc} activeLine={activeLine} activeCursor={playCursor} />
         <EditorPane text={text} onChange={setText} onCursorLine={setActiveLine} />
       </div>
       <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>
