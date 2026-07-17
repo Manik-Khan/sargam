@@ -985,10 +985,27 @@ function applyLoopToEngine(){
 /* ---------------- position abstraction ---------------- */
 function pos(){
   if (state.engine === 'buffer') return state.playing ? (stretch.inputTime || 0) : state.posPaused;
+  // Engine still unchosen (before first play): posPaused is authoritative.
+  // media.currentTime can lag or stay 0 if the element hasn't finished
+  // loading, which would snap the playhead back to the start after a seek.
+  if (state.engine === 'none') return state.posPaused || media.currentTime || 0;
   return media.currentTime || 0;
 }
 function seekTo(t){
   t = Math.min(state.duration, Math.max(0, t));
+  // The engine isn't chosen until buildGraph() runs on the first play, so
+  // until then `state.engine` is 'none' and we cannot know which position
+  // store will be read: the buffer engine reads state.posPaused, the media
+  // engines read media.currentTime. Writing only one meant a seek made
+  // BEFORE the first play was silently discarded — the buffer engine then
+  // started from 0 (or nowhere), which looked like "it won't play until
+  // you refresh and press play first". Write both; they reconcile when the
+  // engine is chosen. (M, 2026-07-16)
+  if (state.engine === 'none'){
+    state.posPaused = t;
+    try { media.currentTime = t; } catch (e) { /* metadata not in yet — posPaused carries it */ }
+    return;
+  }
   if (state.engine === 'buffer'){
     state.posPaused = t;
     if (stretch){ lastEff = effRateAt(t); stretch.schedule({ input: t, rate: lastEff, semitones: totalSemis(), active: state.playing }); }
@@ -999,8 +1016,19 @@ function seekTo(t){
 
 async function togglePlay(){
   if (!state.fileURL) return;
+  const first = !actx; // buildGraph() chooses the engine on the first play
   await buildGraph();
   if (actx.state === 'suspended') await actx.resume();
+  // The engine has just been chosen; a seek made before now was written to
+  // BOTH stores (see seekTo), so hand the media element the position the
+  // buffer store carries — and vice versa — rather than starting from 0.
+  if (first){
+    if (state.engine === 'buffer'){
+      if (!state.posPaused && media.currentTime) state.posPaused = media.currentTime;
+    } else if (state.posPaused && !media.currentTime){
+      try { media.currentTime = state.posPaused; } catch (e) { /* not seekable yet */ }
+    }
+  }
   if (state.engine === 'buffer'){
     if (state.playing){
       state.posPaused = stretch.inputTime || state.posPaused;
