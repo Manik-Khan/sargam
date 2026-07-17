@@ -242,7 +242,22 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
 
   let i = 0;
   const n = body.length;
+  // Watchdog. Every branch below must advance `i`; one that didn't froze
+  // the browser hard (M, 2026-07-16) because parse runs on every keystroke.
+  // This converts any future non-advancing branch into a narrated problem
+  // instead of a hang: the engine's contract is that it never throws, and
+  // a frozen page is worse than either. The bound is generous — the scanner
+  // consumes at least one character per iteration when healthy.
+  let guard = n * 4 + 64;
   while (i < n) {
+    if (--guard < 0) {
+      problems.push({
+        line: lineNo,
+        col: null,
+        msg: 'internal: the parser stopped making progress on this line and gave up — please report it',
+      });
+      break;
+    }
     const c = body[i];
 
     if (c === ' ' || c === '\t' || c === '/') {
@@ -360,6 +375,23 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
     // Plain token: run of non-structural chars.
     let j = i;
     while (j < n && !' \t/|[]()'.includes(body[j])) j++;
+    if (j === i) {
+      // A structural character reached the token reader without any branch
+      // above consuming it — a stray ']' or ')'. Narrate it and step over.
+      //
+      // Before 2026-07-16 this produced an empty token and then `i = j`
+      // reassigned `i` to itself: an infinite loop on a single character,
+      // which froze the browser on every keystroke. Typing `[[DP]]` passes
+      // through `[[DP]`, which leaves exactly this stray, so the app died
+      // mid-word and could only be recovered by reloading the page. (M)
+      problems.push({
+        line: lineNo,
+        col: i + 1,
+        msg: `unexpected '${body[i]}' — no matching opener`,
+      });
+      i++;
+      continue;
+    }
     const tok = body.slice(i, j);
     parseToken(tok, i, clusterCtx);
     i = j;

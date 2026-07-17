@@ -608,6 +608,57 @@ export const smokes = [
   // --- ~ never affects rhythm (spec principle 4). M, 2026-07-16: `~[m - g]`
   // was emitting a phantom EMPTY matra and silently dropping the meend,
   // shifting every matra after it and cascading into vibhag errors.
+  // --- the scanner must ALWAYS advance (M, 2026-07-16: the app froze hard
+  // and needed a page reload whenever a bracket was typed). `]` sits in the
+  // token reader's terminator set but no branch consumed it, so the token
+  // came back empty and `i` was reassigned to itself — an infinite loop on
+  // one character. Typing `[[DP]]` passes through `[[DP]`, which leaves
+  // exactly that stray `]`, so the freeze hit mid-word on every keystroke.
+  {
+    name: 'hang: a stray ] narrates instead of looping forever',
+    fn: () => {
+      const { problems } = parseDocument('tal: tintal\n\nDP]]\n');
+      assert.ok(problems.length > 0, 'must narrate');
+      assert.ok(problems.some((p) => /unexpected/.test(p.msg)), JSON.stringify(problems));
+    },
+  },
+  {
+    name: 'hang: a stray ) narrates instead of looping forever',
+    fn: () => {
+      const { problems } = parseDocument('tal: tintal\n\nS R)\n');
+      assert.ok(problems.length > 0, 'must narrate');
+    },
+  },
+  {
+    name: 'hang: every prefix of a krintan line parses (typing it, keystroke by keystroke)',
+    fn: () => {
+      const full = '@7 ||: S mg | g [[dP/mg/RS]] - | (SR gm P)x3 :||';
+      for (let k = 1; k <= full.length; k++) {
+        const partial = full.slice(0, k);
+        const { doc, problems } = parseDocument(`tal: tintal\n\n${partial}\n`);
+        assert.ok(doc, `prefix ${k} returned no doc: ${JSON.stringify(partial)}`);
+        assert.ok(Array.isArray(problems), `prefix ${k}: ${JSON.stringify(partial)}`);
+      }
+    },
+  },
+  {
+    name: "hang: every prefix of M's Bageshri gat line parses",
+    fn: () => {
+      const full = "| S - - | m - | g [[DP]] | g - m | D - | - - | m~ g | 'Sn 'Sn";
+      for (let k = 1; k <= full.length; k++) {
+        const { doc } = parseDocument(`tal: rupak\n\n${full.slice(0, k)}\n`);
+        assert.ok(doc, `prefix ${k}`);
+      }
+    },
+  },
+  {
+    name: 'hang: the scanner watchdog never fires on the Appendix A corpus',
+    fn: () => {
+      const { problems } = parseDocument(APPENDIX_A);
+      assert.ok(!problems.some((p) => /failed to advance/.test(p.msg)), JSON.stringify(problems));
+      assert.deepEqual(problems, []);
+    },
+  },
   {
     name: 'tilde: ~[m - g] adds no phantom matra and keeps the uneven split',
     fn: () => {
