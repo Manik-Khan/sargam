@@ -14,6 +14,8 @@ import { createPlayer } from './audio.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
+import CommandBar from './CommandBar.jsx';
+import Legend from './Legend.jsx';
 import EditorPane from './EditorPane.jsx';
 import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
@@ -77,6 +79,7 @@ export default function App() {
   const [layout, setLayout] = useState(() => store.getPref('layout', 'side'));
   const [noteNames, setNoteNames] = useState(() => store.getPref('noteNames', 'sargam'));
   const [showDictate, setShowDictate] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
   const [cursorPos, setCursorPos] = useState(0);
   const editorRef = useRef(null);
 
@@ -333,6 +336,28 @@ export default function App() {
     }
   };
 
+  // Selection command: transform the editor's live selection through a
+  // pure engine function (commands.js), keep the result selected so
+  // commands stack (slide, then octave up, then repeat...).
+  const doCommand = (fn) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const a = el.selectionStart ?? 0;
+    const b = el.selectionEnd ?? a;
+    const replaced = fn(text.slice(a, b));
+    setText(text.slice(0, a) + replaced + text.slice(b));
+    const restore = () => {
+      if (!editorRef.current) return;
+      editorRef.current.focus();
+      editorRef.current.setSelectionRange(a, a + replaced.length);
+    };
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+      window.requestAnimationFrame(restore);
+    } else {
+      setTimeout(restore, 0);
+    }
+  };
+
   const toggleLayout = () => {
     const next = layout === 'side' ? 'stacked' : 'side';
     setLayout(next);
@@ -394,6 +419,7 @@ export default function App() {
         noteNames={noteNames}
         onToggleNoteNames={toggleNoteNames}
         onDictate={() => setShowDictate((v) => !v)}
+        onLegend={() => setShowLegend((v) => !v)}
         onToggleLayout={toggleLayout}
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
@@ -423,6 +449,7 @@ export default function App() {
         onLoopMode={doLoopMode}
         onTrackMute={doTrackMute}
       />
+      {showLegend && <Legend onClose={() => setShowLegend(false)} />}
       {showDictate && (
         <DictateBar
           raga={doc.directives.raga}
@@ -438,13 +465,16 @@ export default function App() {
           noteNames={noteNames}
           onSeek={doSeek}
         />
-        <EditorPane
-          text={text}
-          onChange={setText}
-          onCursorLine={setActiveLine}
-          onCursorPos={setCursorPos}
-          editorRef={editorRef}
-        />
+        <div className="app-editor-col">
+          <CommandBar onApply={doCommand} />
+          <EditorPane
+            text={text}
+            onChange={setText}
+            onCursorLine={setActiveLine}
+            onCursorPos={setCursorPos}
+            editorRef={editorRef}
+          />
+        </div>
       </div>
       <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>
         {problems.length === 0 ? (

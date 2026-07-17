@@ -565,3 +565,38 @@
    invisibly — even with no JS, even below the minimum scale. */
 .sr-line-block { overflow-x: auto; max-width: 100%; }
 .app-preview { overflow-x: hidden; }
+
+/* ---- M4: command bar + legend (M, 2026-07-16) ---- */
+.app-editor-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.app-editor-col .app-editor { flex: 1; min-height: 0; }
+.cmdbar {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  padding: 5px 8px;
+  background: var(--sr-paper-raised);
+  border-bottom: 1px solid var(--sr-line);
+}
+.cmd-btn {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; padding: 3px 8px;
+  border: 1px solid var(--sr-line); border-radius: 6px;
+  background: transparent; color: var(--sr-ink); cursor: pointer;
+  white-space: nowrap;
+}
+.cmd-btn:hover { background: var(--sr-paper); }
+.legend {
+  background: var(--sr-paper-raised);
+  border-bottom: 1px solid var(--sr-line);
+  padding: 10px 16px 14px;
+  max-height: 45vh; overflow-y: auto;
+}
+.legend-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
+.legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px 22px; }
+.legend-sec h4 { margin: 0 0 5px; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--sr-ink-soft); }
+.legend-row { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; font-size: 12.5px; }
+.legend-row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--sr-accent);
+  min-width: 96px; flex: none;
+}
+.legend-row span { color: var(--sr-ink); }
+@media print { .legend, .cmdbar { display: none !important; } }

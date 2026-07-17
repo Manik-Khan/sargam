@@ -18,6 +18,7 @@ export default function Toolbar({
   noteNames,
   onToggleNoteNames,
   onDictate,
+  onLegend,
   onToggleLayout,
   onOpenRecent,
   onRemoveRecent,
@@ -110,6 +111,9 @@ export default function Toolbar({
       </button>
       <button className="tb-btn" onClick={onDictate} title="Type or say sargam syllables">
         Dictate
+      </button>
+      <button className="tb-btn" onClick={onLegend} title="What every command means">
+        Key
       </button>
       <span className="tb-file">
         <span
