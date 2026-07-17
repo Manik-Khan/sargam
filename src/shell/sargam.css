@@ -72,24 +72,42 @@
 
 .sr-glyphs {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;   /* every event is now the same height (reserved
+                              lanes), so bottoms align exactly. `baseline`
+                              can't work here: a column-flex event takes its
+                              baseline from its first child, which is a dots
+                              lane whose height depends on the octave. */
   font-size: 21px;
   line-height: 1.15;
   white-space: nowrap;
 }
 
-.sr-underarc { display: block; width: 100%; height: 8px; margin-top: 1px; }
+/* Reserved in EVERY cell (empty slot when the matra isn't subdivided) so
+   all cells are the same height — cells bottom-align, so an optional lane
+   dropped plain matras and their markers below their neighbours'. */
+.sr-arc-lane { display: block; width: 100%; height: 8px; margin-top: 1px; }
 .sr-underarc path { stroke: var(--sr-ink); stroke-width: 1.1; }
 
 /* events */
 .sr-ev { display: inline-flex; flex-direction: column; align-items: center; }
 .sr-ch { display: block; }
-.sr-dots { display: flex; flex-direction: column; align-items: center; line-height: 0.45; }
+/* Both lanes are always present, empty or not, and reserve room for two
+   dots — the octave must not change an event's height (spec §4: the dots
+   are load-bearing; alignment can't depend on whether they're used). */
+.sr-dots {
+  display: flex; flex-direction: column; align-items: center;
+  line-height: 0.45;
+  min-height: 8px;
+}
+.sr-dots-above { justify-content: flex-end; }  /* dot hugs the character */
+.sr-dots-below { justify-content: flex-start; }
 .sr-dot { font-size: 9px; }
 .sr-reg-cool { color: var(--sr-cool); }
 .sr-reg-warm { color: var(--sr-warm); }
 .sr-dim, .sr-cell.sr-dim .sr-glyphs { color: var(--sr-dim); }
-.sr-rest { font-size: 0.9em; }
+/* NOTE: `.sr-rest { font-size: .9em }` was removed 2026-07-16 — a smaller
+   font made the rest's event box shorter, which is exactly the unevenness
+   this wave removes. Rests stay subtle through sr-dim. */
 
 /* barlines, repeats, phrase glyphs */
 .sr-bar {
@@ -426,6 +444,16 @@
 .sr-exp-title {
   font-size: 14px; color: var(--sr-ink-soft); margin: 6px 0 0; font-style: italic;
 }
+/* provenance: composer, year, and anything else M invents — under the
+   title, inline (M's pick, 2026-07-16) */
+.sr-exp-prov { margin: 11px 0 0; font-size: 12.5px; color: var(--sr-ink); }
+.sr-exp-prov-item + .sr-exp-prov-item::before {
+  content: '·';
+  color: var(--sr-dim);
+  margin: 0 9px;
+}
+.sr-exp-prov-label { color: var(--sr-ink-soft); margin-right: 5px; }
+
 .sr-exp-meta { text-align: right; font-size: 12.5px; line-height: 1.9; flex: none; }
 .sr-exp-meta-label { color: var(--sr-ink-soft); margin-right: 7px; }
 .sr-exp-meta-value { color: var(--sr-ink); }

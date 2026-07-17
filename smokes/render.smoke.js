@@ -357,4 +357,114 @@ export const smokes = [
       assert.equal(root.querySelectorAll('.sr-section').length, 0);
     },
   },
+
+  // --- uniform lane structure = uniform cell height = aligned rows.
+  // The misalignment M reported (2026-07-16: plain notes and their markers
+  // sitting lower than subdivided/mandra neighbours) came from OPTIONAL
+  // lanes making cells different heights under bottom alignment. jsdom
+  // can't measure pixels, but it can hold the structural invariant the fix
+  // rests on: every cell and every event carries identical lanes.
+  {
+    name: 'align: every matra cell has exactly three lanes (marker, glyphs, arc)',
+    fn: () => {
+      const cells = renderCorpus().querySelectorAll('.sr-cell');
+      assert.ok(cells.length > 20);
+      for (const c of cells) {
+        assert.equal(c.children.length, 3, 'cell lanes: ' + c.textContent);
+        assert.ok(c.children[0].classList.contains('sr-marker'));
+        assert.ok(c.children[1].classList.contains('sr-glyphs'));
+        assert.ok(c.children[2].classList.contains('sr-arc-lane'));
+      }
+    },
+  },
+  {
+    name: 'align: every event has exactly three lanes (dots, char, dots)',
+    fn: () => {
+      const evs = renderCorpus().querySelectorAll('.sr-ev');
+      assert.ok(evs.length > 20);
+      for (const ev of evs) {
+        assert.equal(ev.children.length, 3, 'event lanes: ' + ev.textContent);
+        assert.ok(ev.children[0].classList.contains('sr-dots-above'));
+        assert.ok(ev.children[1].classList.contains('sr-ch'));
+        assert.ok(ev.children[2].classList.contains('sr-dots-below'));
+      }
+    },
+  },
+  {
+    name: 'align: rests and sustains share the note lane structure',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\n.d - . P\n');
+      const root = renderDocument(doc);
+      const sustain = root.querySelector('.sr-sustain');
+      const rest = root.querySelector('.sr-rest');
+      assert.ok(sustain && rest);
+      assert.equal(sustain.children.length, 3);
+      assert.equal(rest.children.length, 3);
+      assert.equal(sustain.querySelector('.sr-ch').textContent, '—');
+      assert.equal(rest.querySelector('.sr-ch').textContent, '·');
+    },
+  },
+  {
+    name: 'align: plain matra reserves the arc lane but draws no arc',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nS mg R P\n');
+      const cells = renderDocument(doc).querySelectorAll('.sr-cell');
+      assert.ok(cells[1].querySelector('.sr-underarc'), 'subdivided mg draws the arc');
+      assert.equal(cells[0].querySelector('.sr-underarc'), null, 'plain S draws none');
+      assert.ok(cells[0].querySelector('.sr-arc-slot'), 'plain S still reserves the lane');
+      assert.equal(cells[0].children.length, cells[1].children.length, 'same lane count');
+    },
+  },
+
+  // --- export provenance tier (M, 2026-07-16)
+  {
+    name: 'export: custom keys (year, composer) print under the title',
+    fn: () => {
+      const src = `---\nraga: Raga Bageshri\ntal: rupak\ncomposition: vocal\nlaya: madhya\nyear: 1974\ncomposer: Ustad Ali Akbar Khan\n---\n\nGat\n@6 S.n .D.n | S\n`;
+      const el = renderExport(parseDocument(src).doc);
+      const prov = el.querySelector('.sr-exp-prov').textContent;
+      assert.match(prov, /Year/);
+      assert.match(prov, /1974/);
+      assert.match(prov, /Composer/);
+      assert.match(prov, /Ali Akbar Khan/);
+      assert.doesNotMatch(el.querySelector('.sr-exp-meta').textContent, /1974/, 'no duplication');
+    },
+  },
+  {
+    name: 'export: a key never seen before prints with no code change',
+    fn: () => {
+      const src = 'raga: kirwani\ntal: tintal\nsource: AAK archive, tape 12\n\nS R g m\n';
+      const prov = renderExport(parseDocument(src).doc).querySelector('.sr-exp-prov').textContent;
+      assert.match(prov, /Source/);
+      assert.match(prov, /tape 12/);
+    },
+  },
+  {
+    name: 'export: underscores in a key become spaces in its label',
+    fn: () => {
+      const src = 'raga: kirwani\ntal: tintal\ntaught_by: AAK\n\nS R g m\n';
+      const el = renderExport(parseDocument(src).doc);
+      assert.match(el.querySelector('.sr-exp-prov').textContent, /Taught by/);
+    },
+  },
+  {
+    name: 'export: identity stays hidden even in the provenance tier',
+    fn: () => {
+      const src =
+        'raga: kirwani\ntal: tintal\nid: abc-123\ncreated: 2026-01-01T00:00:00.000Z\nmodified: 2026-01-02T00:00:00.000Z\n\nS R g m\n';
+      const el = renderExport(parseDocument(src).doc);
+      assert.equal(el.querySelector('.sr-exp-prov'), null, 'no provenance block at all');
+      assert.doesNotMatch(el.textContent, /abc-123/);
+      assert.doesNotMatch(el.textContent, /2026-01-01/);
+    },
+  },
+  {
+    name: 'export: raga/title never repeat into the provenance line',
+    fn: () => {
+      const el = renderExport(parseDocument(APPENDIX_A).doc);
+      assert.equal(el.querySelector('.sr-exp-prov'), null);
+      assert.equal(el.querySelector('.sr-exp-raga').textContent, 'kirwani');
+      assert.match(el.querySelector('.sr-exp-title').textContent, /Kahe Ko/);
+    },
+  },
 ];

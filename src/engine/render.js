@@ -40,7 +40,12 @@ export function renderDocument(doc, opts = {}) {
 // (a check, not notation) do not appear.
 // ---------------------------------------------------------------------------
 
-const EXPORT_META = [
+// Three tiers, so any key M invents just works (M, 2026-07-16):
+//   identity      — never prints
+//   performance   — the far-right list: how it's played
+//   everything else — provenance under the title: where it came from
+// No allowlist to maintain: `source: AAK tape 12` appears with no code change.
+const EXPORT_PERFORMANCE = [
   ['tal', 'Tal'],
   ['laya', 'Laya'],
   ['tempo', 'Tempo'],
@@ -48,6 +53,9 @@ const EXPORT_META = [
   ['type', 'Type'],
   ['sa', 'Sa'],
 ];
+const EXPORT_IDENTITY = ['id', 'created', 'modified'];
+// raga and title own the headings; they never repeat in a list.
+const EXPORT_HEADINGS = ['raga', 'title'];
 
 /** C# → C♯, Bb → B♭; anything not a plain note name passes through. */
 function prettyPitch(v) {
@@ -56,33 +64,58 @@ function prettyPitch(v) {
   return m[1].toUpperCase() + (m[2] === '#' ? '♯' : '♭');
 }
 
+/** `composer` → `Composer`, `taught_by` → `Taught by`. */
+function prettyKey(k) {
+  const s = String(k).replace(/[_-]+/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function metaRow(label, value) {
+  const row = h('div', 'sr-exp-meta-row');
+  row.appendChild(h('span', 'sr-exp-meta-label', label));
+  row.appendChild(h('span', 'sr-exp-meta-value', String(value)));
+  return row;
+}
+
 /**
  * @param {Document} doc  parsed model
  * @returns {HTMLElement} detached export page; the caller mounts and prints it
  */
 export function renderExport(doc) {
   const dirs = doc.directives || {};
+  const has = (k) => k in dirs && String(dirs[k]).trim() !== '';
   const page = h('div', 'sr-export');
 
   const head = h('div', 'sr-exp-head');
   const left = h('div', 'sr-exp-headings');
   // Raga is the heading; with no raga, the composition's title takes the
   // slot rather than leaving the page untitled (and then isn't repeated).
-  const heading = dirs.raga || dirs.title || null;
+  const heading = has('raga') ? dirs.raga : has('title') ? dirs.title : null;
   if (heading) left.appendChild(h('h1', 'sr-exp-raga', heading));
-  if (dirs.raga && dirs.title) left.appendChild(h('p', 'sr-exp-title', dirs.title));
+  if (has('raga') && has('title')) left.appendChild(h('p', 'sr-exp-title', dirs.title));
+
+  // Provenance: every directive that isn't identity, a heading, or part of
+  // the performance frame — in the order it was written.
+  const perfKeys = new Set(EXPORT_PERFORMANCE.map((p) => p[0]));
+  const prov = h('div', 'sr-exp-prov');
+  for (const k of Object.keys(dirs)) {
+    if (EXPORT_IDENTITY.includes(k) || EXPORT_HEADINGS.includes(k) || perfKeys.has(k)) continue;
+    if (!has(k)) continue;
+    const item = h('span', 'sr-exp-prov-item');
+    item.appendChild(h('span', 'sr-exp-prov-label', prettyKey(k)));
+    item.appendChild(h('span', 'sr-exp-prov-value', String(dirs[k])));
+    prov.appendChild(item);
+  }
+  if (prov.children.length > 0) left.appendChild(prov);
   head.appendChild(left);
 
   const meta = h('div', 'sr-exp-meta');
-  for (const [key, label] of EXPORT_META) {
-    if (!(key in dirs) || String(dirs[key]).trim() === '') continue;
+  for (const [key, label] of EXPORT_PERFORMANCE) {
+    if (!has(key)) continue;
     let value = dirs[key];
     if (key === 'sa') value = prettyPitch(value);
     if (key === 'tempo') value = `${value} bpm`;
-    const row = h('div', 'sr-exp-meta-row');
-    row.appendChild(h('span', 'sr-exp-meta-label', label));
-    row.appendChild(h('span', 'sr-exp-meta-value', String(value)));
-    meta.appendChild(row);
+    meta.appendChild(metaRow(label, value));
   }
   head.appendChild(meta);
   page.appendChild(head);
@@ -310,27 +343,43 @@ function renderCell(line, k, tal, prefix, suffix) {
   cell.appendChild(glyphs);
 
   // Automatic under-arc on subdivided matras (spec principle 2).
-  if (evs.length > 1) {
-    cell.appendChild(underarcSvg());
-  }
+  // The LANE is reserved in every cell — an empty slot when the matra
+  // isn't subdivided — because cells bottom-align: an optional lane made
+  // plain matras shorter, dropping their glyph and their marker below
+  // their neighbours' (M, 2026-07-16). Same idiom as the marker lane.
+  cell.appendChild(evs.length > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
 
   return cell;
 }
 
+// Every event carries the same three lanes — dots above, character, dots
+// below — even when a lane is empty, and rests/sustains share the shape.
+// Optional lanes made events different heights; since cells bottom-align,
+// a plain madhya note sat lower than a mandra or subdivided neighbour and
+// dragged its marker down with it (M, 2026-07-16). Reserved lanes make
+// every cell the same height, so glyphs and markers line up across a row.
 function renderEvent(e) {
-  if (e.type === 'rest') return h('span', 'sr-ev sr-rest sr-dim', '·');
-  if (e.type === 'sustain') return h('span', 'sr-ev sr-sustain sr-dim', '—');
-
-  const o = e.octave || 0;
+  const isNote = e.type === 'note';
+  const o = isNote ? e.octave || 0 : 0;
   const reg = o < 0 ? ' sr-reg-cool' : o > 0 ? ' sr-reg-warm' : '';
-  const ev = h('span', 'sr-ev sr-note' + reg);
+  const cls =
+    e.type === 'rest'
+      ? 'sr-ev sr-rest sr-dim'
+      : e.type === 'sustain'
+        ? 'sr-ev sr-sustain sr-dim'
+        : 'sr-ev sr-note' + reg;
+  const ev = h('span', cls);
+
   const above = h('span', 'sr-dots sr-dots-above');
   for (let i = 0; i < Math.max(0, o); i++) above.appendChild(h('span', 'sr-dot sr-dot-above', '•'));
+  ev.appendChild(above);
+
+  ev.appendChild(h('span', 'sr-ch', e.type === 'rest' ? '·' : e.type === 'sustain' ? '—' : e.ch));
+
   const below = h('span', 'sr-dots sr-dots-below');
   for (let i = 0; i < Math.max(0, -o); i++) below.appendChild(h('span', 'sr-dot sr-dot-below', '•'));
-  if (o > 0) ev.appendChild(above);
-  ev.appendChild(h('span', 'sr-ch', e.ch));
-  if (o < 0) ev.appendChild(below);
+  ev.appendChild(below);
+
   return ev;
 }
 
@@ -361,9 +410,10 @@ function krintanSvg() {
   return svgEl('sr-svg-krintan', 'M4,18 L4,5 L96,5 L96,18');
 }
 
-/** Under-arc: automatic on subdivided matras. */
+/** Under-arc: automatic on subdivided matras. Shares .sr-arc-lane metrics
+ *  with the empty slot so reserved and drawn lanes are the same box. */
 function underarcSvg() {
-  return svgEl('sr-underarc', 'M4,2 Q50,18 96,2');
+  return svgEl('sr-arc-lane sr-underarc', 'M4,2 Q50,18 96,2');
 }
 
 // ---------------------------------------------------------------------------

@@ -605,6 +605,69 @@ export const smokes = [
       assert.ok(outPlain.startsWith('title:'), outPlain.slice(0, 40));
     },
   },
+  // --- ~ never affects rhythm (spec principle 4). M, 2026-07-16: `~[m - g]`
+  // was emitting a phantom EMPTY matra and silently dropping the meend,
+  // shifting every matra after it and cascading into vibhag errors.
+  {
+    name: 'tilde: ~[m - g] adds no phantom matra and keeps the uneven split',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: rupak\n\n~[m - g]\n');
+      const line = doc.sections[0].lines[0];
+      assert.equal(line.matras.length, 1, 'exactly one matra — ~ never affects rhythm');
+      assert.deepEqual(line.matras[0].events.map((e) => e.ch), ['m', 'g']);
+      assert.deepEqual(line.matras[0].events[0].dur, { num: 2, den: 3 }, 'm holds 2/3');
+      assert.deepEqual(line.matras[0].events[1].dur, { num: 1, den: 3 }, 'g lands on the last third');
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+    },
+  },
+  {
+    name: 'tilde: ~[m - g] draws the meend across the bracket (as ~mg does)',
+    fn: () => {
+      const { doc } = parseDocument('tal: rupak\n\n~[m - g]\n');
+      const spans = doc.sections[0].lines[0].spans;
+      assert.equal(spans.length, 1, JSON.stringify(spans));
+      assert.equal(spans[0].type, 'meend');
+      assert.deepEqual(spans[0].from, { matraIndex: 0, eventIndex: 0 });
+      assert.deepEqual(spans[0].to, { matraIndex: 0, eventIndex: 1 });
+    },
+  },
+  {
+    name: 'tilde: a tilde inside bracket slots covers the bracket, not dropped',
+    fn: () => {
+      for (const src of ['[~m g]', '[m~ g]', '[m ~g]']) {
+        const { doc } = parseDocument(`tal: rupak\n\n${src}\n`);
+        const line = doc.sections[0].lines[0];
+        assert.equal(line.matras.length, 1, `${src}: one matra`);
+        assert.equal(line.spans.length, 1, `${src}: meend span — got ${JSON.stringify(line.spans)}`);
+        assert.equal(line.spans[0].type, 'meend');
+      }
+    },
+  },
+  {
+    name: 'tilde: ~ before a krintan bracket keeps the matra count honest',
+    fn: () => {
+      const { doc } = parseDocument('tal: rupak\n\n~[[dP/mg]]\n');
+      const line = doc.sections[0].lines[0];
+      assert.equal(line.matras.length, 2, 'two matras, no phantom');
+      assert.ok(line.spans.some((s) => s.type === 'krintan'));
+    },
+  },
+  {
+    name: 'tilde: a lone ~ with nothing to slide narrates and makes no matra',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: rupak\n\nS ~ R\n');
+      const line = doc.sections[0].lines[0];
+      assert.equal(line.matras.length, 2, 'S and R only — no empty matra');
+      assert.ok(problems.length > 0, 'failure must narrate');
+    },
+  },
+  {
+    name: 'tilde: Appendix A still parses clean after the tilde work',
+    fn: () => {
+      const { problems } = parseDocument(APPENDIX_A);
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+    },
+  },
   {
     name: 'directives: laya/composition emit in canonical order, after tempo',
     fn: () => {

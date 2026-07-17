@@ -219,6 +219,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
 
   // Scanner state.
   let pendingMeendFrom = null; // EventRef awaiting the next note event
+  let bracketTilde = false; // a `~` consumed just before a [ or [[
   let phraseFrom = null; // matra index where ( opened
   const clusterCtx = {
     line,
@@ -255,12 +256,24 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
       continue;
     }
 
+    // `~` immediately before a bracket prefixes that matra, exactly as it
+    // prefixes a cluster (`~SR`, spec §3): the arc covers the bracket. It is
+    // consumed here so it can never become a token of its own — a lone `~`
+    // used to build an EMPTY matra, which shifted every matra after it and
+    // broke spec principle 4 ("~ never affects rhythm"). M, 2026-07-16.
+    if (c === '~' && body[i + 1] === '[') {
+      bracketTilde = true;
+      i++;
+      continue;
+    }
+
     if (c === '[' && body[i + 1] === '[') {
       // Krintan span: contents may hold /, spaces, and | (crosses barlines).
       const close = body.indexOf(']]', i + 2);
       if (close === -1) {
         problems.push({ line: lineNo, col: i + 1, msg: '[[ without closing ]]' });
         i += 2;
+        bracketTilde = false;
         continue;
       }
       const inner = body.slice(i + 2, close);
@@ -274,9 +287,11 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
           from: { matraIndex: beforeMatra, eventIndex: 0 },
           to: { matraIndex: afterMatra - 1, eventIndex: lastM.events.length - 1 },
         });
+        if (bracketTilde) addMeendOverMatras(line, beforeMatra, afterMatra - 1);
       } else {
         problems.push({ line: lineNo, col: i + 1, msg: 'empty krintan [[ ]]' });
       }
+      bracketTilde = false;
       i = close + 2;
       continue;
     }
@@ -286,10 +301,16 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
       if (close === -1) {
         problems.push({ line: lineNo, col: i + 1, msg: '[ without closing ]' });
         i++;
+        bracketTilde = false;
         continue;
       }
       const inner = body.slice(i + 1, close);
+      const beforeMatra = line.matras.length;
       buildSlottedMatra(inner, i + 1, clusterCtx);
+      if (bracketTilde && line.matras.length > beforeMatra) {
+        addMeendOverMatras(line, beforeMatra, line.matras.length - 1);
+      }
+      bracketTilde = false;
       i = close + 1;
       continue;
     }
@@ -438,7 +459,45 @@ function parseToken(tok, col, ctx) {
     return;
   }
   const events = buildClusterEvents(tok, col, ctx, 1);
-  if (events) line.matras.push({ events });
+  // A token that yields no events (a lone `~`) must never push a matra:
+  // `~` is an annotation and cannot affect rhythm (spec principle 4).
+  // Silently, this used to insert an empty matra and shift the rest of the
+  // line — the cause of phantom vibhag errors. M, 2026-07-16.
+  if (events && events.length > 0) {
+    line.matras.push({ events });
+  } else if (events) {
+    problems.push({
+      line: lineNo,
+      col: col + 1,
+      msg: `'${tok}' has no note to slide — a ~ must touch the notes it connects, as in ~mg or m~g`,
+    });
+  }
+}
+
+/**
+ * Draw a meend from the first note of matra `fromM` to the last note of
+ * matra `toM`. Used when a `~` prefixes a bracket — the arc covers the
+ * bracket, mirroring `~SR` covering a cluster (spec §3). No-op when there
+ * aren't two notes to connect, so it can never invent a span.
+ */
+function addMeendOverMatras(line, fromM, toM) {
+  const firstEvs = line.matras[fromM]?.events || [];
+  const lastEvs = line.matras[toM]?.events || [];
+  const first = firstEvs.findIndex((e) => e.type === 'note');
+  let last = -1;
+  for (let i = lastEvs.length - 1; i >= 0; i--) {
+    if (lastEvs[i].type === 'note') {
+      last = i;
+      break;
+    }
+  }
+  if (first === -1 || last === -1) return;
+  if (fromM === toM && first === last) return; // one note connects to nothing
+  line.spans.push({
+    type: 'meend',
+    from: { matraIndex: fromM, eventIndex: first },
+    to: { matraIndex: toM, eventIndex: last },
+  });
 }
 
 /**
@@ -454,7 +513,13 @@ function buildSlottedMatra(inner, col, ctx) {
   }
   // Each slot contributes weight 1 of the matra; a slot may subdivide further.
   const perSlot = [];
-  for (const s of slotStrs) {
+  // Tildes written inside the bracket were silently dropped before
+  // 2026-07-16 (M). They're gathered across the slots and applied to the
+  // finished matra, so `[~m g]`, `[m~ g]` and `[m ~g]` all read as
+  // "this bracket is a slide" — the same as `~[m g]`.
+  const tilde = { leadingTilde: false, sawTilde: false, trailingTilde: false };
+  for (let si = 0; si < slotStrs.length; si++) {
+    const s = slotStrs[si];
     if (s === '.') {
       perSlot.push([{ type: 'rest', w: 1 }]);
     } else if (/^-+$/.test(s)) {
@@ -462,6 +527,16 @@ function buildSlottedMatra(inner, col, ctx) {
     } else if (CLUSTER_RE.test(s)) {
       const atoms = clusterAtoms(s, col, ctx);
       if (!atoms) return; // problem already recorded
+      const t = atoms._tilde;
+      if (t) {
+        if (t.leadingTilde || t.sawTilde) tilde.sawTilde = true;
+        // A trailing tilde only reaches past the bracket from the LAST
+        // slot; on any earlier slot it connects to the next slot inside.
+        if (t.trailingTilde) {
+          if (si === slotStrs.length - 1) tilde.trailingTilde = true;
+          else tilde.sawTilde = true;
+        }
+      }
       perSlot.push(atoms);
     } else {
       line.passthrough.push({ col: col + 1, text: s });
@@ -477,6 +552,7 @@ function buildSlottedMatra(inner, col, ctx) {
     const inSlot = slotAtoms.reduce((a, x) => a + x.w, 0);
     for (const a of slotAtoms) atoms.push({ ...a, num: a.w, den: slotCount * inSlot });
   }
+  atoms._tilde = tilde;
   const events = atomsToEvents(atoms, ctx);
   if (events) ctx.line.matras.push({ events });
 }
