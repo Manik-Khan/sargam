@@ -38,6 +38,7 @@ export function parseDocument(text) {
   let currentTal = null; // tal name, 'free', or null (none declared yet)
   let currentSection = null;
   let lastMusicLine = null;
+  let nextStart = null; // avartan continuation within the current section
   let missingTalReported = false;
 
   const applyDirective = (key, val, lineNo) => {
@@ -133,6 +134,7 @@ export function parseDocument(text) {
       currentSection = { label: trimmed, tal: currentTal ?? 'free', lines: [] };
       doc.sections.push(currentSection);
       lastMusicLine = null;
+      nextStart = null; // a new section resets the cycle to sam
       continue;
     }
 
@@ -150,9 +152,15 @@ export function parseDocument(text) {
       missingTalReported = true;
     }
     const tal = currentTal && currentTal !== 'free' ? getTal(currentTal) : null;
-    const music = parseMusicLine(trimmed, lineNo, tal, problems, currentTal === 'free');
+    const music = parseMusicLine(trimmed, lineNo, tal, problems, currentTal === 'free', nextStart);
     currentSection.lines.push(music);
     lastMusicLine = music;
+    // Continuation is based on the WRITTEN matras (a ||: :|| repeat's
+    // second pass doesn't shift where the next written line sits on the
+    // page — the notation continues from the ink, not the performance).
+    if (tal && music.matras.length > 0) {
+      nextStart = wrapMatra(tal, music.startMatra + music.matras.length);
+    }
   }
 
   return { doc, problems };
@@ -180,7 +188,7 @@ function looksLikeMusic(trimmed) {
 // Music line
 // ---------------------------------------------------------------------------
 
-function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
+function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStart = null) {
   const line = {
     kind: 'music',
     startMatra: 1,
@@ -199,11 +207,18 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false) {
 
   let body = text;
 
-  // @N start offset (before ||: when both are present).
+  // @N start offset (before ||: when both are present) — the explicit
+  // override. Without it, a metered line CONTINUES its section's cycle
+  // (defaultStart), because the avartan does not restart at a written
+  // line break — the tradition's own convention, and M's ruling
+  // 2026-07-16 ("doesn't count the 'S as the 6th beat" without @6).
   const at = body.match(/^@(\d+)\s*/);
   if (at) {
     line.startMatra = parseInt(at[1], 10) || 1;
+    line.explicitStart = true;
     body = body.slice(at[0].length);
+  } else if (defaultStart !== null) {
+    line.startMatra = defaultStart;
   }
 
   // ||: ... :||

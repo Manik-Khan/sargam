@@ -558,3 +558,10 @@
 .dict-primary:disabled { opacity: 0.4; cursor: default; }
 .dict-problem { flex-basis: 100%; font-size: 11.5px; color: var(--sr-accent); }
 @media print { .dict { display: none !important; } }
+
+/* ---- responsive notation (M, 2026-07-16) ----
+   JS shrinks each line to fit (PreviewPane fitLines); this overflow rule
+   is the floor beneath it: a line can always scroll, never be cut off
+   invisibly — even with no JS, even below the minimum scale. */
+.sr-line-block { overflow-x: auto; max-width: 100%; }
+.app-preview { overflow-x: hidden; }

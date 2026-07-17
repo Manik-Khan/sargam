@@ -143,7 +143,9 @@ function serializeMusicLine(line, tal) {
   body = body.replace(/\s+/g, ' ').replace(/\/ /g, '/').replace(/ \//g, '/').trim();
 
   const prefix = [];
-  if (line.startMatra !== 1) prefix.push(`@${line.startMatra}`);
+  // @N emits only when the author wrote it — auto-continued positions are
+  // recomputed on every parse and must not fossilize into the text.
+  if (line.explicitStart) prefix.push(`@${line.startMatra}`);
   if (line.lineRepeat) return `${prefix.join(' ')}${prefix.length ? ' ' : ''}||: ${body} :||`;
   return `${prefix.join(' ')}${prefix.length ? ' ' : ''}${body}`.trim();
 }

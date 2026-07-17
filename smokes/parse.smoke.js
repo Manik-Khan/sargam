@@ -967,5 +967,91 @@ export const smokes = [
       assert.doesNotMatch(attached, /\{dP\} m/, attached);
     },
   },
+// --- avartan continuation across written lines (M, 2026-07-16: "if you
+  // make a new line, it doesn't continue the rhythm... you have to write
+  // @6"). The tradition's convention — visible on M's own Jaijaiwanti page,
+  // where line 2 of an entry picks up mid-cycle. A music line now continues
+  // its section's cycle position; @N stays as the explicit override; a new
+  // section resets to sam.
+  {
+    name: 'continuation: the second line picks up where the first left off',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nS R g m\nP d n N\n');
+      const [a, b] = doc.sections[0].lines;
+      assert.equal(a.startMatra, 1);
+      assert.equal(b.startMatra, 5, 'line 2 continues at matra 5');
+    },
+  },
+  {
+    name: "continuation: M's Bageshri split — 'S lands on beat 6 with no @6 written",
+    fn: () => {
+      const src =
+        'tal: rupak\n\n1.\n' +
+        "| m - - | m~ g | - - | m D - | D - | - - | n - - | - - |\n" +
+        "'S~n 'S~n | D - - | m\n";
+      const { doc, problems } = parseDocument(src);
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+      const [a, b] = doc.sections[0].lines;
+      assert.equal(a.matras.length, 19);
+      // 19 written matras from sam of a 7-matra cycle → next is matra 6
+      assert.equal(b.startMatra, 6, "the 'S is the 6th beat, automatically");
+    },
+  },
+  {
+    name: 'continuation: an explicit @N still overrides',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nS R g m\n@9 P d n N\n');
+      assert.equal(doc.sections[0].lines[1].startMatra, 9);
+    },
+  },
+  {
+    name: 'continuation: a full cycle wraps back to sam',
+    fn: () => {
+      const { doc } = parseDocument(
+        'tal: tintal\n\nS R g m P d n N S R g m P d n N\nS R\n'
+      );
+      assert.equal(doc.sections[0].lines[1].startMatra, 1, 'sixteen matras of tintal → sam');
+    },
+  },
+  {
+    name: 'continuation: a new section resets to sam',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nSthayi\nS R g m P d\n\nAntara\nS R g m\n');
+      assert.equal(doc.sections[0].lines[0].startMatra, 1);
+      assert.equal(doc.sections[1].lines[0].startMatra, 1, 'Antara starts fresh at sam');
+    },
+  },
+  {
+    name: 'continuation: blank lines do not break the chain (labels do)',
+    fn: () => {
+      // A blank line opens a new UNLABELED section (pre-existing model
+      // behavior) — but the cycle continues across it: blank lines are
+      // visual spacing; only a labeled section is a musical reset.
+      const { doc } = parseDocument('tal: tintal\n\nS R g m\n\nP d n N\n');
+      assert.equal(doc.sections.length, 2);
+      assert.equal(doc.sections[1].lines[0].startMatra, 5);
+    },
+  },
+  {
+    name: 'continuation: vibhag validation follows the continued position',
+    fn: () => {
+      // second line starts mid-vibhag of tintal; its first bar closes the
+      // ongoing vibhag with 2 matras and that must NOT be reported short
+      const { problems } = parseDocument('tal: tintal\n\nS R g m P d\nn N | S R g m\n');
+      assert.deepEqual(problems, [], JSON.stringify(problems));
+    },
+  },
+  {
+    name: 'continuation: auto-continued lines round-trip WITHOUT gaining an @N',
+    fn: () => {
+      const src = 'tal: tintal\n\nS R g m\nP d n N\n';
+      const out = serializeDocument(parseDocument(src).doc);
+      assert.doesNotMatch(out, /@5/, out);
+      assertRoundTrip(src);
+      // and an explicit @ survives
+      const out2 = serializeDocument(parseDocument('tal: tintal\n\n@9 P d n N\n').doc);
+      assert.match(out2, /@9 /, out2);
+    },
+  },
 ];
 
