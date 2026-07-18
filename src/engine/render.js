@@ -184,7 +184,16 @@ function renderLine(line, tal, ctx) {
       cols.push('max-content'); // barline column
     }
   }
-  if (line.lineRepeat) cols.push('max-content');
+  let repeatCloseCol = null;
+  let returnCueCol = null;
+  if (line.lineRepeat) {
+    cols.push('max-content');
+    repeatCloseCol = cols.length;
+  }
+  if (line.returnCue) {
+    cols.push('max-content');
+    returnCueCol = cols.length;
+  }
   if (line.passthrough.length > 0) {
     for (let i = 0; i < line.passthrough.length; i++) cols.push('max-content');
   }
@@ -262,11 +271,20 @@ function renderLine(line, tal, ctx) {
   }
 
   // --- repeat-close glyph
-  if (line.lineRepeat) {
+  if (line.lineRepeat && repeatCloseCol !== null) {
     const close = h('div', 'sr-repeat-close sr-glyphcol', ':||');
     close.style.gridRow = '2';
-    close.style.gridColumn = String(cols.length - line.passthrough.length);
+    close.style.gridColumn = String(repeatCloseCol);
     row.appendChild(close);
+  }
+
+  // --- terminal return cue: visible instruction, zero rhythmic time.
+  if (line.returnCue && returnCueCol !== null) {
+    const cue = h('div', 'sr-return-cue', line.returnCue.target);
+    cue.setAttribute('data-return-cue', line.returnCue.target);
+    cue.style.gridRow = '2';
+    cue.style.gridColumn = String(returnCueCol);
+    row.appendChild(cue);
   }
 
   // --- passthrough: dimmed literal text (spec: diagnostics render in place)
@@ -389,10 +407,32 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   const markerText = tal ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + k)) : null;
   cell.appendChild(h('div', 'sr-marker', markerText ?? ''));
 
-  // Glyphs.
+  // Glyphs. Grace notes remain ornaments outside metric slots. Timed
+  // events live in an equal-column slot grid; every explicitly written
+  // internal dash becomes its own visible hold slot without a new attack.
   const glyphs = h('div', 'sr-glyphs');
   if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph', prefix));
-  for (const e of evs) glyphs.appendChild(renderEvent(e, ctx));
+  for (const e of evs.filter((event) => event.grace)) glyphs.appendChild(renderEvent(e, ctx));
+
+  const visualSlots = [];
+  for (const e of evs.filter((event) => !event.grace)) {
+    visualSlots.push({ event: e, hold: false });
+    const writtenSlots = Math.max(1, Number(e.writtenSlots) || 1);
+    for (let slot = 1; slot < writtenSlots; slot++) {
+      visualSlots.push({ event: { type: 'sustain' }, hold: true });
+    }
+  }
+  if (visualSlots.length > 0) {
+    const slots = h('span', 'sr-timed-slots');
+    slots.setAttribute('data-written-slots', String(visualSlots.length));
+    slots.style.gridTemplateColumns = `repeat(${visualSlots.length}, minmax(0.72em, 1fr))`;
+    for (const item of visualSlots) {
+      const slot = h('span', 'sr-slot' + (item.hold ? ' sr-hold-slot' : ''));
+      slot.appendChild(renderEvent(item.event, ctx, item.hold));
+      slots.appendChild(slot);
+    }
+    glyphs.appendChild(slots);
+  }
   if (suffix) glyphs.appendChild(h('span', 'sr-phrase-glyph', suffix));
   cell.appendChild(glyphs);
 
@@ -403,8 +443,8 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   // their neighbours' (M, 2026-07-16). Same idiom as the marker lane.
   // Under-arc = rhythmic subdivision of TIMED notes only (M, 2026-07-16);
   // graces never trigger it. {dP}m: curve only. {d}Pm: curve + arc.
-  const timedCount = evs.filter((e) => !e.grace).length;
-  cell.appendChild(timedCount > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
+  const writtenSlotCount = visualSlots.length;
+  cell.appendChild(writtenSlotCount > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
 
   return cell;
 }
@@ -415,7 +455,7 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
 // a plain madhya note sat lower than a mandra or subdivided neighbour and
 // dragged its marker down with it (M, 2026-07-16). Reserved lanes make
 // every cell the same height, so glyphs and markers line up across a row.
-function renderEvent(e, ctx) {
+function renderEvent(e, ctx, microHold = false) {
   const isNote = e.type === 'note';
   const o = isNote ? e.octave || 0 : 0;
   const reg = o < 0 ? ' sr-reg-cool' : o > 0 ? ' sr-reg-warm' : '';
@@ -423,7 +463,7 @@ function renderEvent(e, ctx) {
     e.type === 'rest'
       ? 'sr-ev sr-rest sr-dim'
       : e.type === 'sustain'
-        ? 'sr-ev sr-sustain sr-dim'
+        ? 'sr-ev sr-sustain sr-dim' + (microHold ? ' sr-micro-hold' : '')
         : 'sr-ev sr-note' + reg + (e.grace ? ' sr-grace' : '');
   const ev = h('span', cls);
 

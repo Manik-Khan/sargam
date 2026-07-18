@@ -78,6 +78,7 @@ Section    { label: string|null, tal: string,          // tal name or 'free'
 Line       { kind: 'music',
              startMatra: int,                          // 1-based; default 1
              lineRepeat: bool,                         // ||: :||
+             returnCue: null|{target,targetSectionIndex}, // terminal gat
              matras: [Matra],
              spans: [Span],                            // meend, krintan
              phraseRepeats: [PhraseRepeat],
@@ -86,7 +87,7 @@ Line       { kind: 'music',
              passthrough: [{col, text}],               // unparsed fragments, rendered dim
              sourceLine: int }
 Matra      { events: [Event] }                          // event durs sum to exactly 1
-Event      { type: 'note',    dur: Frac, ch: string, octave: int }   // ch keeps case: 'S','r','M'…; octave -2..2
+Event      { type: 'note',    dur: Frac, ch: string, octave: int, writtenSlots?: int } // explicit internal dash slots   // ch keeps case: 'S','r','M'…; octave -2..2
            { type: 'rest',    dur: Frac }
            { type: 'sustain', dur: Frac }               // continuation of previous note
 EventRef   { matraIndex: int, eventIndex: int }          // both 0-based within the line
@@ -136,7 +137,7 @@ Round-trip requirement (spec §2): `parseDocument(serializeDocument(parseDocumen
 Full grammar: spec §3. The rules most likely to be fumbled — read them twice:
 - `~` and `[[ ]]` NEVER affect rhythm; only spaces, `/`, brackets, and dashes do (spec principle 4).
 - `.` attached before a letter = mandra prefix; standalone = rest; rest inside a beat needs `[ ]` (spec §3.4–3.5).
-- Unspaced run = one-matra cluster, evenly divided; `-` inside a cluster = one slot; `SRgmP D` vs `SRgmP- D` both put D on beat 2.
+- Unspaced run = one-matra cluster, evenly divided; `-` inside a cluster = one slot; `SRgmP D` vs `SRgmP- D` both put D on beat 2. Explicit internal dashes survive as visible equal slots (`g---` prints four slots) while remaining one attack.
 - `N~ 'S` = meend across two matras; `N~'S` unspaced = a two-note one-matra cluster with a slide. Space decides rhythm; `~` only draws the arc.
 - Directives are legal mid-document and apply forward; `tal: free` = unmetered section (no validation, no markers).
 

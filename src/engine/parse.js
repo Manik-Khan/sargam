@@ -165,7 +165,36 @@ export function parseDocument(text) {
     }
   }
 
+  resolveReturnCues(doc, problems);
   return { doc, problems };
+}
+
+/** Bind each terminal cue to the nearest PRECEDING matching section. */
+function resolveReturnCues(doc, problems) {
+  const previous = new Map();
+  const normalize = (value) => String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.:]+$/, '');
+
+  (doc.sections || []).forEach((section, sectionIndex) => {
+    for (const line of section.lines || []) {
+      const cue = line.returnCue;
+      if (!cue) continue;
+      const targetSectionIndex = previous.get(normalize(cue.target));
+      if (targetSectionIndex === undefined) {
+        problems.push({
+          line: line.sourceLine,
+          col: null,
+          msg: `return cue '${cue.target}' has no preceding ${cue.target} section`,
+        });
+      } else {
+        cue.targetSectionIndex = targetSectionIndex;
+      }
+    }
+    const label = normalize(section.label);
+    if (label) previous.set(label, sectionIndex);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +225,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     startMatra: 1,
     lineRepeat: false,
     firstEndingFrom: null, // 0-based matra where |1 begins
+    returnCue: null, // terminal `gat`: replay the nearest preceding Gat section once
     matras: [],
     spans: [],
     phraseRepeats: [],
@@ -233,6 +263,18 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
       problems.push({ line: lineNo, col: null, msg: '||: without closing :||' });
       body = body.slice(3);
     }
+  }
+
+  // A terminal `gat` is a zero-time return cue, not a note token. It
+  // remains visible in the notation, but the scheduler replays the nearest
+  // preceding section labelled Gat after this line and then resumes. Only the
+  // final token is structural; an interior `gat` is narrated precisely below.
+  const returnMatch = body.match(/(?:^|[\s|])gat\s*$/i);
+  if (returnMatch) {
+    const cueOffset = returnMatch[0].search(/gat/i);
+    const cueStart = (returnMatch.index ?? 0) + cueOffset;
+    line.returnCue = { target: 'gat' };
+    body = body.slice(0, cueStart).trimEnd();
   }
 
   // Scanner state.
@@ -584,6 +626,18 @@ function parseToken(tok, col, ctx) {
 
   if (tok === '') return;
 
+  // `gat` is structural only as the final token. Keeping this diagnostic in
+  // the token parser makes an accidental interior cue clickable and exact.
+  if (/^gat$/i.test(tok)) {
+    line.passthrough.push({ col: col + 1, text: tok });
+    problems.push({
+      line: lineNo,
+      col: col + 1,
+      msg: "return cue 'gat' must be the final token on the line",
+    });
+    return;
+  }
+
   // Standalone rest.
   if (tok === '.') {
     line.matras.push({ events: [{ type: 'rest', dur: frac(1, 1) }] });
@@ -844,6 +898,9 @@ function atomsToEvents(atoms, ctx) {
     if (a.type === 'note') {
       const ref = { matraIndex, eventIndex: events.length };
       const ev = { type: 'note', dur, ch: a.ch, octave: a.octave };
+      // Explicit internal dashes are print-bearing rhythmic slots. Duration
+      // alone cannot preserve `g---` because 4/4 reduces to one whole beat.
+      if (!a.grace && a.w > 1) ev.writtenSlots = a.w;
       if (a.grace) ev.grace = true;
       if (a.preBeat) ev.preBeat = true;
       events.push(ev);
@@ -852,13 +909,19 @@ function atomsToEvents(atoms, ctx) {
       // decoration.
       if (!a.grace) ctx.notePlaced(ref);
     } else if (a.type === 'rest') {
-      events.push({ type: 'rest', dur });
+      const ev = { type: 'rest', dur };
+      if (a.w > 1) ev.writtenSlots = a.w;
+      events.push(ev);
     } else if (events.length > 0) {
       // A dash extends the preceding event (note or rest) within the matra.
+      // Preserve the written slot as well as merging its playback duration.
       const last = events[events.length - 1];
       last.dur = fracAdd(last.dur, dur);
+      last.writtenSlots = (last.writtenSlots ?? 1) + (a.w ?? 1);
     } else {
-      events.push({ type: 'sustain', dur });
+      const ev = { type: 'sustain', dur };
+      if (a.w > 1) ev.writtenSlots = a.w;
+      events.push(ev);
     }
   }
 

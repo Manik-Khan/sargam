@@ -81,6 +81,22 @@
   line-height: 1.15;
   white-space: nowrap;
 }
+/* Timed subdivisions are equal visual slots. Explicit internal dashes
+   (`DnS-`, `g---`) occupy real slots but remain playback sustains, not
+   attacks. Grace notes stay outside this metric grid. */
+.sr-timed-slots {
+  display: inline-grid;
+  align-items: end;
+  justify-items: stretch;
+  min-width: 1em;
+}
+.sr-slot {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-width: 0.72em;
+}
+.sr-hold-slot .sr-ch { color: var(--sr-dim); }
 
 /* Reserved in EVERY cell (empty slot when the matra isn't subdivided) so
    all cells are the same height — cells bottom-align, so an optional lane
@@ -139,6 +155,15 @@
   align-self: end;
   padding: 0 6px 3px;
   text-decoration: underline dotted;
+}
+.sr-return-cue {
+  align-self: end;
+  padding: 0 7px 3px;
+  font-family: Charter, Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--sr-ink-soft);
+  white-space: nowrap;
 }
 
 /* lyric + bol rows */

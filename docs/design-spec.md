@@ -107,7 +107,7 @@ All header metadata is **optional and selectable** *(M, 2026-07-16)* — a docum
 - **One token = one matra.** An unspaced multi-note run (a **cluster**) is one matra divided evenly among its slots: `SRgmP` = five notes in one beat. The under-arc renders automatically on every subdivided matra — brackets are never needed for the arc.
 - **`-` (dash):**
   - As a standalone token: sustain the previous note one full matra. `--` = two matras, counting by hyphen.
-  - Inside a cluster: one subdivision slot of sustain. `P-` = P struck on the front half of the beat, held through the back half. So `SRgmP D` puts D on beat 2 after an even quintuplet; `SRgmP- D` also puts D on beat 2, but beat 1 divides in six with P leaning longer.
+  - Inside a cluster: one subdivision slot of sustain. `P-` = P struck on the front half of the beat, held through the back half. So `SRgmP D` puts D on beat 2 after an even quintuplet; `SRgmP- D` also puts D on beat 2, but beat 1 divides in six with P leaning longer. **Every written internal dash remains visible in the page**: `DnS-` prints `D n S —`; `g---` prints `g — — —`; the under-arc covers all written slots. These dashes extend the preceding attack and never create new attacks. The model stores the explicit slot count because `g---` reduces arithmetically to one whole beat and cannot be reconstructed from duration alone.
   - A cluster may *begin* with `-` (`-P` = previous note held through the first slot, then P).
 - **`_` (underscore):** hold to the end of the current vibhag; renders as the long continuous line. Sam held to khali: `S _ | _ |` renders as `S—|—|`.
 - **`.` (dot):**
@@ -142,7 +142,9 @@ Tokens attach **left to right to matras that begin with a struck note**, skippin
 
 Instrumental stroke marks: `l` = da (vertical tick under the note), `-` = ra (horizontal tick; safe collision — `-` only means ra on a `>` line), `v` = diri. Tokens attach **per note event** in order — including each note inside clusters — skipping sustains and rests. Da diri diri da: `> l v v l`.
 
-### 3.9 Repeats
+## 3.9 Repeats
+
+- **Return to Gat:** terminal `gat` is a zero-time structural cue. It prints after the line, replays the nearest preceding section labelled `Gat` once, then resumes with the next written line. It is legal only as the final token; no target means a diagnostic, never a guessed jump. Replayed material ignores nested return cues to prevent accidental recursion.
 
 - `||: ... :||` wraps a whole line for repetition.
 - `( ... )xN` wraps a phrase within a line — the tihai form: `(SR gm P)x3`. Not nested in v1 (nesting is a diagnostic).

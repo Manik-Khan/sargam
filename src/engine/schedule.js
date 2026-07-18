@@ -82,179 +82,223 @@ export function scheduleDocument(doc, opts = {}) {
 
   const events = [];
   const lineStarts = [];
+  const sections = doc?.sections || [];
   let t = 0;
 
-  (doc?.sections || []).forEach((section, sectionIndex) => {
+  const normalizedLabel = (value) => String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.:]+$/, '');
+
+  const cueTargetIndex = (cue, beforeSectionIndex) => {
+    if (Number.isInteger(cue?.targetSectionIndex)) return cue.targetSectionIndex;
+    const target = normalizedLabel(cue?.target);
+    for (let i = beforeSectionIndex - 1; i >= 0; i--) {
+      if (normalizedLabel(sections[i]?.label) === target) return i;
+    }
+    return -1;
+  };
+
+  const scheduleLine = (
+    section,
+    sectionIndex,
+    line,
+    lineIndex,
+    { recordLineStart = true, allowReturnCue = true } = {}
+  ) => {
+    if (!line.matras || line.matras.length === 0) return;
     const isFree = section.tal === 'free';
     const tal = isFree ? null : getTal(section.tal);
 
-    (section.lines || []).forEach((line, lineIndex) => {
-      if (!line.matras || line.matras.length === 0) return;
+    if (recordLineStart) {
       lineStarts.push({ sectionIndex, lineIndex, sourceLine: line.sourceLine, t });
+    }
 
-      // Unroll phrase repeats into the played order of matra indices.
-      const order = [];
-      for (let i = 0; i < line.matras.length; ) {
-        const pr = (line.phraseRepeats || []).find((r) => r.fromMatra === i);
-        if (pr) {
-          for (let rep = 0; rep < pr.times; rep++) {
-            for (let k = pr.fromMatra; k <= pr.toMatra; k++) order.push(k);
-          }
-          i = pr.toMatra + 1;
-        } else {
-          order.push(i);
-          i++;
+    // Unroll phrase repeats into the played order of matra indices.
+    const order = [];
+    for (let i = 0; i < line.matras.length; ) {
+      const pr = (line.phraseRepeats || []).find((r) => r.fromMatra === i);
+      if (pr) {
+        for (let rep = 0; rep < pr.times; rep++) {
+          for (let k = pr.fromMatra; k <= pr.toMatra; k++) order.push(k);
         }
+        i = pr.toMatra + 1;
+      } else {
+        order.push(i);
+        i++;
       }
-      const passes = line.lineRepeat ? 2 : 1;
-      const endingCut = Number.isInteger(line.firstEndingFrom)
-        ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
-        : -1;
-      let passOffset = 0;
-      for (let pass = 0; pass < passes; pass++) {
-        // Pass one plays the complete line. Later passes stop at |1, so the next
-        // written line takes the place of the first ending without duplicating it.
-        const passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
-        // (matraIndex:eventIndex) → scheduled note, for span resolution.
-        const placed = new Map();
-        let ringing = null; // last note event, for whole-matra sustains
-        passOrder.forEach((matraIndex, playedOrdinal) => {
-          const matraStart = t;
-          events.push({
-            kind: 'cursor',
-            t: matraStart,
-            sectionIndex,
-            lineIndex,
-            matraIndex,
-            sourceLine: line.sourceLine,
-          });
-
-          if (tal) {
-            const cycleMatra = wrapMatra(
-              tal,
-              (line.startMatra || 1) + passOffset + playedOrdinal
-            );
-            let accent = 'plain';
-            if (markerAtMatra(tal, cycleMatra) !== null) {
-              const v = vibhagOfMatra(tal, cycleMatra);
-              accent =
-                v === tal.samVibhag
-                  ? 'sam'
-                  : (tal.khaliVibhags || []).includes(v)
-                    ? 'khali'
-                    : 'vibhag';
-            }
-            events.push({ kind: 'tick', t: matraStart, accent, cycleMatra });
-          }
-
-          const evs = line.matras[matraIndex].events;
-
-          // Whole-matra sustain: extend whatever is ringing.
-          if (evs.length === 1 && evs[0].type === 'sustain') {
-            if (ringing) ringing.dur += spm * (evs[0].dur.num / evs[0].dur.den);
-            t = matraStart + spm;
-            return;
-          }
-
-          // Kan slivers. Same-beat graces ({dP}m) steal from the FRONT of
-          // the destination; pre-beat graces ({dP} m) sound BEFORE the beat,
-          // trimming whatever rings — the destination keeps its whole beat.
-          // Either way, the grid never moves.
-          const preGraces = evs.filter((e) => e.grace && e.preBeat);
-          const sameGraces = evs.filter((e) => e.grace && !e.preBeat);
-          const sliverOf = (n) => (n > 0 ? Math.min(GRACE_FRACTION, GRACE_CAP / n) * spm : 0);
-          const preSliver = sliverOf(preGraces.length);
-          const sliver = sliverOf(sameGraces.length);
-
-          if (preGraces.length > 0) {
-            const total = preGraces.length * preSliver;
-            let start = Math.max(0, matraStart - total);
-            if (ringing && ringing.t + ringing.dur > start) {
-              ringing.dur = Math.max(0, start - ringing.t);
-            }
-            const actualSliver = (matraStart - start) / preGraces.length || 0;
-            preGraces.forEach((e, gi) => {
-              const eventIndex = evs.indexOf(e);
-              const ev = {
-                kind: 'note',
-                t: start + gi * actualSliver,
-                dur: actualSliver,
-                ch: e.ch,
-                semitone: SEMITONES[e.ch],
-                octave: e.octave || 0,
-                freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
-                grace: true,
-                preBeat: true,
-              };
-              events.push(ev);
-              placed.set(`${matraIndex}:${eventIndex}`, ev);
-            });
-          }
-
-          let cursor = matraStart;
-          let graceTotal = sameGraces.length * sliver;
-          evs.forEach((e, eventIndex) => {
-            if (e.grace && e.preBeat) return; // already placed above
-            const frac = e.dur.num / e.dur.den;
-            if (e.type === 'note' && e.grace) {
-              const ev = {
-                kind: 'note',
-                t: cursor,
-                dur: sliver,
-                ch: e.ch,
-                semitone: SEMITONES[e.ch],
-                octave: e.octave || 0,
-                freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
-                grace: true,
-              };
-              events.push(ev);
-              placed.set(`${matraIndex}:${eventIndex}`, ev);
-              cursor += sliver;
-              return;
-            }
-            let dur = spm * frac;
-            if (graceTotal > 0 && e.type === 'note') {
-              dur -= graceTotal; // the destination pays for its graces
-              graceTotal = 0;
-            }
-            if (e.type === 'note') {
-              const ev = {
-                kind: 'note',
-                t: cursor,
-                dur,
-                ch: e.ch,
-                semitone: SEMITONES[e.ch],
-                octave: e.octave || 0,
-                freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
-              };
-              events.push(ev);
-              placed.set(`${matraIndex}:${eventIndex}`, ev);
-              ringing = ev;
-              cursor += dur;
-            } else if (e.type === 'rest') {
-              ringing = null;
-              cursor += dur;
-            } else {
-              // partial sustain inside a subdivided matra: parser already
-              // merged in-matra dashes into their notes; a standalone one
-              // extends whatever rings.
-              if (ringing) ringing.dur += dur;
-              cursor += dur;
-            }
-          });
-          t = matraStart + spm;
+    }
+    const passes = line.lineRepeat ? 2 : 1;
+    const endingCut = Number.isInteger(line.firstEndingFrom)
+      ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
+      : -1;
+    let passOffset = 0;
+    for (let pass = 0; pass < passes; pass++) {
+      // Pass one plays the complete line. Later passes stop at |1, so the next
+      // written line takes the place of the first ending without duplicating it.
+      const passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
+      // (matraIndex:eventIndex) → scheduled note, for span resolution.
+      const placed = new Map();
+      let ringing = null; // last note event, for whole-matra sustains
+      passOrder.forEach((matraIndex, playedOrdinal) => {
+        const matraStart = t;
+        events.push({
+          kind: 'cursor',
+          t: matraStart,
+          sectionIndex,
+          lineIndex,
+          matraIndex,
+          sourceLine: line.sourceLine,
         });
 
-        // Resolve meend spans for this pass: the destination glides from
-        // the source's pitch. Kan spans need nothing — graces already sound.
-        for (const span of line.spans || []) {
-          if (span.type !== 'meend') continue;
-          const from = placed.get(`${span.from.matraIndex}:${span.from.eventIndex}`);
-          const to = placed.get(`${span.to.matraIndex}:${span.to.eventIndex}`);
-          if (from && to && !to.glideFrom) to.glideFrom = from.freq;
+        if (tal) {
+          const cycleMatra = wrapMatra(
+            tal,
+            (line.startMatra || 1) + passOffset + playedOrdinal
+          );
+          let accent = 'plain';
+          if (markerAtMatra(tal, cycleMatra) !== null) {
+            const v = vibhagOfMatra(tal, cycleMatra);
+            accent =
+              v === tal.samVibhag
+                ? 'sam'
+                : (tal.khaliVibhags || []).includes(v)
+                  ? 'khali'
+                  : 'vibhag';
+          }
+          events.push({ kind: 'tick', t: matraStart, accent, cycleMatra });
         }
-        passOffset += passOrder.length;
+
+        const evs = line.matras[matraIndex].events;
+
+        // Whole-matra sustain: extend whatever is ringing.
+        if (evs.length === 1 && evs[0].type === 'sustain') {
+          if (ringing) ringing.dur += spm * (evs[0].dur.num / evs[0].dur.den);
+          t = matraStart + spm;
+          return;
+        }
+
+        // Kan slivers. Same-beat graces ({dP}m) steal from the FRONT of
+        // the destination; pre-beat graces ({dP} m) sound BEFORE the beat,
+        // trimming whatever rings — the destination keeps its whole beat.
+        // Either way, the grid never moves.
+        const preGraces = evs.filter((e) => e.grace && e.preBeat);
+        const sameGraces = evs.filter((e) => e.grace && !e.preBeat);
+        const sliverOf = (n) => (n > 0 ? Math.min(GRACE_FRACTION, GRACE_CAP / n) * spm : 0);
+        const preSliver = sliverOf(preGraces.length);
+        const sliver = sliverOf(sameGraces.length);
+
+        if (preGraces.length > 0) {
+          const total = preGraces.length * preSliver;
+          let start = Math.max(0, matraStart - total);
+          if (ringing && ringing.t + ringing.dur > start) {
+            ringing.dur = Math.max(0, start - ringing.t);
+          }
+          const actualSliver = (matraStart - start) / preGraces.length || 0;
+          preGraces.forEach((e, gi) => {
+            const eventIndex = evs.indexOf(e);
+            const ev = {
+              kind: 'note',
+              t: start + gi * actualSliver,
+              dur: actualSliver,
+              ch: e.ch,
+              semitone: SEMITONES[e.ch],
+              octave: e.octave || 0,
+              freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
+              grace: true,
+              preBeat: true,
+            };
+            events.push(ev);
+            placed.set(`${matraIndex}:${eventIndex}`, ev);
+          });
+        }
+
+        let cursor = matraStart;
+        let graceTotal = sameGraces.length * sliver;
+        evs.forEach((e, eventIndex) => {
+          if (e.grace && e.preBeat) return; // already placed above
+          const frac = e.dur.num / e.dur.den;
+          if (e.type === 'note' && e.grace) {
+            const ev = {
+              kind: 'note',
+              t: cursor,
+              dur: sliver,
+              ch: e.ch,
+              semitone: SEMITONES[e.ch],
+              octave: e.octave || 0,
+              freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
+              grace: true,
+            };
+            events.push(ev);
+            placed.set(`${matraIndex}:${eventIndex}`, ev);
+            cursor += sliver;
+            return;
+          }
+          let dur = spm * frac;
+          if (graceTotal > 0 && e.type === 'note') {
+            dur -= graceTotal; // the destination pays for its graces
+            graceTotal = 0;
+          }
+          if (e.type === 'note') {
+            const ev = {
+              kind: 'note',
+              t: cursor,
+              dur,
+              ch: e.ch,
+              semitone: SEMITONES[e.ch],
+              octave: e.octave || 0,
+              freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
+            };
+            events.push(ev);
+            placed.set(`${matraIndex}:${eventIndex}`, ev);
+            ringing = ev;
+            cursor += dur;
+          } else if (e.type === 'rest') {
+            ringing = null;
+            cursor += dur;
+          } else {
+            // Partial sustain inside a subdivided matra extends whatever is
+            // ringing. writtenSlots is visual metadata only; timing remains
+            // exactly the fraction produced by the parser.
+            if (ringing) ringing.dur += dur;
+            cursor += dur;
+          }
+        });
+        t = matraStart + spm;
+      });
+
+      // Resolve meend spans for this pass: the destination glides from
+      // the source's pitch. Kan spans need nothing — graces already sound.
+      for (const span of line.spans || []) {
+        if (span.type !== 'meend') continue;
+        const from = placed.get(`${span.from.matraIndex}:${span.from.eventIndex}`);
+        const to = placed.get(`${span.to.matraIndex}:${span.to.eventIndex}`);
+        if (from && to && !to.glideFrom) to.glideFrom = from.freq;
       }
+      passOffset += passOrder.length;
+    }
+
+    // Terminal `gat`: replay the nearest preceding Gat section once, then
+    // resume at the next written line. The replay keeps cursor highlighting
+    // but does not create duplicate lineStarts, and nested return cues are
+    // ignored so a printed instruction can never create an infinite loop.
+    if (allowReturnCue && line.returnCue) {
+      const targetSectionIndex = cueTargetIndex(line.returnCue, sectionIndex);
+      const target = sections[targetSectionIndex];
+      if (target && targetSectionIndex < sectionIndex) {
+        (target.lines || []).forEach((targetLine, targetLineIndex) => {
+          scheduleLine(target, targetSectionIndex, targetLine, targetLineIndex, {
+            recordLineStart: false,
+            allowReturnCue: false,
+          });
+        });
+      }
+    }
+  };
+
+  sections.forEach((section, sectionIndex) => {
+    (section.lines || []).forEach((line, lineIndex) => {
+      scheduleLine(section, sectionIndex, line, lineIndex);
     });
   });
 

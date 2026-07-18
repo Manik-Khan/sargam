@@ -52,3 +52,39 @@ print.
 The diagnostics list is still collapsed on demand. Each visible issue is now a
 button: selecting it focuses the text editor, scrolls to its source line, and
 selects either the reported token or the full line when no column is available.
+
+## Visible internal hold slots
+
+A dash written inside a one-beat cluster is both time and ink:
+
+```text
+DnS-   g---   -.nS   g-S   gm-
+```
+
+The renderer now keeps every written subdivision visible. `DnS-` prints four
+equal slots (`D n S —`), and `g---` prints `g — — —`, with the rhythmic
+under-arc covering the complete beat. The extra dashes are sustains, never new
+MIDI attacks. This distinction is stored explicitly because `g---` reduces to
+one whole beat mathematically; duration alone cannot remember that four slots
+were written.
+
+Bracket hierarchy remains distinct. `[SR g]` gives `g` half of the beat because
+it is the second of two outer slots, but it does not invent a hold dash that the
+writer did not enter.
+
+## Terminal `gat` return cue
+
+At the end of a music line, lowercase `gat` is a zero-time structural cue:
+
+```text
+S .n .D .n gat
+```
+
+It prints as a small instruction after the line. Playback finishes the current
+line, replays the nearest preceding section labelled `Gat` once, then resumes
+with the next written line. The inserted replay does not recursively honor
+another return cue, so the structure cannot loop accidentally.
+
+`gat` is legal only as the final token. In the middle of a line it produces a
+clickable diagnostic. If no earlier `Gat` section exists, Sargam reports the
+missing target and does not guess.

@@ -156,6 +156,7 @@ function serializeMusicLine(line, tal) {
     else body += p;
   }
   body = body.replace(/\s+/g, ' ').replace(/\/ /g, '/').replace(/ \//g, '/').trim();
+  if (line.returnCue?.target) body = `${body} ${line.returnCue.target}`.trim();
 
   const prefix = [];
   // @N emits only when the author wrote it — auto-continued positions are
@@ -233,44 +234,147 @@ function matraToken(line, k) {
   const spacedPrefix = pre.length ? `{${pre.map(noteAtom).join('')}} ` : '';
   const gracePrefix = spacedPrefix + (graces.length ? `{${graces.map(noteAtom).join('')}}` : '');
 
-  // Single whole-matra event.
+  // Single whole-matra event. Explicit in-beat hold slots survive even
+  // when their fractions reduce to 1/1 (`g---` must not serialize as `g`).
   if (evs.length === 1 && evs[0].dur.num === evs[0].dur.den) {
     const e = evs[0];
-    if (e.type === 'note')
-      return gracePrefix + withinMatraTilde(line, matraIndex, [noteAtom(e)], [0]);
-    if (e.type === 'rest') return '.';
-    return '-';
+    const writtenSlots = Math.max(1, Number(e.writtenSlots) || 1);
+    if (e.type === 'note') {
+      const atom = noteAtom(e) + '-'.repeat(writtenSlots - 1);
+      return gracePrefix + withinMatraTilde(line, matraIndex, [atom], [0]);
+    }
+    if (e.type === 'rest') {
+      if (writtenSlots === 1) return '.';
+      return `[${['.', ...Array(writtenSlots - 1).fill('-')].join(' ')}]`;
+    }
+    if (writtenSlots === 1) return '-';
+    return `[${Array(writtenSlots).fill('-').join(' ')}]`;
   }
 
-  // Subdivided matra: compute slot counts from durations.
-  const L = evs.reduce((acc, e) => lcm(acc, e.dur.den), 1);
-  const slots = evs.map((e) => (e.dur.num * L) / e.dur.den);
+  // Subdivided matra. Explicit dash extensions are source meaning,
+  // not something inferred from a long duration: `[SR g]` gives g half a
+  // beat without spelling a hold, while `DnS-` explicitly prints one.
+  const explicitHolds = evs.some((e) => Number(e.writtenSlots) > 1);
   const hasRest = evs.some((e) => e.type === 'rest');
+  const hasSustain = evs.some((e) => e.type === 'sustain');
 
-  if (hasRest) {
-    // Bracket form: each event is an atom slot plus `-` extension slots.
-    const entries = [];
-    evs.forEach((e, i) => {
-      entries.push(e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-');
-      for (let s = 1; s < slots[i]; s++) entries.push('-');
+  if (explicitHolds || hasSustain) {
+    if (hasRest) {
+      const entries = [];
+      evs.forEach((e) => {
+        entries.push(e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-');
+        for (let slot = 1; slot < Math.max(1, Number(e.writtenSlots) || 1); slot++) {
+          entries.push('-');
+        }
+      });
+      return gracePrefix + `[${entries.join(' ')}]`;
+    }
+    const atoms = evs.map((e) => {
+      const base = e.type === 'note' ? noteAtom(e) : '-';
+      return base + '-'.repeat(Math.max(1, Number(e.writtenSlots) || 1) - 1);
     });
+    return (
+      gracePrefix +
+      withinMatraTilde(
+        line,
+        matraIndex,
+        atoms,
+        evs.map((_, i) => pre.length + graces.length + i)
+      )
+    );
+  }
+
+  const sameDuration = evs.every(
+    (e) => e.dur.num * evs[0].dur.den === evs[0].dur.num * e.dur.den
+  );
+  if (sameDuration && !hasRest) {
+    const atoms = evs.map((e) => (e.type === 'note' ? noteAtom(e) : '-'));
+    return (
+      gracePrefix +
+      withinMatraTilde(
+        line,
+        matraIndex,
+        atoms,
+        evs.map((_, i) => pre.length + graces.length + i)
+      )
+    );
+  }
+  if (sameDuration && hasRest) {
+    const entries = evs.map((e) => (e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-'));
     return gracePrefix + `[${entries.join(' ')}]`;
   }
 
-  // Cluster form: atoms with merged `-` extensions.
+  // Unequal durations without written holds came from bracket hierarchy,
+  // e.g. `[SR g]`: two equal outer slots, the first divided into S/R.
+  const hierarchical = bracketFromDurations(evs);
+  if (hierarchical) return gracePrefix + hierarchical;
+
+  // Defensive fallback for a hand-built model: preserve timing even when it
+  // cannot be expressed as equal bracket groups. This is not reached by the
+  // parser's own grammar.
+  const L = evs.reduce((acc, e) => lcm(acc, e.dur.den), 1);
+  const slots = evs.map((e) => (e.dur.num * L) / e.dur.den);
+  if (hasRest) {
+    const entries = [];
+    evs.forEach((e, i) => {
+      entries.push(e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-');
+      for (let slot = 1; slot < slots[i]; slot++) entries.push('-');
+    });
+    return gracePrefix + `[${entries.join(' ')}]`;
+  }
   const atoms = evs.map((e, i) => {
-    const base = e.type === 'note' ? noteAtom(e) : '-'.repeat(slots[i]);
-    return e.type === 'note' ? base + '-'.repeat(slots[i] - 1) : base;
+    const base = e.type === 'note' ? noteAtom(e) : '-';
+    return base + '-'.repeat(slots[i] - 1);
   });
-  return (
-    gracePrefix +
-    withinMatraTilde(
-      line,
-      matraIndex,
-      atoms,
-      evs.map((_, i) => pre.length + graces.length + i)
-    )
-  );
+  return gracePrefix + withinMatraTilde(line, matraIndex, atoms, evs.map((_, i) => i));
+
+}
+
+/** Recover equal outer bracket slots from exact event durations.
+ * `[SR g]` → groups [SR, g], while explicit holds are handled earlier. */
+function bracketFromDurations(evs) {
+  const L = evs.reduce((acc, e) => lcm(acc, e.dur.den), 1);
+  const units = evs.map((e) => (e.dur.num * L) / e.dur.den);
+  for (let slotCount = 2; slotCount <= L; slotCount++) {
+    if (L % slotCount !== 0) continue;
+    const slotUnits = L / slotCount;
+    const groups = [];
+    let group = [];
+    let sum = 0;
+    let valid = true;
+    for (let i = 0; i < evs.length; i++) {
+      if (units[i] > slotUnits || sum + units[i] > slotUnits) {
+        valid = false;
+        break;
+      }
+      group.push(i);
+      sum += units[i];
+      if (sum === slotUnits) {
+        const firstUnits = units[group[0]];
+        if (!group.every((idx) => units[idx] === firstUnits)) {
+          valid = false;
+          break;
+        }
+        if (group.length > 1 && group.some((idx) => evs[idx].type !== 'note')) {
+          valid = false;
+          break;
+        }
+        groups.push(group);
+        group = [];
+        sum = 0;
+      }
+    }
+    if (!valid || group.length > 0 || groups.length !== slotCount) continue;
+    const tokens = groups.map((indices) => {
+      if (indices.length === 1) {
+        const e = evs[indices[0]];
+        return e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-';
+      }
+      return indices.map((idx) => noteAtom(evs[idx])).join('');
+    });
+    return `[${tokens.join(' ')}]`;
+  }
+  return null;
 }
 
 /** Prefix `~` for meend spans within this matra. The old after-atom form

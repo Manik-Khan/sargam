@@ -19,6 +19,16 @@ export function friendlyProblemMessage(message) {
     return `Sargam did not recognize “${match[1]}” as notation on this line.`;
   }
 
+  match = /^return cue '([^']+)' must be the final token on the line$/.exec(text);
+  if (match) {
+    return `“${match[1]}” is a return instruction and must sit at the end of the line.`;
+  }
+
+  match = /^return cue '([^']+)' has no preceding ([^ ]+) section$/.exec(text);
+  if (match) {
+    return `This line says to return to ${match[1]}, but no earlier ${match[2]} section was found.`;
+  }
+
   return text;
 }
 
