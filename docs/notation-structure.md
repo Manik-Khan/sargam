@@ -88,3 +88,12 @@ another return cue, so the structure cannot loop accidentally.
 `gat` is legal only as the final token. In the middle of a line it produces a
 clickable diagnostic. If no earlier `Gat` section exists, Sargam reports the
 missing target and does not guess.
+
+## Discrete internal hold slots
+
+An internal dash is a countable subdivision position, not a stretchable glyph.
+`DnS-` and `g---` therefore render as four distinct, evenly spaced microbeat
+slots. Hold slots use short centered rules with visible space between them;
+the under-arc spans the complete written slot group. These marks do not add
+MIDI attacks or alter timing.
+

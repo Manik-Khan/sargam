@@ -71,12 +71,24 @@ export const smokes = [
       const root = renderDocument(doc);
       const cells = [...root.querySelectorAll('.sr-cell')];
       assert.equal(cells[0].querySelector('.sr-timed-slots').dataset.writtenSlots, '4');
+      assert.deepEqual(
+        [...cells[0].querySelectorAll('.sr-slot')].map((slot) => slot.dataset.slotKind),
+        ['attack', 'attack', 'attack', 'hold']
+      );
       assert.equal(cells[0].querySelectorAll('.sr-micro-hold').length, 1);
       assert.ok(cells[0].querySelector('.sr-underarc'));
       assert.equal(cells[1].querySelector('.sr-timed-slots').dataset.writtenSlots, '4');
+      assert.deepEqual(
+        [...cells[1].querySelectorAll('.sr-slot')].map((slot) => slot.dataset.slotKind),
+        ['attack', 'hold', 'hold', 'hold']
+      );
       assert.equal(cells[1].querySelectorAll('.sr-micro-hold').length, 3);
       assert.ok(cells[1].querySelector('.sr-underarc'));
       assert.equal(cells[1].textContent.includes('g———'), true);
+      assert.equal(
+        cells[1].querySelector('.sr-timed-slots').style.gridTemplateColumns,
+        'repeat(4, minmax(0.84em, max-content))'
+      );
     },
   },
   {

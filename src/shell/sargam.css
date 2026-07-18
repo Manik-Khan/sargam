@@ -86,17 +86,38 @@
    attacks. Grace notes stay outside this metric grid. */
 .sr-timed-slots {
   display: inline-grid;
+  grid-auto-flow: column;
   align-items: end;
-  justify-items: stretch;
+  justify-items: center;
+  column-gap: 0.22em;
   min-width: 1em;
 }
 .sr-slot {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  min-width: 0.72em;
+  min-width: 0.84em;
 }
-.sr-hold-slot .sr-ch { color: var(--sr-dim); }
+/* An internal `-` is a discrete microbeat position, not a scalable em-dash.
+   Draw a short centered rule inside each slot so g--- reads as g  –  –  –,
+   with three countable holds, in both screen and print output. The literal
+   en dash remains in the DOM for copy/accessibility but is visually replaced
+   by this fixed-size mark. */
+.sr-micro-hold .sr-ch {
+  position: relative;
+  width: 0.84em;
+  min-width: 0.84em;
+  color: transparent;
+}
+.sr-micro-hold .sr-ch::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.48em;
+  border-top: 1.35px solid var(--sr-dim);
+  transform: translate(-50%, -50%);
+}
 
 /* Reserved in EVERY cell (empty slot when the matra isn't subdivided) so
    all cells are the same height — cells bottom-align, so an optional lane

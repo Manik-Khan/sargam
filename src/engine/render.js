@@ -425,9 +425,17 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   if (visualSlots.length > 0) {
     const slots = h('span', 'sr-timed-slots');
     slots.setAttribute('data-written-slots', String(visualSlots.length));
-    slots.style.gridTemplateColumns = `repeat(${visualSlots.length}, minmax(0.72em, 1fr))`;
-    for (const item of visualSlots) {
+    // Every written microbeat is a real, discrete column. Do not use `1fr`
+    // in an intrinsic-width inline grid: browsers can collapse those tracks
+    // until adjacent em dashes read as one stretched line. Fixed minimum
+    // slot widths plus a visible gap make DnS- and g--- unambiguously four
+    // written positions while still allowing wide Western spellings to grow.
+    slots.style.gridTemplateColumns = `repeat(${visualSlots.length}, minmax(0.84em, max-content))`;
+    for (let slotIndex = 0; slotIndex < visualSlots.length; slotIndex++) {
+      const item = visualSlots[slotIndex];
       const slot = h('span', 'sr-slot' + (item.hold ? ' sr-hold-slot' : ''));
+      slot.setAttribute('data-slot-index', String(slotIndex));
+      slot.setAttribute('data-slot-kind', item.hold ? 'hold' : 'attack');
       slot.appendChild(renderEvent(item.event, ctx, item.hold));
       slots.appendChild(slot);
     }
