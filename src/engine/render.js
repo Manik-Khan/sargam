@@ -1,3 +1,4 @@
+// SARGAM_NOTATION_STRUCTURE_WAVE_2026_07_18
 // src/engine/render.js — Sargam engine: model → DOM.
 // Plain JS. Produces DOM but never imports React (plan global constraint);
 // `document` is referenced only at call time so jsdom smokes can inject it.
@@ -210,6 +211,27 @@ function renderLine(line, tal, ctx) {
     row.appendChild(wrap);
   }
 
+  // --- first-ending (volta) bracket, sharing the over-arc lane.
+  if (Number.isInteger(line.firstEndingFrom) && line.firstEndingFrom < line.matras.length) {
+    const fromCol = colOf[line.firstEndingFrom];
+    const toCol = colOf[line.matras.length - 1];
+    if (fromCol !== undefined && toCol !== undefined) {
+      const volta = h('div', 'sr-volta sr-volta-first', '1.');
+      volta.setAttribute('data-first-ending', String(line.firstEndingFrom));
+      volta.style.gridRow = '1';
+      volta.style.gridColumn = `${fromCol} / ${toCol + 1}`;
+      volta.style.alignSelf = 'start';
+      volta.style.minHeight = '0.78em';
+      volta.style.borderTop = '1px solid currentColor';
+      volta.style.borderLeft = '1px solid currentColor';
+      volta.style.padding = '0.05em 0 0 0.28em';
+      volta.style.fontSize = '0.72em';
+      volta.style.lineHeight = '1';
+      volta.style.opacity = '0.8';
+      row.appendChild(volta);
+    }
+  }
+
   // --- repeat-open glyph
   if (line.lineRepeat) {
     const open = h('div', 'sr-repeat-open sr-glyphcol', '||:');
@@ -318,8 +340,9 @@ function renderLine(line, tal, ctx) {
   return block;
 }
 
-/** True if a barline falls after 0-based matra index k (derived from tal). */
+/** True if a structural or derived barline falls after 0-based matra k. */
 function boundaryAfter(line, k, tal) {
+  if (line.firstEndingFrom === k + 1) return true;
   return markerAtMatra(tal, line.startMatra + k + 1) !== null;
 }
 

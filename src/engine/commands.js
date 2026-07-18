@@ -1,3 +1,4 @@
+// SARGAM_NOTATION_STRUCTURE_WAVE_2026_07_18
 // src/engine/commands.js — M4 selection commands (M, 2026-07-16: "buttons
 // that let us highlight sections of notes and apply that formatting to the
 // section — so you don't have to remember all of the commands").
@@ -27,8 +28,7 @@ export function applySlide(sel) {
   const [lead, core, tail] = trimmed(sel);
   if (core === '') return lead + '~' + tail;
   if (!/\s/.test(core)) return lead + '~' + core + tail;
-  const m = core.match(/^(\S+)([\s\S]*)$/);
-  return lead + m[1] + '~' + m[2] + tail;
+  return lead + '~(' + core + ')' + tail;
 }
 
 /**

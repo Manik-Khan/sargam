@@ -1,3 +1,4 @@
+// SARGAM_NOTATION_STRUCTURE_WAVE_2026_07_18
 // schedule.js — M3 "hear your music", Wave A (spec §6).
 // Flattens the parsed model into ONE timed event list: melody notes with
 // exact onsets/durations (seconds derived from exact matra fractions),
@@ -106,13 +107,18 @@ export function scheduleDocument(doc, opts = {}) {
         }
       }
       const passes = line.lineRepeat ? 2 : 1;
-
+      const endingCut = Number.isInteger(line.firstEndingFrom)
+        ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
+        : -1;
+      let passOffset = 0;
       for (let pass = 0; pass < passes; pass++) {
+        // Pass one plays the complete line. Later passes stop at |1, so the next
+        // written line takes the place of the first ending without duplicating it.
+        const passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
         // (matraIndex:eventIndex) → scheduled note, for span resolution.
         const placed = new Map();
         let ringing = null; // last note event, for whole-matra sustains
-
-        order.forEach((matraIndex, playedOrdinal) => {
+        passOrder.forEach((matraIndex, playedOrdinal) => {
           const matraStart = t;
           events.push({
             kind: 'cursor',
@@ -126,7 +132,7 @@ export function scheduleDocument(doc, opts = {}) {
           if (tal) {
             const cycleMatra = wrapMatra(
               tal,
-              (line.startMatra || 1) + playedOrdinal + pass * order.length
+              (line.startMatra || 1) + passOffset + playedOrdinal
             );
             let accent = 'plain';
             if (markerAtMatra(tal, cycleMatra) !== null) {
@@ -247,6 +253,7 @@ export function scheduleDocument(doc, opts = {}) {
           const to = placed.get(`${span.to.matraIndex}:${span.to.eventIndex}`);
           if (from && to && !to.glideFrom) to.glideFrom = from.freq;
         }
+        passOffset += passOrder.length;
       }
     });
   });

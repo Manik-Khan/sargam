@@ -29,10 +29,10 @@ export const smokes = [
     },
   },
   {
-    name: 'slide: a multi-beat selection slides across the boundary (m~ g)',
+    name: 'slide: a multi-beat selection gets one ranged arc (~(m g))',
     fn() {
-      assert.equal(applySlide('m g'), 'm~ g');
-      assert.equal(applySlide('m D -'), 'm~ D -');
+      assert.equal(applySlide('m g'), '~(m g)');
+      assert.equal(applySlide('m D -'), '~(m D -)');
       parses(applySlide('m g'));
     },
   },

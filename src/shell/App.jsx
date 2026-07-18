@@ -1,3 +1,4 @@
+// SARGAM_NOTATION_FOLLOWUP_V3_2026_07_18
 // src/shell/App.jsx — shell: text → parseDocument → renderDocument live per
 // keystroke (spec §4), now wired to M2 "keep your music" (spec §7):
 // toolbar (New/Open/Save/Recent), Cmd+S, debounced autosave to the
@@ -21,6 +22,7 @@ import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
 import NewDocDialog from './NewDocDialog.jsx';
 import ExportView from './ExportView.jsx';
+import ProblemsPanel from './ProblemsPanel.jsx';
 import './sargam.css';
 
 const STARTER = `title: Kahe Ko (khyal) — R. 1732
@@ -501,18 +503,7 @@ export default function App() {
           </div>
         </div>
       </div>
-      <div className={'app-problems' + (problems.length ? ' has-problems' : '')}>
-        {problems.length === 0 ? (
-          <div className="app-problems-ok">No problems.</div>
-        ) : (
-          problems.map((p, i) => (
-            <div className="app-problem" key={i}>
-              line {p.line}
-              {p.col != null ? `, col ${p.col}` : ''}: {p.msg}
-            </div>
-          ))
-        )}
-      </div>
+  <ProblemsPanel problems={problems} text={text} editorRef={editorRef} />
     </div>
   );
 }

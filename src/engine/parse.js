@@ -1,3 +1,5 @@
+// SARGAM_SOFT_BARS_NAVIGATION_V4_2026_07_18
+// SARGAM_NOTATION_STRUCTURE_WAVE_2026_07_18
 // src/engine/parse.js — Sargam engine: text → best-effort model + diagnostics.
 // Plain JS, no React, no DOM. NEVER throws, never rejects a document (spec §2):
 // unparseable fragments become dimmed passthrough runs with a Problem.
@@ -193,6 +195,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     kind: 'music',
     startMatra: 1,
     lineRepeat: false,
+    firstEndingFrom: null, // 0-based matra where |1 begins
     matras: [],
     spans: [],
     phraseRepeats: [],
@@ -237,6 +240,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
   let bracketTilde = false; // a `~` consumed just before a [ or [[
   let pendingGraces = null; // {atoms, col} — `{run} ` awaiting its note (cross-beat kan)
   let phraseFrom = null; // matra index where ( opened
+  let rangedSlideFrom = null; // matra index where ~( opened
   const clusterCtx = {
     line,
     lineNo,
@@ -289,9 +293,35 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
       continue;
     }
 
+    // |1 begins first-pass-only material inside a repeated line. It also
+    // records a soft phrase boundary for source/lyric alignment; tala divisions
+    // are derived independently from tal + @N + counted matras.
+    if (c === '|' && body[i + 1] === '1' && !/\d/.test(body[i + 2] || '')) {
+      bars.push(line.matras.length);
+      if (line.firstEndingFrom !== null) {
+        problems.push({ line: lineNo, col: i + 1, msg: 'only one |1 first ending is supported on a line' });
+      } else {
+        line.firstEndingFrom = line.matras.length;
+      }
+      i += 2;
+      continue;
+    }
     if (c === '|') {
       bars.push(line.matras.length);
       i++;
+      continue;
+    }
+
+    // A ranged slide keeps its written rhythm while drawing one arc from the
+    // first note after ~( to the last note before ). Parentheses without ~
+    // remain phrase-repeat syntax and still require xN.
+    if (c === '~' && body[i + 1] === '(') {
+      if (rangedSlideFrom !== null || phraseFrom !== null) {
+        problems.push({ line: lineNo, col: i + 1, msg: 'nested slide/repeat parentheses are not supported' });
+      } else {
+        rangedSlideFrom = line.matras.length;
+      }
+      i += 2;
       continue;
     }
 
@@ -420,6 +450,21 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     }
 
     if (c === ')') {
+      if (rangedSlideFrom !== null) {
+        const to = line.matras.length - 1;
+        if (to < rangedSlideFrom) {
+          problems.push({ line: lineNo, col: i + 1, msg: 'empty ~( ) slide' });
+        } else {
+          const before = line.spans.length;
+          addMeendOverMatras(line, rangedSlideFrom, to, true);
+          if (line.spans.length === before) {
+            problems.push({ line: lineNo, col: i + 1, msg: '~( ) needs a note at both ends of the slide' });
+          }
+        }
+        rangedSlideFrom = null;
+        i++;
+        continue;
+      }
       const xm = body.slice(i + 1).match(/^x(\d+)/);
       if (phraseFrom === null) {
         problems.push({ line: lineNo, col: i + 1, msg: ') without opening (' });
@@ -472,6 +517,9 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     i = j;
   }
 
+  if (rangedSlideFrom !== null) {
+    problems.push({ line: lineNo, col: null, msg: '~( without closing )' });
+  }
   if (phraseFrom !== null) {
     problems.push({ line: lineNo, col: null, msg: '( without closing )xN' });
   }
@@ -486,19 +534,22 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     });
   }
 
-  // Vibhag validation — only when bars were actually typed (spec: | is
-  // validated; barless lines are legal scratchpad writing).
-  if (tal && bars.length > 0) {
-    validateBars(line, bars, tal, lineNo, problems);
-  } else if (isFree && bars.length > 0) {
-    // Failures narrate: a | in an unmetered section does nothing, so say so.
-    problems.push({
-      line: lineNo,
-      col: null,
-      msg: "'|' has no effect here — this section is unmetered (tal: free applies from above). Add a tal: directive above this line to meter it.",
-    });
+  if (line.firstEndingFrom !== null) {
+    if (!line.lineRepeat) {
+      problems.push({ line: lineNo, col: null, msg: '|1 first ending requires ||: ... :||' });
+    }
+    if (line.firstEndingFrom <= 0) {
+      problems.push({ line: lineNo, col: null, msg: '|1 needs common repeated material before the first ending' });
+    }
+    if (line.firstEndingFrom >= line.matras.length) {
+      problems.push({ line: lineNo, col: null, msg: '|1 first ending is empty' });
+    }
   }
 
+  // SARGAM_SOFT_BARS_NAVIGATION_V4_2026_07_18: Written | characters are soft phrase dividers. They remain in
+  // line._bars for source grouping and lyric/bol alignment, but they do not
+  // assert tala-vibhag boundaries. True tala positions come from the selected
+  // tal, the line's @N start, and the counted matras.
   return line;
 }
 
@@ -594,7 +645,7 @@ function parseToken(tok, col, ctx) {
  * bracket, mirroring `~SR` covering a cluster (spec §3). No-op when there
  * aren't two notes to connect, so it can never invent a span.
  */
-function addMeendOverMatras(line, fromM, toM) {
+function addMeendOverMatras(line, fromM, toM, ranged = false) {
   const firstEvs = line.matras[fromM]?.events || [];
   const lastEvs = line.matras[toM]?.events || [];
   const first = firstEvs.findIndex((e) => e.type === 'note');
@@ -607,11 +658,13 @@ function addMeendOverMatras(line, fromM, toM) {
   }
   if (first === -1 || last === -1) return;
   if (fromM === toM && first === last) return; // one note connects to nothing
-  line.spans.push({
+  const span = {
     type: 'meend',
     from: { matraIndex: fromM, eventIndex: first },
     to: { matraIndex: toM, eventIndex: last },
-  });
+  };
+  if (ranged) span.ranged = true;
+  line.spans.push(span);
 }
 
 /**

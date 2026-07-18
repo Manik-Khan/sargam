@@ -1,3 +1,4 @@
+// SARGAM_NOTATION_STRUCTURE_WAVE_2026_07_18
 // src/engine/serialize.js — Sargam engine: model → canonical text.
 // Plain JS, no React, no DOM. Requirement (spec §2):
 // parse(serialize(parse(t))) is deep-equal stable; for well-formed input,
@@ -96,13 +97,25 @@ function serializeMusicLine(line, tal) {
 
   // 2. Cross-matra meend: trailing ~ on the from matra's token.
   for (const span of line.spans) {
-    if (span.type !== 'meend') continue;
+    if (span.type !== 'meend' || span.ranged) continue;
     if (span.from.matraIndex === span.to.matraIndex) continue; // handled in matraToken
     const item = items.find((it) => it.from <= span.from.matraIndex && span.from.matraIndex <= it.to);
     if (item && !item.text.endsWith('~')) item.text += '~';
   }
 
-  // 3. Phrase repeats.
+  // 3. Ranged multi-matra meend. The parentheses preserve spaces/matras;
+  // unlike a phrase repeat, the closing ) has no xN suffix.
+  for (const span of line.spans) {
+    if (span.type !== 'meend' || !span.ranged) continue;
+    const a = items.find((it) => it.from <= span.from.matraIndex && span.from.matraIndex <= it.to);
+    const b = items.find((it) => it.from <= span.to.matraIndex && span.to.matraIndex <= it.to);
+    if (a && b) {
+      a.text = '~(' + a.text;
+      b.text = b.text + ')';
+    }
+  }
+
+  // 4. Phrase repeats.
   for (const pr of line.phraseRepeats) {
     const a = items.find((it) => it.from === pr.fromMatra);
     const b = items.find((it) => it.to === pr.toMatra);
@@ -112,7 +125,7 @@ function serializeMusicLine(line, tal) {
     }
   }
 
-  // 4. Krintan wrapping (interior joined with /).
+  // 5. Krintan wrapping (interior joined with /).
   for (const span of line.spans) {
     if (span.type !== 'krintan') continue;
     const ai = items.findIndex((it) => it.from <= span.from.matraIndex && span.from.matraIndex <= it.to);
@@ -123,19 +136,21 @@ function serializeMusicLine(line, tal) {
     items[bi].text = items[bi].text + ']]';
   }
 
-  // 5. Assemble with derived bars between matras at vibhag boundaries.
+  // 6. Assemble with derived bars and an explicit |1 first-ending boundary.
   const parts = [];
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     parts.push(it.text);
     if (i === items.length - 1) break;
-    if (tal && boundaryAfter(line, it.to, tal)) parts.push('|');
+    if (line.firstEndingFrom === it.to + 1) parts.push('|1');
+    else if (tal && boundaryAfter(line, it.to, tal)) parts.push('|');
     parts.push(it.joinNext === '/' ? '/' : ' ');
   }
   // Bars glue without surrounding join chars; normalize spacing.
   let body = '';
   for (const p of parts) {
     if (p === '|') body += ' | ';
+    else if (p === '|1') body += ' |1 ';
     else if (p === ' ') body += ' ';
     else if (p === '/') body += '/';
     else body += p;

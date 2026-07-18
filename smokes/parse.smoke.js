@@ -456,14 +456,19 @@ export const smokes = [
 
   // ---- diagnostics: never throws ----
   {
-    name: 'diagnostics: 5-matra vibhag → one problem naming the vibhag, no throw',
+    name: 'phrase bars: @N and typed | coexist without vibhag diagnostics',
     fn: () => {
-      const { problems } = line('S R g m P | S R g m |');
-      assert.equal(problems.length, 1);
-      assert.match(problems[0].msg, /vibhag 1/);
-      assert.match(problems[0].msg, /5/);
-      assert.match(problems[0].msg, /4/);
-      assert.equal(problems[0].line, 3);
+      const source = `tal: rupak
+
+Gat
+@4 ||: S .n .D .n | S - - | m - | g - | g - m | D - | - - |1 m g R :||
+`;
+      const { doc, problems } = parseDocument(source);
+      assert.deepEqual(problems, [], JSON.stringify(problems, null, 2));
+      const parsed = doc.sections[0].lines[0];
+      assert.equal(parsed.startMatra, 4);
+      assert.equal(parsed.firstEndingFrom, 18);
+      assert.deepEqual(parsed._bars, [4, 7, 9, 11, 14, 16, 18]);
     },
   },
   {
@@ -492,12 +497,13 @@ export const smokes = [
     },
   },
   {
-    name: "diagnostics: '|' in an unmetered section narrates instead of vanishing",
+    name: "phrase bars: '|' is also legal in tal: free",
     fn: () => {
       const { doc, problems } = parseDocument('tal: free\n\nS R | g m\n');
-      assert.equal(doc.sections[0].lines[0].matras.length, 4);
-      assert.equal(problems.length, 1);
-      assert.match(problems[0].msg, /unmetered/);
+      const parsed = doc.sections[0].lines[0];
+      assert.equal(parsed.matras.length, 4);
+      assert.deepEqual(parsed._bars, [2]);
+      assert.deepEqual(problems, []);
     },
   },
   {

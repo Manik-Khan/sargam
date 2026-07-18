@@ -628,3 +628,118 @@
 .app-veiled { visibility: hidden; pointer-events: none; }
 .tb-tabs { display: flex; gap: 2px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--sr-line); }
 @media print { .app-vilambit, .tb-tabs { display: none !important; } }
+
+/* SARGAM_NOTATION_FOLLOWUP_V3_2026_07_18: compact, toggleable diagnostics. The old rules above remain as
+   harmless history; these later rules intentionally override them. */
+.sr-volta-first {
+  display: none !important;
+}
+
+.app-problems {
+  flex: none;
+  max-height: none;
+  overflow: visible;
+  border-top: 1px solid var(--sr-line);
+  background: var(--sr-alert-bg);
+  font-family: system-ui, sans-serif;
+  font-size: 12.5px;
+}
+
+.app-problems-summary {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--sr-alert);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-problems-summary:hover {
+  background: rgba(138, 50, 38, 0.055);
+}
+
+.app-problems-count {
+  font-weight: 600;
+}
+
+.app-problems-toggle {
+  margin-left: auto;
+  color: var(--sr-ink-soft);
+}
+
+.app-problems-list {
+  max-height: 24vh;
+  overflow: auto;
+  border-top: 1px solid color-mix(in srgb, var(--sr-alert) 18%, transparent);
+  padding: 4px 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.app-problem {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 16px;
+  color: var(--sr-alert);
+}
+
+.app-problem + .app-problem {
+  border-top: 1px solid color-mix(in srgb, var(--sr-alert) 9%, transparent);
+}
+
+.app-problem-location {
+  color: var(--sr-ink-soft);
+  white-space: nowrap;
+}
+
+.app-problem-message {
+  min-width: 0;
+}
+
+.app-problem-count {
+  color: var(--sr-ink-soft);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .app-problem {
+    grid-template-columns: 1fr max-content;
+  }
+
+  .app-problem-message {
+    grid-column: 1 / -1;
+  }
+}
+
+@media print {
+  .app-problems {
+    display: none !important;
+  }
+}
+
+/* SARGAM_SOFT_BARS_NAVIGATION_V4_2026_07_18: clickable diagnostics that jump to the source editor. */
+.app-problem {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-problem:hover {
+  background: rgba(138, 50, 38, 0.055);
+}
+
+.app-problem:focus-visible {
+  outline: 2px solid var(--sr-alert);
+  outline-offset: -2px;
+}
+
