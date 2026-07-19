@@ -79,8 +79,18 @@ export function makeAudioEnv() {
     return response;
   };
 
+  const createContext = () => {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    try {
+      return new AudioContextClass({ latencyHint: 'interactive' });
+    } catch {
+      // Older WebKit builds may reject constructor options.
+      return new AudioContextClass();
+    }
+  };
+
   return {
-    createContext: () => new (window.AudioContext || window.webkitAudioContext)(),
+    createContext,
     fetchArrayBuffer: async (url) => (await fetchChecked(url)).arrayBuffer(),
     fetchText: async (url) => (await fetchChecked(url)).text(),
     importModule: (url) => import(/* @vite-ignore */ url),

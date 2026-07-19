@@ -63,32 +63,59 @@ function mockCtx() {
 }
 
 /** Fake timer registry the test advances by hand. */
-function mockTimers() {
-  const timers = new Map();
+function mockTimers(now = () => 0) {
+  const intervals = new Map();
+  const timeouts = new Map();
   let nextId = 1;
+  const fireDueTimeouts = () => {
+    let ran = true;
+    while (ran) {
+      ran = false;
+      for (const [id, timer] of [...timeouts]) {
+        if (timer.at <= now() + 1e-9) {
+          timeouts.delete(id);
+          timer.fn();
+          ran = true;
+        }
+      }
+    }
+  };
   return {
     setInterval: (fn, ms) => {
       const id = nextId++;
-      timers.set(id, { fn, ms });
+      intervals.set(id, { fn, ms });
       return id;
     },
-    clearInterval: (id) => timers.delete(id),
-    fire() {
-      for (const { fn } of [...timers.values()]) fn();
+    clearInterval: (id) => intervals.delete(id),
+    setTimeout: (fn, ms) => {
+      const id = nextId++;
+      timeouts.set(id, { fn, at: now() + ms / 1000 });
+      return id;
     },
+    clearTimeout: (id) => timeouts.delete(id),
+    fire() {
+      for (const { fn } of [...intervals.values()]) fn();
+      fireDueTimeouts();
+    },
+    fireTimeouts: fireDueTimeouts,
     get active() {
-      return timers.size;
+      return intervals.size;
+    },
+    get pendingTimeouts() {
+      return timeouts.size;
     },
   };
 }
 
 function make(src) {
   const ctx = mockCtx();
-  const timers = mockTimers();
+  const timers = mockTimers(() => ctx.currentTime);
   const player = createPlayer({
     createContext: () => ctx,
     setInterval: timers.setInterval,
     clearInterval: timers.clearInterval,
+    setTimeout: timers.setTimeout,
+    clearTimeout: timers.clearTimeout,
   });
   player.load(scheduleDocument(parseDocument(src).doc));
   return { ctx, timers, player };
@@ -102,10 +129,10 @@ export const smokes = [
     fn() {
       const { ctx, player } = make(SRC);
       player.play();
-      // At t=0 with a 100ms horizon, only events at t<=0.1 land: S + its tick.
+      // At t=0 with a 300ms horizon, only events at t<=0.3 land.
       assert.ok(ctx._started.length >= 1, 'something scheduled inside the gesture');
       assert.ok(
-        ctx._started.every((s) => s.at <= 0.1 + 1e-9),
+        ctx._started.every((s) => s.at <= 0.3 + 1e-9),
         'nothing beyond the horizon'
       );
     },
@@ -191,6 +218,25 @@ export const smokes = [
       assert.ok(seen.length >= 4, 'all four matra cursors dispatched');
       assert.equal(seen[0].matraIndex, 0);
       assert.equal(seen[3].matraIndex, 3);
+    },
+  },
+  {
+    name: 'audio: lookahead queues audio early but moves the visible cursor at its exact time',
+    fn() {
+      const { timers, ctx, player } = make(
+        'tal: tintal\ntempo: 240\n\nS R\n'
+      );
+      const seen = [];
+      player.onCursor((ev) => seen.push(ev.matraIndex));
+      player.play();
+      assert.deepEqual(seen, [0], 'the second cursor is not shown 250ms early');
+      assert.ok(timers.pendingTimeouts >= 1, 'future cursor is waiting for audio time');
+      ctx.currentTime = 0.24;
+      timers.fireTimeouts();
+      assert.deepEqual(seen, [0]);
+      ctx.currentTime = 0.25;
+      timers.fireTimeouts();
+      assert.deepEqual(seen, [0, 1]);
     },
   },
   {

@@ -64,3 +64,21 @@ This checkpoint carries GeneralUser GS 1.471 from the npm package
 URL and preset catalogue so a newer compatible GeneralUser release can replace
 it later without touching notation syntax, playback scheduling, or saved
 compositions.
+
+## Playback alignment
+
+Sampled voices use an AudioWorklet, so commands are queued farther ahead than
+native Web Audio nodes. The notation cursor is deferred until the exact
+AudioContext event time; it is never advanced merely because an event entered
+the scheduler lookahead window.
+
+For sampled voices, Sargam also:
+
+- waits for the local SoundFont to finish loading before transport begins,
+- gives the first note a short hidden scheduling lead,
+- prepares program, controller, and pitch state before note-on,
+- avoids resending the full controller set for every note,
+- and requests an interactive-latency AudioContext where supported.
+
+These are timing safeguards only. They do not alter written pitch, tempo, or
+note duration.

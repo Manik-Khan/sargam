@@ -136,6 +136,10 @@ export default function App() {
   }, [player]); // restore the saved transport preferences once
 
   useEffect(() => {
+    if (isSoundfontVoice(melodyVoice)) void player.prepareMelodyVoice();
+  }, [melodyVoice, player]);
+
+  useEffect(() => {
     player.onCursor((ev) =>
       setPlayCursor({ sectionIndex: ev.sectionIndex, lineIndex: ev.lineIndex, matraIndex: ev.matraIndex })
     );
@@ -177,13 +181,30 @@ export default function App() {
     return null;
   };
 
-  const doPlayPause = () => {
+  const doPlayPause = async () => {
     if (playing) {
       player.pause();
       setPlaying(false);
       setPosition(player.position);
       return;
     }
+
+    // Do not begin a sampled-voice transport while the 30 MB bank is still
+    // loading. Starting immediately used the pluck fallback for the opening
+    // notes and made the selected instrument appear to enter late.
+    if (isSoundfontVoice(player.melodyVoice) && !player.soundfontReady) {
+      const label = melodyVoiceLabel(player.melodyVoice);
+      setNotice(`Loading ${label} before playback…`);
+      const ready = await player.prepareMelodyVoice();
+      if (!ready) {
+        const detail = player.soundfontError?.message;
+        setNotice(
+          `${label} could not load${detail ? `: ${detail}` : ''}. ` +
+            'Current Pluck will be used as the fallback.'
+        );
+      }
+    }
+
     const range = loopMode === 'off' ? null : rangeFor(loopMode);
     player.setLoop(range);
     const from =

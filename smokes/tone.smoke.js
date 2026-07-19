@@ -161,25 +161,32 @@ export const smokes = [
       for (const voice of SOUNDFONT_VOICES) {
         calls.length = 0;
         adapter.setVoice(voice);
+        const def = MELODY_VOICE_DEFS[voice];
+        assert.ok(
+          calls.some((c) => c[0] === 'program' && c[2] === def.program),
+          `${voice} selects program ${def.program}`
+        );
+
+        calls.length = 0;
         adapter.play(
           { freq: 440, glideFrom: null, dur: 0.5, grace: false },
           at,
           voice,
           { velocity: 0.5 }
         );
-        const def = MELODY_VOICE_DEFS[voice];
-        assert.ok(
-          calls.some((c) => c[0] === 'program' && c[2] === def.program),
-          `${voice} selects program ${def.program}`
-        );
         const noteOns = calls.filter((c) => c[0] === 'on');
         assert.equal(noteOns.length, 1, `${voice} has one untransposed fundamental`);
         assert.equal(noteOns[0][2], 69, `${voice} plays A4 as MIDI 69`);
         assert.equal(noteOns[0][4]?.time, at);
-        assert.ok(
-          calls.some((c) => c[0] === 'bend' && c[2] === 8192 && c[3]?.time === at),
-          `${voice} is centered at concert pitch`
+        assert.equal(
+          calls.filter((c) => c[0] === 'cc').length,
+          0,
+          `${voice} does not flood the worklet with per-note controller setup`
         );
+        const center = calls.find((c) => c[0] === 'bend' && c[2] === 8192);
+        assert.ok(center, `${voice} is centered at concert pitch`);
+        assert.ok(center[3]?.time < at, `${voice} pitch is prepared before note-on`);
+        assert.ok(at - center[3].time <= 0.041);
         at += 1;
       }
 
@@ -196,7 +203,7 @@ export const smokes = [
         [57, 69, 81],
         'optional harmonium layers surround but do not replace the written pitch'
       );
-      assert.ok(calls.some((c) => c[0] === 'bend' && c[3]?.time === 20));
+      assert.ok(calls.some((c) => c[0] === 'bend' && c[3]?.time < 20));
       assert.equal(calls.filter((c) => c[0] === 'construct').length, 0);
     },
   },

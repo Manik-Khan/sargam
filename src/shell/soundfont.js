@@ -30,6 +30,7 @@ export const GENERALUSER_SOUNDFONT_URL =
 
 const CHANNELS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15]);
 const PITCH_RANGE = 12;
+const SETUP_LEAD_S = 0.04;
 
 export function frequencyToMidi(freq) {
   const f = Number(freq);
@@ -83,6 +84,11 @@ export function createGeneralUserSoundfont(env) {
 
   function opts(at) {
     return Number.isFinite(at) ? { time: at } : undefined;
+  }
+
+  function setupTime(at) {
+    const now = Number(context?.currentTime) || 0;
+    return Math.max(now, Number(at) - SETUP_LEAD_S);
   }
 
   function controller(channel, number, value, at = null) {
@@ -156,15 +162,24 @@ export function createGeneralUserSoundfont(env) {
     return preparePromise;
   }
 
-  function scheduleBend(channel, fromSemitones, toSemitones, at, duration) {
+  function scheduleBend(
+    channel,
+    fromSemitones,
+    toSemitones,
+    setupAt,
+    noteAt,
+    duration
+  ) {
     if (!synth) return;
-    synth.pitchWheel(channel, bendValue(fromSemitones), opts(at));
+    // Establish the starting pitch before note-on. The moving bend begins at
+    // the written note time, so setup latency cannot push the attack late.
+    synth.pitchWheel(channel, bendValue(fromSemitones), opts(setupAt));
     const steps = Math.max(1, Math.min(8, Math.round(duration / 0.018)));
     for (let i = 1; i <= steps; i++) {
       const p = i / steps;
       const eased = 1 - Math.pow(1 - p, 2);
       const semis = fromSemitones + (toSemitones - fromSemitones) * eased;
-      synth.pitchWheel(channel, bendValue(semis), opts(at + duration * p));
+      synth.pitchWheel(channel, bendValue(semis), opts(noteAt + duration * p));
     }
   }
 
@@ -184,12 +199,25 @@ export function createGeneralUserSoundfont(env) {
       Math.min(127, Math.round(toneVelocity(s.velocity, ev.grace) * 127))
     );
 
-    if (channelVoice.get(channel) !== mode) applyPreset(channel, mode, at);
-    applyChannelSettings(channel, mode, s, at);
+    const setupAt = setupTime(at);
+    if (channelVoice.get(channel) !== mode) {
+      applyPreset(channel, mode, setupAt);
+      applyChannelSettings(channel, mode, s, setupAt);
+    }
+    // Settings are already applied to every channel by setVoice/setSettings.
+    // Avoid re-sending six controller messages for every single note; that
+    // message burst can make real-time worklet playback trail the scheduler.
     if (glideDuration > 0.005) {
-      scheduleBend(channel, startRelative, targetRelative, at, glideDuration);
+      scheduleBend(
+        channel,
+        startRelative,
+        targetRelative,
+        setupAt,
+        at,
+        glideDuration
+      );
     } else {
-      synth.pitchWheel(channel, bendValue(targetRelative), opts(at));
+      synth.pitchWheel(channel, bendValue(targetRelative), opts(setupAt));
     }
 
     const notes = [target.midi];

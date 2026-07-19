@@ -29,7 +29,8 @@ import {
   toneVelocity,
 } from './tone.js';
 
-const LOOKAHEAD_S = 0.1; // schedule this far ahead of the audio clock
+const LOOKAHEAD_S = 0.3; // AudioWorklet commands need comfortable lead time
+const SOUNDFONT_START_LEAD_S = 0.06; // first sampled note is queued before it is due
 const TICK_MS = 25; // driver timer period
 const noop = () => {};
 
@@ -70,11 +71,14 @@ function decodeAudioData(context, arrayBuffer) {
  *   createContext: () => AudioContext-like,
  *   fetchArrayBuffer?: (url: string) => Promise<ArrayBuffer>,
  *   setInterval?: Function, clearInterval?: Function,
+ *   setTimeout?: Function, clearTimeout?: Function,
  * }} env
  */
 export function createPlayer(env) {
   const setI = env.setInterval || ((fn, ms) => setInterval(fn, ms));
   const clearI = env.clearInterval || ((id) => clearInterval(id));
+  const setT = env.setTimeout || ((fn, ms) => setTimeout(fn, ms));
+  const clearT = env.clearTimeout || ((id) => clearTimeout(id));
 
   let ctx = null;
   let schedule = null;
@@ -95,6 +99,7 @@ export function createPlayer(env) {
   let droneMode = 'off'; // off | sa-pa | sa-ma
   let onCursor = noop;
   let onStop = noop;
+  const cursorTimers = new Set();
   let masterGains = null;
   let mixBus = null;
   let melodyFilter = null;
@@ -279,6 +284,26 @@ export function createPlayer(env) {
 
   function schedTime(ev) {
     return startedAt + (ev.t - offset);
+  }
+
+  function clearCursorTimers() {
+    for (const id of cursorTimers) clearT(id);
+    cursorTimers.clear();
+  }
+
+  // Cursor events are discovered during lookahead, but the screen must move
+  // at the event's AudioContext time rather than up to LOOKAHEAD_S early.
+  function dispatchCursorAt(ev, at) {
+    const delayMs = Math.max(0, (at - ctx.currentTime) * 1000);
+    if (delayMs <= 2) {
+      if (playing) onCursor(ev, at);
+      return;
+    }
+    const id = setT(() => {
+      cursorTimers.delete(id);
+      if (playing) onCursor(ev, at);
+    }, delayMs);
+    cursorTimers.add(id);
   }
 
   // ---- melody voices ----
@@ -539,7 +564,7 @@ export function createPlayer(env) {
       if (loop && ev.t >= loop.to) break; // handled by the loop wrap below
       if (ev.kind === 'note') playNote(ev, at);
       else if (ev.kind === 'tick') playTick(ev, at);
-      else if (ev.kind === 'cursor') onCursor(ev, at);
+      else if (ev.kind === 'cursor') dispatchCursorAt(ev, at);
       nextIndex++;
     }
 
@@ -547,6 +572,7 @@ export function createPlayer(env) {
     const now = ctx.currentTime;
     if (now >= startedAt + (endT - offset)) {
       if (loop) {
+        clearCursorTimers();
         // wrap: rebase the clock at the loop head, seek the event index
         startedAt = startedAt + (endT - offset - (loop.from - offset)) + 0;
         startedAt = now; // rebase precisely at wrap detection
@@ -573,6 +599,7 @@ export function createPlayer(env) {
       timer = null;
     }
     if (soundfont) soundfont.stopAll(true);
+    clearCursorTimers();
     offset = 0;
     nextIndex = 0;
     nextDroneAt = null;
@@ -591,9 +618,14 @@ export function createPlayer(env) {
       if (talaSound === 'tabla') void prepareTabla();
       if (isSoundfontVoice(melodyVoice)) void prepareSoundfont();
       if (from !== null) offset = from;
-      startedAt = ctx.currentTime;
+      clearCursorTimers();
+      const startLead =
+        isSoundfontVoice(melodyVoice) && soundfont?.ready
+          ? SOUNDFONT_START_LEAD_S
+          : 0;
+      startedAt = ctx.currentTime + startLead;
       nextIndex = seekIndex(offset);
-      nextDroneAt = ctx.currentTime;
+      nextDroneAt = startedAt;
       droneStep = 0;
       playing = true;
       if (timer === null) timer = setI(pump, TICK_MS);
@@ -602,9 +634,10 @@ export function createPlayer(env) {
     },
     pause() {
       if (!playing) return;
-      offset = offset + (ctx.currentTime - startedAt);
+      offset = Math.max(offset, offset + (ctx.currentTime - startedAt));
       playing = false;
       if (soundfont) soundfont.stopAll(true);
+      clearCursorTimers();
       nextDroneAt = null;
       droneStep = 0;
       if (timer !== null) {
@@ -618,8 +651,13 @@ export function createPlayer(env) {
     setLoop(range) {
       loop = range; // {from, to} | null
       if (playing && loop && (offset < loop.from || offset >= loop.to)) {
+        clearCursorTimers();
         offset = loop.from;
-        startedAt = ctx.currentTime;
+        const startLead =
+          isSoundfontVoice(melodyVoice) && soundfont?.ready
+            ? SOUNDFONT_START_LEAD_S
+            : 0;
+        startedAt = ctx.currentTime + startLead;
         nextIndex = seekIndex(loop.from);
       }
     },
@@ -674,7 +712,9 @@ export function createPlayer(env) {
     },
     get position() {
       if (!ctx) return offset;
-      return playing ? offset + (ctx.currentTime - startedAt) : offset;
+      return playing
+        ? Math.max(offset, offset + (ctx.currentTime - startedAt))
+        : offset;
     },
     get talaSound() {
       return talaSound;
