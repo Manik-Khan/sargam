@@ -92,6 +92,20 @@ export const smokes = [
     },
   },
   {
+    name: 'adjacent whole-matra sustains remain separate rendered hold cells',
+    fn() {
+      const { doc } = parseDocument('tal: rupak\n\n-- .nS\n');
+      const root = renderDocument(doc);
+      const cells = [...root.querySelectorAll('.sr-cell')];
+      assert.equal(cells.length, 3);
+      assert.equal(cells[0].querySelectorAll('.sr-sustain:not(.sr-micro-hold)').length, 1);
+      assert.equal(cells[1].querySelectorAll('.sr-sustain:not(.sr-micro-hold)').length, 1);
+      assert.equal(cells[0].querySelector('.sr-glyphs').textContent, '—');
+      assert.equal(cells[1].querySelector('.sr-glyphs').textContent, '—');
+      assert.notEqual(cells[0], cells[1], 'each written dash owns a distinct matra cell');
+    },
+  },
+  {
     name: 'micro holds change notation only — MIDI timing and attacks stay exact',
     fn() {
       const schedule = scheduleDocument(parseDocument('tal: rupak\ntempo: 60\n\nDnS- g---\n').doc);

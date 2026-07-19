@@ -97,3 +97,11 @@ slots. Hold slots use short centered rules with visible space between them;
 the under-arc spans the complete written slot group. These marks do not add
 MIDI attacks or alter timing.
 
+
+### Adjacent full-beat holds
+
+Standalone dashes such as `--` are separate matras, not one extensible line.
+Screen and print rendering use one short centered hold mark per matra, with the
+cell spacing preserving the beat boundary. Internal holds use the same visual
+language at a slightly smaller width, so `g---` and `--` are both countable at
+a glance without their neighboring marks fusing together.

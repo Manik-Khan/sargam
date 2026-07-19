@@ -98,26 +98,30 @@
   align-items: flex-end;
   min-width: 0.84em;
 }
-/* An internal `-` is a discrete microbeat position, not a scalable em-dash.
-   Draw a short centered rule inside each slot so g--- reads as g  –  –  –,
-   with three countable holds, in both screen and print output. The literal
-   en dash remains in the DOM for copy/accessibility but is visually replaced
-   by this fixed-size mark. */
-.sr-micro-hold .sr-ch {
+/* A written `-` is a countable hold position, never a scalable em-dash.
+   This applies both to internal microbeat holds (`g---`) and to standalone
+   whole-matra sustains (`--`). The literal dash remains in the DOM for copy
+   and accessibility, but each hold is painted as its own short centered rule.
+   Adjacent whole-beat holds therefore remain visibly separate instead of
+   fusing into one long horizontal stroke. */
+.sr-sustain .sr-ch {
   position: relative;
   width: 0.84em;
   min-width: 0.84em;
   color: transparent;
 }
-.sr-micro-hold .sr-ch::after {
+.sr-sustain .sr-ch::after {
   content: '';
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 0.48em;
+  width: 0.46em;
   border-top: 1.35px solid var(--sr-dim);
   transform: translate(-50%, -50%);
 }
+/* Internal holds sit in tighter subdivision columns, so their mark is a touch
+   shorter than a full-matra sustain while remaining the same glyph family. */
+.sr-micro-hold .sr-ch::after { width: 0.38em; }
 
 /* Reserved in EVERY cell (empty slot when the matra isn't subdivided) so
    all cells are the same height — cells bottom-align, so an optional lane
