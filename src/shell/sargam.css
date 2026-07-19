@@ -37,7 +37,11 @@
 .sr-line-group { margin-bottom: 18px; break-inside: auto; }
 .sr-line-block { margin-bottom: 7px; max-width: 100%; overflow-x: auto; break-inside: avoid; }
 .sr-line-block:last-child { margin-bottom: 0; }
-.sr-line-block[data-system-index]:not([data-system-index="0"]) .sr-row { margin-left: 1.45em; }
+/* Folded systems are continuations of the same musical line, so every
+   system uses the identical notation origin. Do not indent continuation
+   rows: their sam/khali and matra columns should align with neighboring
+   lines and with the first system. */
+.sr-line-block[data-system-index] .sr-row { margin-inline-start: 0; }
 
 .sr-row {
   display: grid;
@@ -538,8 +542,7 @@
   .sr-section-label { break-after: avoid; page-break-after: avoid; }
   .sr-line-group { break-inside: auto; }
   .sr-line-block { break-inside: avoid; page-break-inside: avoid; overflow: visible; }
-  .sr-line-block[data-system-index]:not([data-system-index="0"]) .sr-row { margin-left: 1.45em; }
-}
+  }
 
 /* ---- kan / grace notes (M's grammar, 2026-07-16) ---- */
 /* Small and raised before the full-sized destination, as the handwriting

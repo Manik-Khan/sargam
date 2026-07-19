@@ -1,5 +1,6 @@
 // Responsive musical-system layout + Bageshri starter (2026-07-18).
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { parseDocument } from '../src/engine/parse.js';
 import { renderDocument, renderExport } from '../src/engine/render.js';
@@ -7,6 +8,7 @@ import { getTal } from '../src/engine/tala.js';
 import { planLineSystems } from '../src/engine/layout.js';
 import { BAGESHRI_STARTER } from '../src/examples/bageshri.js';
 
+const shellCss = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
 globalThis.document = dom.window.document;
 
@@ -45,6 +47,19 @@ export const smokes = [
       const indices = [...root.querySelectorAll('.sr-cell')].map((c) => Number(c.dataset.matra));
       assert.deepEqual(indices, Array.from({ length: 14 }, (_, i) => i));
       assert.equal(root.querySelectorAll('[style*="zoom"]').length, 0);
+    },
+  },
+  {
+    name: 'systems: folded continuations keep the same left origin',
+    fn() {
+      assert.match(
+        shellCss,
+        /\.sr-line-block\[data-system-index\] \.sr-row \{ margin-inline-start: 0; \}/,
+      );
+      assert.doesNotMatch(
+        shellCss,
+        /data-system-index[^}]*margin-left:\s*1\.45em/s,
+      );
     },
   },
   {

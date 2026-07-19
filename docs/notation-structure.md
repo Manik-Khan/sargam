@@ -141,3 +141,10 @@ and then resume at the following written section.
 The default blank-session example is now the complete Raga Bageshri Gat and
 Taans corpus. Its copied identity fields are intentionally omitted so every new
 saved document receives its own `id`, `created`, and `modified` values.
+
+### Folded-system alignment
+
+Every visual system generated from one source line starts at the same notation
+origin as the first system and neighboring lines. Continuation rows are not
+indented. Folding changes only vertical flow; it does not create a paragraph-
+style hanging indent or shift sam/khali columns sideways.
