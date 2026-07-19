@@ -225,7 +225,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     startMatra: 1,
     lineRepeat: false,
     firstEndingFrom: null, // 0-based matra where |1 begins
-    returnCue: null, // terminal `gat`: replay the nearest preceding Gat section once
+    returnCue: null, // terminal gat / gat@N / gat!: aligned, explicit, or full Gat return
     matras: [],
     spans: [],
     phraseRepeats: [],
@@ -254,6 +254,41 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     line.startMatra = defaultStart;
   }
 
+  // Terminal Gat return cues are zero-time structure, not note tokens:
+  //   gat     align to the cycle position where this line lands
+  //   gat@N   enter the Gat explicitly at cycle matra N
+  //   gat!    replay the complete Gat from its written beginning
+  // Only the final token is structural; an interior form receives a precise
+  // clickable diagnostic in parseToken.
+  const returnMatch = body.match(/(?:^|[\s|])(gat(?:@\d+|!)?)\s*$/i);
+  if (returnMatch) {
+    const token = returnMatch[1];
+    const cueOffset = returnMatch[0].toLowerCase().indexOf('gat');
+    const cueStart = (returnMatch.index ?? 0) + cueOffset;
+    if (/!$/.test(token)) {
+      line.returnCue = { target: 'gat', mode: 'full' };
+    } else {
+      const explicit = token.match(/@(\d+)$/);
+      if (explicit) {
+        const matra = Number(explicit[1]);
+        if (!Number.isInteger(matra) || matra < 1 || (tal && matra > tal.matras)) {
+          problems.push({
+            line: lineNo,
+            col: cueStart + 1,
+            msg: tal
+              ? `gat@${explicit[1]} is outside ${tal.name}'s 1–${tal.matras} matra cycle`
+              : `gat@${explicit[1]} needs a positive matra number`,
+          });
+        } else {
+          line.returnCue = { target: 'gat', mode: 'matra', matra };
+        }
+      } else {
+        line.returnCue = { target: 'gat', mode: 'align' };
+      }
+    }
+    body = body.slice(0, cueStart).trimEnd();
+  }
+
   // ||: ... :||
   if (body.startsWith('||:')) {
     if (/:\|\|\s*$/.test(body)) {
@@ -265,17 +300,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     }
   }
 
-  // A terminal `gat` is a zero-time return cue, not a note token. It
-  // remains visible in the notation, but the scheduler replays the nearest
-  // preceding section labelled Gat after this line and then resumes. Only the
-  // final token is structural; an interior `gat` is narrated precisely below.
-  const returnMatch = body.match(/(?:^|[\s|])gat\s*$/i);
-  if (returnMatch) {
-    const cueOffset = returnMatch[0].search(/gat/i);
-    const cueStart = (returnMatch.index ?? 0) + cueOffset;
-    line.returnCue = { target: 'gat' };
-    body = body.slice(0, cueStart).trimEnd();
-  }
+
 
   // Scanner state.
   let pendingMeendFrom = null; // EventRef awaiting the next note event
@@ -626,14 +651,14 @@ function parseToken(tok, col, ctx) {
 
   if (tok === '') return;
 
-  // `gat` is structural only as the final token. Keeping this diagnostic in
-  // the token parser makes an accidental interior cue clickable and exact.
-  if (/^gat$/i.test(tok)) {
+  // Gat return forms are structural only as the final token. Keeping this
+  // diagnostic in the token parser makes an accidental interior cue exact.
+  if (/^gat(?:@\d+|!)?$/i.test(tok)) {
     line.passthrough.push({ col: col + 1, text: tok });
     problems.push({
       line: lineNo,
       col: col + 1,
-      msg: "return cue 'gat' must be the final token on the line",
+      msg: `return cue '${tok}' must be the final token on the line`,
     });
     return;
   }

@@ -156,7 +156,14 @@ function serializeMusicLine(line, tal) {
     else body += p;
   }
   body = body.replace(/\s+/g, ' ').replace(/\/ /g, '/').replace(/ \//g, '/').trim();
-  if (line.returnCue?.target) body = `${body} ${line.returnCue.target}`.trim();
+  if (line.returnCue?.target) {
+    const cue = line.returnCue.mode === 'full'
+      ? `${line.returnCue.target}!`
+      : line.returnCue.mode === 'matra' && Number.isInteger(line.returnCue.matra)
+        ? `${line.returnCue.target}@${line.returnCue.matra}`
+        : line.returnCue.target;
+    body = `${body} ${cue}`.trim();
+  }
 
   const prefix = [];
   // @N emits only when the author wrote it — auto-continued positions are

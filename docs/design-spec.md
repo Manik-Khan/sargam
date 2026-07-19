@@ -144,7 +144,7 @@ Instrumental stroke marks: `l` = da (vertical tick under the note), `-` = ra (ho
 
 ## 3.9 Repeats
 
-- **Return to Gat:** terminal `gat` is a zero-time structural cue. It prints after the line, replays the nearest preceding section labelled `Gat` once, then resumes with the next written line. It is legal only as the final token; no target means a diagnostic, never a guessed jump. Replayed material ignores nested return cues to prevent accidental recursion.
+- **Return to Gat:** terminal Gat cues are zero-time structure and legal only as the final token. Plain `gat` enters the nearest preceding section labelled `Gat` at the tala position where the current line lands; `gat@N` explicitly enters at cycle matra N; `gat!` replays from the Gat's written beginning. Each form prints after the line, replays once, then resumes with the next written line. Missing targets and out-of-cycle matras diagnose rather than guess; replayed material ignores nested return cues to prevent recursion.
 
 - `||: ... :||` wraps a whole line for repetition.
 - `( ... )xN` wraps a phrase within a line — the tihai form: `(SR gm P)x3`. Not nested in v1 (nesting is a diagnostic).
@@ -158,7 +158,7 @@ After `tal: free`: no vibhag validation, no derived markers, no tick track. Note
 
 Updates on every keystroke; never goes blank.
 
-- **Layout unit: the matra cell.** Each line is a row of cells sized to the tal (free-flowing in unmetered sections), barlines at vibhag boundaries, derived markers above the first cell of each vibhag, computed from tal + start offset.
+- **Layout unit: the matra cell.** A source line remains one semantic/playback line but may fold into several readable visual systems. Breaks occur only between whole matras, preferring a written soft `|`, then automatically derived sam/khali, then another derived vibhag boundary, then the latest safe beat. The renderer never breaks through a beat cluster, explicit internal holds, `~(...)`, `[[...]]`, or `( )xN`. Barlines and markers remain derived from tal + start offset on every continuation system.
 - **Arcs as SVG**, three distinct styles matching the handwriting: under-arc (automatic, subdivided matras), over-arc (`~` slides, extending into the destination when connected), square over-bracket (krintan, crossing barlines when it does). Arcs scale with their spans.
 - **Octave dots** below/above each note. Register additionally **tints**: mandra cool (blue family), taar warm (red family) — defaults, adjustable later; dots remain load-bearing so print and colorblind reading never depend on color.
 - **Sustains** render as the continuous line: within cells for counted dashes, stretching to the barline for `_`. Dashes render dimmer than notes so held time reads differently from struck time.
@@ -170,7 +170,7 @@ Updates on every keystroke; never goes blank.
 
 ### 4.1 Export view *(added 2026-07-16, M's call — promoted from backlog)*
 
-The artifact you hand to someone, or keep. Export opens the notation **alone** — no toolbar, no editor, no problems strip, identity directives hidden — and invokes the browser print dialog: *Save as PDF* produces the file, a printer produces paper. Same engine output as the preview, so typography needs no second implementation; works offline; works in Safari; no dependencies.
+The artifact you hand to someone, or keep. Export opens the notation **alone** — no toolbar, no editor, no problems strip, identity directives hidden — and invokes the browser print dialog: *Save as PDF* produces the file, a printer produces paper. Preview and export share the same musical-system planner; export uses the printable page width, keeps each system intact across a page break, and may paginate between systems rather than shrinking an entire long line. Works offline; works in Safari; no dependencies.
 
 **Header layout (M's design):** the **raga is the main title**. The remaining metadata (tal, composition type, laya, tempo, and the composition's `title:`) runs as a **list down the far right**. `title:` is not retired by this — raga is the organizing axis, `title:` is the piece's name and is what disambiguates the many compositions in one raga (the recent-files list and filenames depend on it).
 

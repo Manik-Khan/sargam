@@ -78,7 +78,7 @@ Section    { label: string|null, tal: string,          // tal name or 'free'
 Line       { kind: 'music',
              startMatra: int,                          // 1-based; default 1
              lineRepeat: bool,                         // ||: :||
-             returnCue: null|{target,targetSectionIndex}, // terminal gat
+             returnCue: null|{target,mode,matra?,targetSectionIndex}, // gat / gat@N / gat!
              matras: [Matra],
              spans: [Span],                            // meend, krintan
              phraseRepeats: [PhraseRepeat],

@@ -17,6 +17,7 @@
 import { getTal, wrapMatra, markerAtMatra, landing } from './tala.js';
 import { spellDegree } from './western.js';
 import { DEFAULT_SA } from './schedule.js';
+import { planLineSystems } from './layout.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -36,6 +37,7 @@ export function renderDocument(doc, opts = {}) {
     ...opts,
     noteNames: opts.noteNames === 'western' ? 'western' : 'sargam',
     sa: doc?.directives?.sa || DEFAULT_SA,
+    maxSystemEm: Number.isFinite(Number(opts.maxSystemEm)) ? Number(opts.maxSystemEm) : Infinity,
   };
   for (let si = 0; si < (doc.sections || []).length; si++) {
     el.appendChild(renderSection(doc.sections[si], si, ctx));
@@ -143,7 +145,7 @@ export function renderExport(doc, opts = {}) {
 
   // The notation is the same engine output as the preview — no cursor, so
   // no landing reports; no second typographic implementation to drift.
-  page.appendChild(renderDocument(doc, opts));
+  page.appendChild(renderDocument(doc, { maxSystemEm: 40, ...opts }));
   return page;
 }
 
@@ -164,6 +166,23 @@ function renderSection(section, sectionIndex, opts) {
 // ---------------------------------------------------------------------------
 
 function renderLine(line, tal, ctx) {
+  const group = h('div', 'sr-line-group');
+  if (line.sourceLine !== undefined) group.setAttribute('data-source-line', String(line.sourceLine));
+  const ranges = planLineSystems(line, tal, { maxEm: ctx.maxSystemEm });
+  ranges.forEach((range, systemIndex) => {
+    const systemLine = sliceLineForSystem(line, tal, range.from, range.to, systemIndex, ranges.length);
+    const block = renderLineBlock(systemLine, tal, ctx);
+    block.setAttribute('data-system-index', String(systemIndex));
+    block.setAttribute('data-system-count', String(ranges.length));
+    block.setAttribute('data-system-from', String(range.from));
+    block.setAttribute('data-system-to', String(range.to));
+    block.setAttribute('data-system-break', range.reason);
+    group.appendChild(block);
+  });
+  return group;
+}
+
+function renderLineBlock(line, tal, ctx) {
   const block = h('div', 'sr-line-block');
   // click-to-position seam: the shell maps clicks back to the source line
   if (line.sourceLine !== undefined) {
@@ -176,7 +195,9 @@ function renderLine(line, tal, ctx) {
   //     [repeat-close?] [passthrough...]
   const cols = [];
   const colOf = []; // grid column (1-based) of each matra cell
-  if (line.lineRepeat) cols.push('max-content');
+  const showRepeatOpen = line.repeatOpen ?? line.lineRepeat;
+  const showRepeatClose = line.repeatClose ?? line.lineRepeat;
+  if (showRepeatOpen) cols.push('max-content');
   for (let k = 0; k < line.matras.length; k++) {
     colOf[k] = cols.length + 1;
     cols.push(tal ? 'minmax(2.6em, max-content)' : 'max-content');
@@ -186,7 +207,7 @@ function renderLine(line, tal, ctx) {
   }
   let repeatCloseCol = null;
   let returnCueCol = null;
-  if (line.lineRepeat) {
+  if (showRepeatClose) {
     cols.push('max-content');
     repeatCloseCol = cols.length;
   }
@@ -212,8 +233,9 @@ function renderLine(line, tal, ctx) {
           ? 'sr-arc sr-arc-kan'
           : 'sr-arc sr-arc-krintan'
     );
-    wrap.setAttribute('data-from-matra', String(span.from.matraIndex));
-    wrap.setAttribute('data-to-matra', String(span.to.matraIndex));
+    const matraOffset = Number(line._matraOffset) || 0;
+    wrap.setAttribute('data-from-matra', String(matraOffset + span.from.matraIndex));
+    wrap.setAttribute('data-to-matra', String(matraOffset + span.to.matraIndex));
     wrap.style.gridRow = '1';
     wrap.style.gridColumn = `${fromCol} / ${toCol + 1}`; // into the destination
     wrap.appendChild(span.type === 'krintan' ? krintanSvg() : meendSvg());
@@ -242,7 +264,7 @@ function renderLine(line, tal, ctx) {
   }
 
   // --- repeat-open glyph
-  if (line.lineRepeat) {
+  if (showRepeatOpen) {
     const open = h('div', 'sr-repeat-open sr-glyphcol', '||:');
     open.style.gridRow = '2';
     open.style.gridColumn = '1';
@@ -271,7 +293,7 @@ function renderLine(line, tal, ctx) {
   }
 
   // --- repeat-close glyph
-  if (line.lineRepeat && repeatCloseCol !== null) {
+  if (showRepeatClose && repeatCloseCol !== null) {
     const close = h('div', 'sr-repeat-close sr-glyphcol', ':||');
     close.style.gridRow = '2';
     close.style.gridColumn = String(repeatCloseCol);
@@ -280,7 +302,7 @@ function renderLine(line, tal, ctx) {
 
   // --- terminal return cue: visible instruction, zero rhythmic time.
   if (line.returnCue && returnCueCol !== null) {
-    const cue = h('div', 'sr-return-cue', line.returnCue.target);
+    const cue = h('div', 'sr-return-cue', returnCueText(line.returnCue));
     cue.setAttribute('data-return-cue', line.returnCue.target);
     cue.style.gridRow = '2';
     cue.style.gridColumn = String(returnCueCol);
@@ -345,17 +367,61 @@ function renderLine(line, tal, ctx) {
 
   // --- playback cursor (M3 seam)
   const c = ctx.activeCursor;
-  if (
-    c &&
-    c.sectionIndex === ctx.sectionIndex &&
-    c.lineIndex === ctx.lineIndex &&
-    colOf[c.matraIndex] !== undefined
-  ) {
+  if (c && c.sectionIndex === ctx.sectionIndex && c.lineIndex === ctx.lineIndex) {
     const cells = row.querySelectorAll('.sr-cell');
-    cells[c.matraIndex]?.classList.add('sr-active');
+    const localIndex = c.matraIndex - (Number(line._matraOffset) || 0);
+    if (colOf[localIndex] !== undefined) cells[localIndex]?.classList.add('sr-active');
   }
 
   return block;
+}
+
+function returnCueText(cue) {
+  if (!cue) return '';
+  if (cue.mode === 'full') return `${cue.target}!`;
+  if (cue.mode === 'matra' && Number.isInteger(cue.matra)) return `${cue.target}@${cue.matra}`;
+  return cue.target || 'gat';
+}
+
+function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
+  if (to < from) return line;
+  const offsetRef = (ref) => ({ ...ref, matraIndex: ref.matraIndex - from });
+  const sliced = {
+    ...line,
+    startMatra: tal ? wrapMatra(tal, (line.startMatra || 1) + from) : (line.startMatra || 1) + from,
+    matras: line.matras.slice(from, to + 1),
+    spans: (line.spans || [])
+      .filter((span) => span.from.matraIndex >= from && span.to.matraIndex <= to)
+      .map((span) => ({ ...span, from: offsetRef(span.from), to: offsetRef(span.to) })),
+    phraseRepeats: (line.phraseRepeats || [])
+      .filter((repeat) => repeat.fromMatra >= from && repeat.toMatra <= to)
+      .map((repeat) => ({
+        ...repeat,
+        fromMatra: repeat.fromMatra - from,
+        toMatra: repeat.toMatra - from,
+      })),
+    lyrics: (line.lyrics || [])
+      .filter((lyric) => lyric.matraIndex >= from && lyric.matraIndex <= to)
+      .map((lyric) => ({ ...lyric, matraIndex: lyric.matraIndex - from })),
+    bols: (line.bols || [])
+      .filter((bol) => bol.ref.matraIndex >= from && bol.ref.matraIndex <= to)
+      .map((bol) => ({ ...bol, ref: offsetRef(bol.ref) })),
+    firstEndingFrom:
+      Number.isInteger(line.firstEndingFrom) && line.firstEndingFrom >= from && line.firstEndingFrom <= to
+        ? line.firstEndingFrom - from
+        : null,
+    repeatOpen: Boolean(line.lineRepeat && systemIndex === 0),
+    repeatClose: Boolean(line.lineRepeat && systemIndex === systemCount - 1),
+    returnCue: systemIndex === systemCount - 1 ? line.returnCue : null,
+    passthrough: systemIndex === systemCount - 1 ? line.passthrough : [],
+    _matraOffset: from,
+    _isLastSystem: systemIndex === systemCount - 1,
+  };
+  Object.defineProperty(sliced, '_bars', {
+    value: (line._bars || []).filter((bar) => bar > from && bar <= to + 1).map((bar) => bar - from),
+    enumerable: false,
+  });
+  return sliced;
 }
 
 /** True if a structural or derived barline falls after 0-based matra k. */
@@ -401,7 +467,7 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
     'div',
     'sr-cell' + (allSustain ? ' sr-dim' : '') + (evs[0]?.holdToVibhag ? ' sr-hold' : '')
   );
-  cell.setAttribute('data-matra', String(k));
+  cell.setAttribute('data-matra', String((Number(line._matraOffset) || 0) + k));
 
   // Marker lane: derived from tal + start offset; empty node keeps rows aligned.
   const markerText = tal ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + k)) : null;

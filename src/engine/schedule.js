@@ -99,24 +99,9 @@ export function scheduleDocument(doc, opts = {}) {
     return -1;
   };
 
-  const scheduleLine = (
-    section,
-    sectionIndex,
-    line,
-    lineIndex,
-    { recordLineStart = true, allowReturnCue = true } = {}
-  ) => {
-    if (!line.matras || line.matras.length === 0) return;
-    const isFree = section.tal === 'free';
-    const tal = isFree ? null : getTal(section.tal);
-
-    if (recordLineStart) {
-      lineStarts.push({ sectionIndex, lineIndex, sourceLine: line.sourceLine, t });
-    }
-
-    // Unroll phrase repeats into the played order of matra indices.
+  const writtenOrder = (line) => {
     const order = [];
-    for (let i = 0; i < line.matras.length; ) {
+    for (let i = 0; i < (line.matras?.length || 0); ) {
       const pr = (line.phraseRepeats || []).find((r) => r.fromMatra === i);
       if (pr) {
         for (let rep = 0; rep < pr.times; rep++) {
@@ -128,6 +113,49 @@ export function scheduleDocument(doc, opts = {}) {
         i++;
       }
     }
+    return order;
+  };
+
+  const performedMatraCount = (line) => {
+    const order = writtenOrder(line);
+    if (!line.lineRepeat) return order.length;
+    const cut = Number.isInteger(line.firstEndingFrom)
+      ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
+      : -1;
+    return order.length + (cut >= 0 ? cut : order.length);
+  };
+
+  const findEntry = (section, desiredMatra) => {
+    const targetTal = section?.tal === 'free' ? null : getTal(section?.tal);
+    if (!targetTal || !Number.isInteger(desiredMatra)) return null;
+    for (let lineIndex = 0; lineIndex < (section.lines || []).length; lineIndex++) {
+      const candidate = section.lines[lineIndex];
+      for (let matraIndex = 0; matraIndex < (candidate.matras || []).length; matraIndex++) {
+        if (wrapMatra(targetTal, (candidate.startMatra || 1) + matraIndex) === desiredMatra) {
+          return { lineIndex, matraIndex };
+        }
+      }
+    }
+    return null;
+  };
+
+  const scheduleLine = (
+    section,
+    sectionIndex,
+    line,
+    lineIndex,
+    { recordLineStart = true, allowReturnCue = true, startMatraIndex = null } = {}
+  ) => {
+    if (!line.matras || line.matras.length === 0) return;
+    const isFree = section.tal === 'free';
+    const tal = isFree ? null : getTal(section.tal);
+
+    if (recordLineStart) {
+      lineStarts.push({ sectionIndex, lineIndex, sourceLine: line.sourceLine, t });
+    }
+
+    // Unroll phrase repeats into the played order of matra indices.
+    const order = writtenOrder(line);
     const passes = line.lineRepeat ? 2 : 1;
     const endingCut = Number.isInteger(line.firstEndingFrom)
       ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
@@ -136,7 +164,15 @@ export function scheduleDocument(doc, opts = {}) {
     for (let pass = 0; pass < passes; pass++) {
       // Pass one plays the complete line. Later passes stop at |1, so the next
       // written line takes the place of the first ending without duplicating it.
-      const passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
+      let passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
+      let entryOrderOffset = 0;
+      if (pass === 0 && Number.isInteger(startMatraIndex)) {
+        const entry = passOrder.findIndex((matraIndex) => matraIndex === startMatraIndex);
+        if (entry >= 0) {
+          entryOrderOffset = entry;
+          passOrder = passOrder.slice(entry);
+        }
+      }
       // (matraIndex:eventIndex) → scheduled note, for span resolution.
       const placed = new Map();
       let ringing = null; // last note event, for whole-matra sustains
@@ -154,7 +190,7 @@ export function scheduleDocument(doc, opts = {}) {
         if (tal) {
           const cycleMatra = wrapMatra(
             tal,
-            (line.startMatra || 1) + passOffset + playedOrdinal
+            (line.startMatra || 1) + passOffset + entryOrderOffset + playedOrdinal
           );
           let accent = 'plain';
           if (markerAtMatra(tal, cycleMatra) !== null) {
@@ -278,22 +314,38 @@ export function scheduleDocument(doc, opts = {}) {
       passOffset += passOrder.length;
     }
 
-    // Terminal `gat`: replay the nearest preceding Gat section once, then
-    // resume at the next written line. The replay keeps cursor highlighting
-    // but does not create duplicate lineStarts, and nested return cues are
-    // ignored so a printed instruction can never create an infinite loop.
+    // Gat return cues replay a preceding Gat section once and then resume:
+    //   gat     enters at the cycle position where this line lands
+    //   gat@N   enters explicitly at target-cycle matra N
+    //   gat!    begins at the Gat's written start (legacy/full-section form)
+    // Nested cues are ignored so an instruction can never recurse forever.
     if (allowReturnCue && line.returnCue) {
       const targetSectionIndex = cueTargetIndex(line.returnCue, sectionIndex);
       const target = sections[targetSectionIndex];
       if (target && targetSectionIndex < sectionIndex) {
+        const sourceTal = section.tal === 'free' ? null : getTal(section.tal);
+        let desiredMatra = null;
+        if (line.returnCue.mode === 'matra') {
+          desiredMatra = line.returnCue.matra;
+        } else if (line.returnCue.mode !== 'full' && sourceTal) {
+          desiredMatra = wrapMatra(
+            sourceTal,
+            (line.startMatra || 1) + performedMatraCount(line)
+          );
+        }
+        const entry = line.returnCue.mode === 'full' ? null : findEntry(target, desiredMatra);
         (target.lines || []).forEach((targetLine, targetLineIndex) => {
+          if (entry && targetLineIndex < entry.lineIndex) return;
           scheduleLine(target, targetSectionIndex, targetLine, targetLineIndex, {
             recordLineStart: false,
             allowReturnCue: false,
+            startMatraIndex:
+              entry && targetLineIndex === entry.lineIndex ? entry.matraIndex : null,
           });
         });
       }
     }
+
   };
 
   sections.forEach((section, sectionIndex) => {

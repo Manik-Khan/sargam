@@ -105,3 +105,39 @@ Screen and print rendering use one short centered hold mark per matra, with the
 cell spacing preserving the beat boundary. Internal holds use the same visual
 language at a slightly smaller width, so `g---` and `--` are both countable at
 a glance without their neighboring marks fusing together.
+
+## Responsive musical systems
+
+A source music line remains one semantic line for editing, playback, looping,
+and return cues, but the preview/export renderer may fold it into several
+visual systems. System breaks occur only between complete matras.
+
+Break preference is:
+
+1. a written soft divider `|`;
+2. an automatically derived sam or khali boundary;
+3. another automatically derived vibhag boundary;
+4. the last safe whole-matra edge that fits.
+
+A break never cuts through `~(...)`, `[[...]]`, `( )xN`, a beat cluster, or a
+note's written internal hold slots. Preview and export share the same planner;
+export uses a print-page width and no longer shrinks an entire long line.
+
+## Gat return entry
+
+Terminal Gat return cues are zero-time playback structure:
+
+- `gat` enters the nearest preceding Gat at the tala position where the current
+  line lands. A taan that already includes the mukra and lands on sam therefore
+  skips the Gat's written pickup.
+- `gat@N` explicitly enters the Gat at cycle matra `N`.
+- `gat!` replays the Gat from its written beginning.
+
+All three forms print as compact cues, are valid only at line end, replay once,
+and then resume at the following written section.
+
+## Starter composition
+
+The default blank-session example is now the complete Raga Bageshri Gat and
+Taans corpus. Its copied identity fields are intentionally omitted so every new
+saved document receives its own `id`, `created`, and `modified` values.

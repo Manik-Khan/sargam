@@ -1,51 +1,44 @@
-// src/shell/PreviewPane.jsx — mounts the engine's detached DOM in a ref
-// and swaps it per parse (plan Wave 3). React never reaches inside;
-// render.js owns everything below the mount point.
+// src/shell/PreviewPane.jsx — mounts the engine's detached DOM in a ref.
+// Long semantic lines are re-rendered as readable musical systems rather
+// than globally shrunk. The renderer plans only whole-matra breaks and keeps
+// ornaments/repeats intact.
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderDocument } from '../engine/render.js';
 
-// Shrink each notation line to fit the pane: notation is a fixed-metric
-// grid (arcs span cells by column, so cells can't reflow to a second row
-// without a real system-breaking engine — backlogged). Scale is applied
-// via `zoom`, which reflows layout so heights stay correct; below the
-// floor the line scrolls horizontally instead of vanishing (the CSS
-// overflow rule is the no-JS safety net).
-const MIN_FIT = 0.55;
-function fitLines(root) {
-  if (!root) return;
-  const paneWidth = root.clientWidth;
-  if (!paneWidth) return; // jsdom / not laid out yet
-  for (const block of root.querySelectorAll('.sr-line-block')) {
-    block.style.zoom = '';
-    const need = block.scrollWidth;
-    if (need > paneWidth) {
-      block.style.zoom = String(Math.max(MIN_FIT, paneWidth / need));
-    }
-  }
+function widthInEm(el) {
+  if (!el || !el.clientWidth) return 56;
+  const fontSize = Number.parseFloat(getComputedStyle(el).fontSize) || 16;
+  // Leave a small breath at the right edge; very narrow panes still receive
+  // enough room for a useful phrase rather than one beat per system.
+  return Math.max(18, Math.floor(el.clientWidth / fontSize) - 2);
 }
 
 export default function PreviewPane({ doc, activeLine, activeCursor, noteNames, onSeek }) {
   const mount = useRef(null);
+  const [maxSystemEm, setMaxSystemEm] = useState(56);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mount.current) return;
-    const el = renderDocument(doc, { activeLine, activeCursor, noteNames });
-    mount.current.replaceChildren(el);
-    fitLines(mount.current);
-  }, [doc, activeLine, activeCursor, noteNames]);
-
-  // Refit when the window/pane resizes (M, 2026-07-16: half-width browser
-  // cut lines off invisibly).
-  useEffect(() => {
-    if (!mount.current || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => fitLines(mount.current));
+    const update = () => setMaxSystemEm((old) => {
+      const next = widthInEm(mount.current);
+      return Math.abs(next - old) >= 1 ? next : old;
+    });
+    update();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(update);
     ro.observe(mount.current);
     return () => ro.disconnect();
   }, []);
 
-  // Click a matra in the notation to put the playhead there (M,
-  // 2026-07-16). Delegated, so the per-keystroke re-render stays cheap.
+  useEffect(() => {
+    if (!mount.current) return;
+    const el = renderDocument(doc, { activeLine, activeCursor, noteNames, maxSystemEm });
+    mount.current.replaceChildren(el);
+  }, [doc, activeLine, activeCursor, noteNames, maxSystemEm]);
+
+  // Click a matra in any folded system to put the playhead at its ORIGINAL
+  // matra index. data-matra remains absolute across visual system breaks.
   const handleClick = (e) => {
     if (!onSeek) return;
     const cell = e.target.closest('.sr-cell');

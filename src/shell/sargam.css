@@ -23,7 +23,7 @@
   color: var(--sr-ink);
 }
 
-.sr-section { margin-bottom: 28px; }
+.sr-section { margin-bottom: 28px; break-inside: auto; }
 
 .sr-section-label {
   font-size: 13px;
@@ -34,14 +34,19 @@
   margin: 0 0 10px;
 }
 
-.sr-line-block { margin-bottom: 18px; }
+.sr-line-group { margin-bottom: 18px; break-inside: auto; }
+.sr-line-block { margin-bottom: 7px; max-width: 100%; overflow-x: auto; break-inside: avoid; }
+.sr-line-block:last-child { margin-bottom: 0; }
+.sr-line-block[data-system-index]:not([data-system-index="0"]) .sr-row { margin-left: 1.45em; }
 
 .sr-row {
   display: grid;
   grid-template-rows: auto auto auto auto;
   align-items: end;
   column-gap: 2px;
-  overflow-x: auto;
+  overflow-x: visible;
+  width: max-content;
+  min-width: max-content;
   padding: 2px 0;
 }
 
@@ -529,8 +534,11 @@
     margin: 0 !important; padding: 0 !important;
     box-shadow: none !important;
   }
-  .sr-section { break-inside: avoid; }
-  .sr-line-block { break-inside: avoid; }
+  .sr-section { break-inside: auto; }
+  .sr-section-label { break-after: avoid; page-break-after: avoid; }
+  .sr-line-group { break-inside: auto; }
+  .sr-line-block { break-inside: avoid; page-break-inside: avoid; overflow: visible; }
+  .sr-line-block[data-system-index]:not([data-system-index="0"]) .sr-row { margin-left: 1.45em; }
 }
 
 /* ---- kan / grace notes (M's grammar, 2026-07-16) ---- */
@@ -618,12 +626,13 @@
 .dict-problem { flex-basis: 100%; font-size: 11.5px; color: var(--sr-accent); }
 @media print { .dict { display: none !important; } }
 
-/* ---- responsive notation (M, 2026-07-16) ----
-   JS shrinks each line to fit (PreviewPane fitLines); this overflow rule
-   is the floor beneath it: a line can always scroll, never be cut off
-   invisibly — even with no JS, even below the minimum scale. */
-.sr-line-block { overflow-x: auto; max-width: 100%; }
+/* ---- responsive notation systems ----
+   PreviewPane supplies the available width to the shared system planner.
+   One source line may fold into several whole-matra systems; no global zoom
+   is applied, and an indivisible ornament may scroll rather than become
+   illegible. */
 .app-preview { overflow-x: hidden; }
+.sr-line-group { max-width: 100%; }
 
 /* ---- M4: command bar + legend (M, 2026-07-16) ---- */
 .app-editor-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }

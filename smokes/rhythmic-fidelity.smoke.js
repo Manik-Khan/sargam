@@ -127,7 +127,7 @@ export const smokes = [
       const parsed = parseDocument(CUE_DOC);
       assert.deepEqual(parsed.problems, []);
       const cue = parsed.doc.sections[1].lines[0].returnCue;
-      assert.deepEqual(cue, { target: 'gat', targetSectionIndex: 0 });
+      assert.deepEqual(cue, { target: 'gat', mode: 'align', targetSectionIndex: 0 });
       assert.match(serializeDocument(parsed.doc), /g m gat/);
     },
   },
@@ -153,6 +153,69 @@ export const smokes = [
       close(schedule.lineStarts[0].t, 0);
       close(schedule.lineStarts[1].t, 2);
       close(schedule.lineStarts[2].t, 6);
+    },
+  },
+
+  {
+    name: 'gat return forms parse and serialize distinctly',
+    fn() {
+      const src = `tal: rupak
+
+Gat
+@4 S .n .D .n S R g
+
+A
+S R g m P d n gat@1
+S R g m P d n gat@4
+S R g m P d n gat!
+`;
+      const parsed = parseDocument(src);
+      assert.deepEqual(parsed.problems, []);
+      const lines = parsed.doc.sections[1].lines;
+      assert.deepEqual(lines[0].returnCue, { target: 'gat', mode: 'matra', matra: 1, targetSectionIndex: 0 });
+      assert.deepEqual(lines[1].returnCue, { target: 'gat', mode: 'matra', matra: 4, targetSectionIndex: 0 });
+      assert.deepEqual(lines[2].returnCue, { target: 'gat', mode: 'full', targetSectionIndex: 0 });
+      const canonical = serializeDocument(parsed.doc);
+      assert.match(canonical, /gat@1/);
+      assert.match(canonical, /gat@4/);
+      assert.match(canonical, /gat!/);
+    },
+  },
+  {
+    name: 'plain gat aligns to the source landing; explicit/full forms override it',
+    fn() {
+      const make = (cue) => `tal: rupak
+tempo: 60
+
+Gat
+@4 S .n .D .n S R g
+
+Variation
+S R g m P d n ${cue}
+
+Next
+P
+`;
+      const firstReplayCursor = (cue) => {
+        const schedule = scheduleDocument(parseDocument(make(cue)).doc);
+        const cursors = schedule.events.filter((e) => e.kind === 'cursor');
+        let lastVariation = -1;
+        for (let i = 0; i < cursors.length; i++) if (cursors[i].sourceLine === 8) lastVariation = i;
+        return cursors[lastVariation + 1];
+      };
+      assert.equal(firstReplayCursor('gat').matraIndex, 4, 'seven-matra line lands on sam, so skip @4 mukra');
+      assert.equal(firstReplayCursor('gat@1').matraIndex, 4, 'explicit sam selects the same Gat entry');
+      assert.equal(firstReplayCursor('gat@4').matraIndex, 0, 'explicit matra 4 includes the mukra');
+      assert.equal(firstReplayCursor('gat!').matraIndex, 0, 'full Gat starts exactly as written');
+    },
+  },
+  {
+    name: 'gat@N outside the active tal cycle is a precise diagnostic',
+    fn() {
+      const parsed = parseDocument('tal: rupak\n\nGat\nS R\n\nA\nS R gat@8\n');
+      assert.equal(parsed.problems.length, 1);
+      assert.match(parsed.problems[0].msg, /outside rupak.*1–7/);
+      assert.equal(parsed.problems[0].col, 5);
     },
   },
   {

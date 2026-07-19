@@ -23,33 +23,10 @@ import Toolbar from './Toolbar.jsx';
 import NewDocDialog from './NewDocDialog.jsx';
 import ExportView from './ExportView.jsx';
 import ProblemsPanel from './ProblemsPanel.jsx';
+import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import './sargam.css';
 
-const STARTER = `title: Kahe Ko (khyal) — R. 1732
-raga: kirwani
-tal: tintal
-sa: C#
-tempo: 72
-
-Sthayi
-@7 ||: .d P | mg R m m | P d N~ 'S | .d - P m | R - :||
-" ka- he | ko ma- na na- | hi | ma- ne | re
-
-Vistars
-@7 S R | g - - - | - R g m | P -
-@7 R m | g - - - | m R g m | P - d - | P -
-
-Tihai
-(SR gm P)x3
-
-Krintan (cross-beat)
-[[dP/mg/RS]] -
-
-tal: free
-
-Alap
-~PS.NRS.N.D N
-`;
+const STARTER = BAGESHRI_STARTER;
 
 const clock = makeClock();
 
@@ -231,7 +208,7 @@ export default function App() {
 
   const suggestName = () => {
     if (fileName) return fileName;
-    const title = doc.directives.title;
+    const title = doc.directives.title || doc.directives.raga;
     if (title) {
       const slug = title
         .toLowerCase()
