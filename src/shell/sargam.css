@@ -614,6 +614,86 @@
   cursor: default;
 }
 
+.tp-tone {
+  position: relative;
+}
+.tp-tone > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid var(--sr-line);
+  border-radius: 6px;
+  background: var(--sr-paper);
+  color: var(--sr-ink-soft);
+}
+.tp-tone > summary::-webkit-details-marker { display: none; }
+.tp-tone[open] > summary {
+  background: var(--sr-ink);
+  border-color: var(--sr-ink);
+  color: var(--sr-paper-raised);
+}
+.tp-tone-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(430px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--sr-line);
+  border-radius: 8px;
+  background: var(--sr-paper-raised);
+  box-shadow: 0 8px 26px rgba(43, 38, 32, 0.18);
+}
+.tp-tone-heading {
+  margin-bottom: 8px;
+  font-family: Charter, Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+.tp-tone-row {
+  display: grid;
+  grid-template-columns: 68px 46px minmax(100px, 1fr) 46px 38px;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  font-size: 11px;
+}
+.tp-tone-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--sr-ink);
+}
+.tp-tone-row output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--sr-ink-soft);
+  text-align: right;
+}
+.tp-tone-row.is-disabled { opacity: 0.42; }
+.tp-tone-name { font-size: 12px; color: var(--sr-ink); }
+.tp-tone-edge { color: var(--sr-ink-soft); text-align: right; }
+.tp-tone-edge-right { text-align: left; }
+.tp-tone-switches {
+  display: flex;
+  gap: 18px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sr-line);
+  font-size: 12px;
+}
+.tp-tone-switches label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.tp-tone-note {
+  margin: 9px 0 0;
+  color: var(--sr-ink-soft);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 /* live playback cursor — driven by the same event list as the sound */
 .sr-cell.sr-active {
   background: #f3ead8;

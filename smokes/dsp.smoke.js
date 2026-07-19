@@ -78,6 +78,25 @@ export const smokes = [
     },
   },
   {
+    name: 'practice voice: body follows the requested pitch instead of a fixed resonance',
+    fn() {
+      for (const f of [131, 220, 440]) {
+        const buf = renderPracticePluck({
+          freq: f,
+          dur: 1.2,
+          sampleRate: SR,
+          variant: 0,
+          brightness: 0.3,
+        });
+        const got = dominantPeriod(buf, SR);
+        assert.ok(
+          Math.abs(got - f) / f < 0.035,
+          `asked ${f}, practice voice rings at ${got.toFixed(1)}`
+        );
+      }
+    },
+  },
+  {
     name: 'practice voice: softer variants remain audible, bounded and repeatably different',
     fn() {
       const a = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 0 });

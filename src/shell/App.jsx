@@ -12,6 +12,7 @@ import { ensureIdentity, createStore, createFileIO, setDirective } from '../engi
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
 import { documentToMusicXML } from '../engine/western.js';
 import { createPlayer, DRONE_MODES, MELODY_VOICES } from './audio.js';
+import { normalizeToneMap, updateToneMap } from './tone.js';
 import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
@@ -91,6 +92,9 @@ export default function App() {
     tick: prefGain(store.getPref('volumeTala', 0.25), 0.25),
     drone: prefGain(store.getPref('volumeTanpura', 0.16), 0.16),
   }));
+  const [toneByVoice, setToneByVoice] = useState(() =>
+    normalizeToneMap(store.getPref('melodyToneSettings', null))
+  );
   const [melodyVoice, setMelodyVoice] = useState(() => {
     const saved = store.getPref('melodyVoice', 'pluck');
     return MELODY_VOICES.includes(saved) ? saved : 'pluck';
@@ -119,6 +123,9 @@ export default function App() {
     player.setGain('drone', volumes.drone);
     player.setMuted('melody', mutes.melody);
     player.setMuted('tick', mutes.tick);
+    for (const [voice, settings] of Object.entries(toneByVoice)) {
+      player.setToneSettings(voice, settings);
+    }
     player.setMelodyVoice(melodyVoice);
     player.setDroneMode(droneMode);
     player.setTalaSound(talaSound);
@@ -298,6 +305,30 @@ export default function App() {
     setMelodyVoice(next);
     player.setMelodyVoice(next);
     store.setPref('melodyVoice', next);
+
+    if (next === 'harmonium') {
+      setNotice('Loading the sampled harmonium for its first use…');
+      void player.prepareMelodyVoice().then((ready) => {
+        if (ready) {
+          setNotice('Sampled harmonium is ready.');
+        } else {
+          const detail = player.harmoniumError?.message;
+          setNotice(
+            `Sampled harmonium could not load${detail ? `: ${detail}` : ''}. ` +
+              'Current Pluck will be used as the fallback.'
+          );
+        }
+      });
+    }
+  };
+
+  const doToneChange = (key, value) => {
+    setToneByVoice((previous) => {
+      const next = updateToneMap(previous, melodyVoice, { [key]: value });
+      player.setToneSettings(melodyVoice, next[melodyVoice]);
+      store.setPref('melodyToneSettings', next);
+      return next;
+    });
   };
 
   const doDroneMode = (mode) => {
@@ -558,6 +589,7 @@ export default function App() {
         tracks={mutes}
         volumes={volumes}
         melodyVoice={melodyVoice}
+        tone={toneByVoice[melodyVoice]}
         droneMode={droneMode}
         talaSound={talaSound}
         onPlayPause={doPlayPause}
@@ -567,6 +599,7 @@ export default function App() {
         onTrackMute={doTrackMute}
         onTrackGain={doTrackGain}
         onMelodyVoice={doMelodyVoice}
+        onToneChange={doToneChange}
         onDroneMode={doDroneMode}
         onTalaSound={doTalaSound}
       />

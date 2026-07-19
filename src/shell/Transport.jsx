@@ -14,6 +14,38 @@ function pct(value) {
   return `${Math.round((Number(value) || 0) * 100)}%`;
 }
 
+const TONE_LABELS = Object.freeze({
+  velocity: ['Touch', 'Soft', 'Firm'],
+  brightness: ['Brightness', 'Dark', 'Bright'],
+  attack: ['Attack', 'Immediate', 'Gentle'],
+  release: ['Release', 'Short', 'Long'],
+  reverb: ['Room', 'Dry', 'Roomy'],
+  chorus: ['Chorus', 'None', 'Wide'],
+});
+
+function ToneSlider({ name, value, onChange, disabled = false }) {
+  const [label, low, high] = TONE_LABELS[name];
+  return (
+    <label className={'tp-tone-row' + (disabled ? ' is-disabled' : '')}>
+      <span className="tp-tone-name">{label}</span>
+      <span className="tp-tone-edge">{low}</span>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(name, Number(e.target.value))}
+        onKeyDown={(e) => e.stopPropagation()}
+        aria-label={`${label}: ${pct(value)}`}
+      />
+      <span className="tp-tone-edge tp-tone-edge-right">{high}</span>
+      <output>{pct(value)}</output>
+    </label>
+  );
+}
+
 export default function Transport({
   playing,
   position,
@@ -23,6 +55,7 @@ export default function Transport({
   tracks,
   volumes,
   melodyVoice,
+  tone,
   droneMode,
   talaSound,
   onPlayPause,
@@ -32,6 +65,7 @@ export default function Transport({
   onTrackMute,
   onTrackGain,
   onMelodyVoice,
+  onToneChange,
   onDroneMode,
   onTalaSound,
 }) {
@@ -42,6 +76,17 @@ export default function Transport({
     const v = parseInt(bpmDraft, 10);
     if (Number.isFinite(v) && v >= 10 && v <= 400 && v !== bpm) onBpm(v);
     else setBpmDraft(String(bpm));
+  };
+
+  const voiceTone = tone || {
+    velocity: 0.65,
+    brightness: 0.5,
+    attack: 0.1,
+    release: 0.3,
+    reverb: 0.05,
+    chorus: 0,
+    coupler: false,
+    subOctave: false,
   };
 
   return (
@@ -76,7 +121,7 @@ export default function Transport({
             commitBpm();
             e.target.blur();
           }
-          e.stopPropagation(); // Space in the field must not toggle play
+          e.stopPropagation();
         }}
         title="Playback speed — writes the tempo: directive"
       />
@@ -109,8 +154,59 @@ export default function Transport({
         <option value="pluck">Current pluck</option>
         <option value="practice">Soft practice</option>
         <option value="sine">Sine / ear training</option>
-        <option value="harmonium">Harmonium-like</option>
+        <option value="harmonium">Sampled harmonium</option>
       </select>
+      <details className="tp-tone" onKeyDown={(e) => e.stopPropagation()}>
+        <summary>Sound settings</summary>
+        <div className="tp-tone-menu">
+          <div className="tp-tone-heading">
+            {melodyVoice === 'harmonium' ? 'Sampled harmonium' :
+              melodyVoice === 'practice' ? 'Soft practice' :
+                melodyVoice === 'sine' ? 'Sine / ear training' : 'Current pluck'}
+          </div>
+          <ToneSlider name="velocity" value={voiceTone.velocity} onChange={onToneChange} />
+          <ToneSlider
+            name="brightness"
+            value={voiceTone.brightness}
+            onChange={onToneChange}
+            disabled={melodyVoice === 'sine'}
+          />
+          <ToneSlider name="attack" value={voiceTone.attack} onChange={onToneChange} />
+          <ToneSlider name="release" value={voiceTone.release} onChange={onToneChange} />
+          <ToneSlider name="reverb" value={voiceTone.reverb} onChange={onToneChange} />
+          {melodyVoice === 'harmonium' && (
+            <>
+              <ToneSlider name="chorus" value={voiceTone.chorus} onChange={onToneChange} />
+              <div className="tp-tone-switches">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={voiceTone.coupler}
+                    onChange={(e) => onToneChange('coupler', e.target.checked)}
+                  />
+                  Upper coupler
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={voiceTone.subOctave}
+                    onChange={(e) => onToneChange('subOctave', e.target.checked)}
+                  />
+                  Sub-octave
+                </label>
+              </div>
+              <p className="tp-tone-note">
+                The first use loads the SoundFont online. Current Pluck remains the fallback.
+              </p>
+            </>
+          )}
+          {melodyVoice === 'practice' && (
+            <p className="tp-tone-note">
+              The fixed out-of-tune resonance has been removed; body tone now follows each note.
+            </p>
+          )}
+        </div>
+      </details>
       <span className="tp-sep" />
       <span className="tp-label">Tanpura</span>
       <span className="tp-seg" role="group" aria-label="Tanpura support">

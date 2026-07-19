@@ -233,6 +233,22 @@ export const smokes = [
     },
   },
   {
+    name: 'audio: per-voice tone settings are normalized and kept independently',
+    fn() {
+      const player = createPlayer({ createContext: mockCtx });
+      player.setToneSettings('pluck', { brightness: 0.1, velocity: 3 });
+      player.setToneSettings('harmonium', { brightness: 0.8, coupler: true });
+      assert.equal(player.toneSettings.pluck.brightness, 0.1);
+      assert.equal(player.toneSettings.pluck.velocity, 1);
+      assert.equal(player.toneSettings.harmonium.brightness, 0.8);
+      assert.equal(player.toneSettings.harmonium.coupler, true);
+      assert.notEqual(
+        player.toneSettings.practice.brightness,
+        player.toneSettings.harmonium.brightness
+      );
+    },
+  },
+  {
     name: 'audio: tanpura support schedules a tonic-relative drone beside the melody',
     fn() {
       const { ctx, player } = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');

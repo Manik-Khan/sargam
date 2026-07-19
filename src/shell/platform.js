@@ -73,12 +73,18 @@ export function openViaInput() {
 
 /** Audio env for createPlayer: the real AudioContext, lazily. */
 export function makeAudioEnv() {
+  const fetchChecked = async (url) => {
+    const response = await window.fetch(url);
+    if (!response.ok) throw new Error(`Could not load audio asset: ${url}`);
+    return response;
+  };
+
   return {
     createContext: () => new (window.AudioContext || window.webkitAudioContext)(),
-    fetchArrayBuffer: async (url) => {
-      const response = await window.fetch(url);
-      if (!response.ok) throw new Error(`Could not load audio sample: ${url}`);
-      return response.arrayBuffer();
-    },
+    fetchArrayBuffer: async (url) => (await fetchChecked(url)).arrayBuffer(),
+    fetchText: async (url) => (await fetchChecked(url)).text(),
+    importModule: (url) => import(/* @vite-ignore */ url),
+    createObjectURL: (blob) => URL.createObjectURL(blob),
+    revokeObjectURL: (url) => URL.revokeObjectURL(url),
   };
 }

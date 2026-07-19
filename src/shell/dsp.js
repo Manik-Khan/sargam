@@ -82,45 +82,49 @@ function normalize(out, peakTarget = 0.82) {
 }
 
 /**
- * A rounder practice voice built from the physical-model pluck rather than
- * pretending to be a literal sarod sample. It keeps the requested pitch and
- * attack, but adds a softer excitation, fixed instrument-body resonances,
- * and two restrained early reflections so it sits beside real tabla more
- * naturally. `variant` supplies repeat-to-repeat timbral variation while
- * remaining deterministic and cacheable.
+ * A rounder practice voice built entirely from the requested pluck pitch.
+ * The earlier prototype mixed fixed 155/285 Hz oscillators into every note;
+ * those unrelated tones were audibly out of tune. This version uses only
+ * filtered and delayed copies of the source string, so all colour remains
+ * harmonically tied to the played note.
  */
-export function renderPracticePluck({ freq, dur, sampleRate, variant = 0 }) {
+export function renderPracticePluck({
+  freq,
+  dur,
+  sampleRate,
+  variant = 0,
+  brightness = 0.3,
+}) {
+  const b = Math.min(1, Math.max(0, Number(brightness) || 0));
   const base = renderPluck({
     freq,
     dur,
     sampleRate,
-    bright: 0.24 + (Math.abs(variant) % 4) * 0.025,
+    bright: 0.12 + b * 0.52 + (Math.abs(variant) % 4) * 0.012,
     variant,
   });
   const out = new Float32Array(base.length);
-  const attack = Math.max(1, Math.round(0.009 * sampleRate));
-  const roomA = Math.round(0.037 * sampleRate);
-  const roomB = Math.round(0.071 * sampleRate);
-  const bodyA = 155 + (Math.abs(variant) % 3) * 7;
-  const bodyB = 285 + (Math.abs(variant + 1) % 3) * 11;
+  const attack = Math.max(1, Math.round(0.008 * sampleRate));
+  const reflectionA = Math.round((0.029 + (Math.abs(variant) % 3) * 0.002) * sampleRate);
+  const reflectionB = Math.round((0.061 + (Math.abs(variant + 1) % 3) * 0.003) * sampleRate);
+  const bodyDelay = Math.max(1, Math.round(sampleRate / Math.max(60, freq * 2)));
   let low = 0;
+  let lower = 0;
 
   for (let i = 0; i < out.length; i++) {
-    const t = i / sampleRate;
-    // Gentle one-pole smoothing removes the brittle edge without erasing
-    // the plucked identity.
-    low += 0.19 * (base[i] - low);
-    const bodyEnv = Math.exp(-3.4 * t);
-    const body =
-      0.045 * Math.sin(2 * Math.PI * bodyA * t) * bodyEnv +
-      0.025 * Math.sin(2 * Math.PI * bodyB * t) * Math.exp(-4.8 * t);
-    const reflectionA = i >= roomA ? base[i - roomA] * 0.075 : 0;
-    const reflectionB = i >= roomB ? base[i - roomB] * 0.04 : 0;
+    // Two cascaded one-pole filters soften the transient without creating a
+    // new pitch. A tiny period-related delayed copy adds body that follows
+    // the actual note rather than imposing a fixed resonance.
+    low += (0.12 + b * 0.11) * (base[i] - low);
+    lower += 0.075 * (low - lower);
+    const body = i >= bodyDelay ? base[i - bodyDelay] * 0.055 : 0;
+    const roomA = i >= reflectionA ? base[i - reflectionA] * 0.06 : 0;
+    const roomB = i >= reflectionB ? base[i - reflectionB] * 0.032 : 0;
     const ramp = i < attack ? i / attack : 1;
-    out[i] = (0.88 * low + body + reflectionA + reflectionB) * ramp;
+    out[i] = (0.72 * low + 0.22 * lower + body + roomA + roomB) * ramp;
   }
 
-  return normalize(out, 0.78);
+  return normalize(out, 0.76);
 }
 
 /**
