@@ -547,7 +547,7 @@
 
 /* ---- M3 transport strip (mock approved 2026-07-16, BPM redline applied) ---- */
 .transport {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 6px 14px;
   background: var(--sr-paper-raised);
   border-bottom: 1px solid var(--sr-line);
@@ -577,6 +577,23 @@
 }
 .tp-seg button.on { background: var(--sr-ink); color: var(--sr-paper-raised); }
 .tp-check { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--sr-ink); cursor: pointer; }
+.tp-track {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 178px;
+}
+.tp-track .tp-check { min-width: 66px; }
+.tp-volume {
+  width: 76px;
+  accent-color: var(--sr-ink);
+  cursor: pointer;
+}
+.tp-volume-value {
+  width: 34px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--sr-ink-soft);
+  text-align: right;
+}
 
 /* live playback cursor — driven by the same event list as the sound */
 .sr-cell.sr-active {

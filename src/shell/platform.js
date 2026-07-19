@@ -75,5 +75,10 @@ export function openViaInput() {
 export function makeAudioEnv() {
   return {
     createContext: () => new (window.AudioContext || window.webkitAudioContext)(),
+    fetchArrayBuffer: async (url) => {
+      const response = await window.fetch(url);
+      if (!response.ok) throw new Error(`Could not load audio sample: ${url}`);
+      return response.arrayBuffer();
+    },
   };
 }

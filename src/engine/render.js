@@ -377,10 +377,9 @@ function renderLineBlock(line, tal, ctx) {
 }
 
 function returnCueText(cue) {
-  if (!cue) return '';
-  if (cue.mode === 'full') return `${cue.target}!`;
-  if (cue.mode === 'matra' && Number.isInteger(cue.matra)) return `${cue.target}@${cue.matra}`;
-  return cue.target || 'gat';
+  // The detailed return mode is playback structure. Readers only need the
+  // musical instruction; gat@N and gat! therefore render and print as gat.
+  return cue?.target || (cue ? 'gat' : '');
 }
 
 function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {

@@ -1,8 +1,5 @@
-// src/shell/Transport.jsx — the M3 transport strip (mock approved with one
-// redline, 2026-07-16: the BPM field IS the tempo: directive — editing it
-// edits the text, because text is the source of truth. laya: carries the
-// tradition's word for speed; tempo: carries the playback number.)
-// Presentational: all behavior injected from App.jsx.
+// src/shell/Transport.jsx — notation transport and compact sound controls.
+// Presentational: all playback and preference behavior is injected from App.
 
 import React, { useEffect, useState } from 'react';
 
@@ -13,6 +10,10 @@ function fmt(sec) {
   return `${m}:${s}`;
 }
 
+function pct(value) {
+  return `${Math.round((Number(value) || 0) * 100)}%`;
+}
+
 export default function Transport({
   playing,
   position,
@@ -20,11 +21,15 @@ export default function Transport({
   bpm,
   loopMode,
   tracks,
+  volumes,
+  talaSound,
   onPlayPause,
   onStop,
   onBpm,
   onLoopMode,
   onTrackMute,
+  onTrackGain,
+  onTalaSound,
 }) {
   const [bpmDraft, setBpmDraft] = useState(String(bpm));
   useEffect(() => setBpmDraft(String(bpm)), [bpm]);
@@ -86,15 +91,52 @@ export default function Transport({
         ))}
       </span>
       <span className="tp-sep" />
-      {['melody', 'tick'].map((tr) => (
-        <label className="tp-check" key={tr}>
+      <span className="tp-label">Tala sound</span>
+      <span className="tp-seg" role="group" aria-label="Tala sound">
+        {['click', 'tabla', 'off'].map((mode) => (
+          <button
+            key={mode}
+            className={talaSound === mode ? 'on' : ''}
+            aria-pressed={talaSound === mode}
+            onClick={() => onTalaSound(mode)}
+            title={
+              mode === 'tabla'
+                ? 'Recorded tabla prototype; Rupak is mapped first and other talas retain the click'
+                : undefined
+            }
+          >
+            {mode}
+          </button>
+        ))}
+      </span>
+      <span className="tp-sep" />
+      {[
+        ['melody', 'Melody'],
+        ['tick', 'Tala'],
+      ].map(([track, label]) => (
+        <div className="tp-track" key={track}>
+          <label className="tp-check">
+            <input
+              type="checkbox"
+              checked={!tracks[track]}
+              onChange={(e) => onTrackMute(track, !e.target.checked)}
+            />
+            {label}
+          </label>
           <input
-            type="checkbox"
-            checked={!tracks[tr]}
-            onChange={(e) => onTrackMute(tr, !e.target.checked)}
+            className="tp-volume"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volumes[track]}
+            onChange={(e) => onTrackGain(track, Number(e.target.value))}
+            onKeyDown={(e) => e.stopPropagation()}
+            aria-label={`${label} volume`}
+            title={`${label} volume: ${pct(volumes[track])}`}
           />
-          {tr}
-        </label>
+          <output className="tp-volume-value">{pct(volumes[track])}</output>
+        </div>
       ))}
     </div>
   );

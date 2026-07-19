@@ -12,6 +12,7 @@ import { ensureIdentity, createStore, createFileIO, setDirective } from '../engi
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
 import { documentToMusicXML } from '../engine/western.js';
 import { createPlayer } from './audio.js';
+import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
@@ -29,6 +30,11 @@ import './sargam.css';
 const STARTER = BAGESHRI_STARTER;
 
 const clock = makeClock();
+
+const prefGain = (value, fallback) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : fallback;
+};
 
 export default function App() {
   const store = useMemo(() => createStore(window.localStorage, clock), []);
@@ -66,6 +72,8 @@ export default function App() {
   const [view, setView] = useState('notation');
   const [cursorPos, setCursorPos] = useState(0);
   const editorRef = useRef(null);
+  const jumpSelectionRef = useRef(null);
+  const jumpTimerRef = useRef(null);
 
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const dirty = text !== lastSaved;
@@ -78,6 +86,14 @@ export default function App() {
   const [playCursor, setPlayCursor] = useState(null);
   const [loopMode, setLoopMode] = useState('off');
   const [mutes, setMutes] = useState({ melody: false, tick: false });
+  const [volumes, setVolumes] = useState(() => ({
+    melody: prefGain(store.getPref('volumeMelody', 0.4), 0.4),
+    tick: prefGain(store.getPref('volumeTala', 0.25), 0.25),
+  }));
+  const [talaSound, setTalaSound] = useState(() => {
+    const saved = store.getPref('talaSound', 'click');
+    return ['click', 'tabla', 'off'].includes(saved) ? saved : 'click';
+  });
   const bpm = Number(doc.directives.tempo) || 60;
 
   useEffect(() => {
@@ -87,6 +103,14 @@ export default function App() {
     setPlayCursor(null);
     setPosition(0);
   }, [schedule, player]);
+
+  useEffect(() => {
+    player.setGain('melody', volumes.melody);
+    player.setGain('tick', volumes.tick);
+    player.setMuted('melody', mutes.melody);
+    player.setMuted('tick', mutes.tick);
+    player.setTalaSound(talaSound);
+  }, [player]); // restore the saved transport preferences once
 
   useEffect(() => {
     player.onCursor((ev) =>
@@ -106,13 +130,13 @@ export default function App() {
 
   // The loop range and start point come from the text cursor's line — the
   // same machinery the landing report rides.
-  const rangeFor = (mode) => {
+  const rangeFor = (mode, sourceLine = activeLine) => {
     const starts = schedule.lineStarts;
     if (starts.length === 0) return null;
-    let idx = starts.findIndex((l) => l.sourceLine === activeLine);
+    let idx = starts.findIndex((l) => l.sourceLine === sourceLine);
     if (idx === -1) {
       idx = 0;
-      for (let i = 0; i < starts.length; i++) if (starts[i].sourceLine <= activeLine) idx = i;
+      for (let i = 0; i < starts.length; i++) if (starts[i].sourceLine <= sourceLine) idx = i;
     }
     const cur = starts[idx];
     if (mode === 'line') {
@@ -181,22 +205,92 @@ export default function App() {
     }
   };
 
+  const clearJumpSelection = (el, collapse = true) => {
+    const jump = jumpSelectionRef.current;
+    if (!jump || !el) return;
+    if (collapse && el.selectionStart === jump.start && el.selectionEnd === jump.end) {
+      el.setSelectionRange(jump.caret, jump.caret);
+    }
+    jumpSelectionRef.current = null;
+    clearTimeout(jumpTimerRef.current);
+  };
+
+  const focusSourceLine = (sourceLine) => {
+    const range = sourceLineRange(text, sourceLine);
+    const reveal = () => {
+      const el = editorRef.current;
+      if (!el) return;
+      clearJumpSelection(el, false);
+
+      try {
+        el.focus({ preventScroll: true });
+      } catch {
+        el.focus();
+      }
+      el.setSelectionRange(range.start, range.end);
+      const style = window.getComputedStyle(el);
+      let lineHeight = Number.parseFloat(style.lineHeight);
+      if (!Number.isFinite(lineHeight)) {
+        lineHeight = (Number.parseFloat(style.fontSize) || 14) * 1.7;
+      }
+      el.scrollTop = centeredLineScrollTop({
+        line: range.line,
+        lineHeight,
+        paddingTop: Number.parseFloat(style.paddingTop) || 0,
+        clientHeight: el.clientHeight,
+      });
+
+      jumpSelectionRef.current = { ...range, caret: range.start };
+      jumpTimerRef.current = setTimeout(() => clearJumpSelection(el), 1400);
+      setCursorPos(range.start);
+    };
+
+    if (window.requestAnimationFrame) window.requestAnimationFrame(reveal);
+    else setTimeout(reveal, 0);
+  };
+
   const doSeek = (sourceLine, matraIndex) => {
     setActiveLine(sourceLine);
+    focusSourceLine(sourceLine);
     const t = timeFor(schedule, sourceLine, matraIndex);
     setPosition(t);
     if (playing) {
       player.pause();
-      const range = loopMode === 'off' ? null : rangeFor(loopMode);
+      const range = loopMode === 'off' ? null : rangeFor(loopMode, sourceLine);
       player.setLoop(range);
       player.play({ from: t });
     }
   };
 
-  const doTrackMute = (track, v) => {
-    setMutes((prev) => ({ ...prev, [track]: v }));
-    player.setMuted(track, v);
+  const doTrackMute = (track, value) => {
+    setMutes((prev) => ({ ...prev, [track]: value }));
+    player.setMuted(track, value);
   };
+
+  const doTrackGain = (track, value) => {
+    const next = prefGain(value, track === 'melody' ? 0.4 : 0.25);
+    setVolumes((prev) => ({ ...prev, [track]: next }));
+    player.setGain(track, next);
+    store.setPref(track === 'melody' ? 'volumeMelody' : 'volumeTala', next);
+  };
+
+  const doTalaSound = (mode) => {
+    const next = ['click', 'tabla', 'off'].includes(mode) ? mode : 'click';
+    setTalaSound(next);
+    player.setTalaSound(next);
+    store.setPref('talaSound', next);
+    if (next === 'tabla') {
+      void player.prepareTalaSound().then((ready) => {
+        if (!ready) {
+          setNotice('Tabla samples could not be loaded — the tala track will use the click instead.');
+        }
+      });
+    }
+  };
+
+  const doEditorBeforeEdit = (el) => clearJumpSelection(el);
+
+  useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
 
   // Debounced autosave: raw text only, never mutated (M2 decision).
   const autosaveTimer = useRef(null);
@@ -429,11 +523,15 @@ export default function App() {
         bpm={bpm}
         loopMode={loopMode}
         tracks={mutes}
+        volumes={volumes}
+        talaSound={talaSound}
         onPlayPause={doPlayPause}
         onStop={doStop}
         onBpm={doBpm}
         onLoopMode={doLoopMode}
         onTrackMute={doTrackMute}
+        onTrackGain={doTrackGain}
+        onTalaSound={doTalaSound}
       />
       {showLegend && view === 'notation' && <Legend onClose={() => setShowLegend(false)} />}
       {showDictate && (
@@ -475,6 +573,7 @@ export default function App() {
               onChange={setText}
               onCursorLine={setActiveLine}
               onCursorPos={setCursorPos}
+              onBeforeEdit={doEditorBeforeEdit}
               editorRef={editorRef}
             />
           </div>

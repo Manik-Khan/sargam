@@ -535,6 +535,26 @@ export const smokes = [
   // stays sargam always. Same grid, same octave dots, same arcs — only the
   // letter changes. A reading aid, not a different notation system.
   {
+    name: 'gat return modes stay distinct in source but all display and print as gat',
+    fn: () => {
+      const src = `tal: rupak
+
+Gat
+S R g m P d n
+
+Taans
+S R g m P d n gat
+S R g m P d n gat@1
+S R g m P d n gat!
+`;
+      const { doc } = parseDocument(src);
+      const preview = [...renderDocument(doc).querySelectorAll('.sr-return-cue')].map((e) => e.textContent);
+      const exported = [...renderExport(doc).querySelectorAll('.sr-return-cue')].map((e) => e.textContent);
+      assert.deepEqual(preview, ['gat', 'gat', 'gat']);
+      assert.deepEqual(exported, ['gat', 'gat', 'gat']);
+    },
+  },
+  {
     name: 'western names: sa C — S R g m read as C D E-flat F',
     fn: () => {
       const { doc } = parseDocument('sa: C\ntal: tintal\n\nS R g m\n');

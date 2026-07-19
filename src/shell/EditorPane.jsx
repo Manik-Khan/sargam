@@ -1,12 +1,18 @@
-// src/shell/EditorPane.jsx — the plain textarea (spec §5: Phase 1 editor;
-// native undo preserved, selection commands arrive in M4).
-// Reports the cursor's SOURCE LINE upward so the preview can scope the
-// landing report to it (spec §4). The line number is derived here and only
-// reported when it changes, so ordinary typing costs no extra renders.
+// src/shell/EditorPane.jsx — the plain textarea (spec §5: Phase 1 editor).
+// Reports the cursor's SOURCE LINE upward and accepts a small before-edit
+// hook so preview-driven temporary line selections cannot be accidentally
+// overwritten by the first keystroke.
 
 import React, { useCallback, useRef } from 'react';
 
-export default function EditorPane({ text, onChange, onCursorLine, onCursorPos, editorRef }) {
+export default function EditorPane({
+  text,
+  onChange,
+  onCursorLine,
+  onCursorPos,
+  onBeforeEdit,
+  editorRef,
+}) {
   const lastLine = useRef(0);
 
   const report = useCallback(
@@ -24,6 +30,10 @@ export default function EditorPane({ text, onChange, onCursorLine, onCursorPos, 
     [onCursorLine, onCursorPos]
   );
 
+  const beforeEdit = (el) => {
+    if (onBeforeEdit) onBeforeEdit(el);
+  };
+
   return (
     <textarea
       ref={editorRef}
@@ -32,6 +42,12 @@ export default function EditorPane({ text, onChange, onCursorLine, onCursorPos, 
       onChange={(e) => {
         onChange(e.target.value);
         report(e.target);
+      }}
+      onBeforeInput={(e) => beforeEdit(e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key.length === 1 || ['Backspace', 'Delete', 'Enter'].includes(e.key)) {
+          beforeEdit(e.currentTarget);
+        }
       }}
       onSelect={(e) => report(e.target)}
       onKeyUp={(e) => report(e.target)}

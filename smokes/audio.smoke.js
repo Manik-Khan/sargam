@@ -206,6 +206,16 @@ export const smokes = [
     },
   },
   {
+    name: 'audio: notation starts quieter and independent gains clamp safely',
+    fn() {
+      const player = createPlayer({ createContext: mockCtx });
+      assert.deepEqual(player.gains, { melody: 0.4, tick: 0.25 });
+      player.setGain('melody', 0.62);
+      player.setGain('tick', 9);
+      assert.deepEqual(player.gains, { melody: 0.62, tick: 1 });
+    },
+  },
+  {
     name: 'audio: play with nothing loaded is a safe no-op',
     fn() {
       const player = createPlayer({ createContext: mockCtx });

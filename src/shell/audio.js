@@ -7,19 +7,51 @@
 //
 // Every browser surface is injected (env), so the driver logic runs — and
 // is smoked — in bare node with a fake clock and a recording context.
-// Voice DESIGN (timbre, tick sounds, glide shape) is the Wave C ear pass,
-// judged by M; the constants here are starting points, not conclusions.
+
+import { renderPluck, renderTick } from './dsp.js';
+import {
+  GHE_ROUND_ROBIN,
+  TABLA_SAMPLE_URLS,
+  tablaVoicesForTick,
+} from './tabla.js';
 
 const LOOKAHEAD_S = 0.1; // schedule this far ahead of the audio clock
 const TICK_MS = 25; // driver timer period
-
 const noop = () => {};
 
-import { renderPluck, renderTick } from './dsp.js';
+const clampGain = (value, fallback = 1) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : fallback;
+};
+
+/** Decode with both the promise and callback forms used across browsers. */
+function decodeAudioData(context, arrayBuffer) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err || new Error('Could not decode tabla sample'));
+    };
+
+    try {
+      const result = context.decodeAudioData(arrayBuffer, done, fail);
+      if (result && typeof result.then === 'function') result.then(done, fail);
+    } catch (err) {
+      fail(err);
+    }
+  });
+}
 
 /**
  * @param {{
  *   createContext: () => AudioContext-like,
+ *   fetchArrayBuffer?: (url: string) => Promise<ArrayBuffer>,
  *   setInterval?: Function, clearInterval?: Function,
  * }} env
  */
@@ -37,11 +69,22 @@ export function createPlayer(env) {
   let offset = 0;
   let nextIndex = 0;
   let loop = null; // {from, to} in schedule seconds, or null
-  const gains = { melody: 1, tick: 1 };
+  // Quieter defaults keep notation playback in the same useful range as
+  // class recordings. App.jsx restores each user's saved preferences.
+  const gains = { melody: 0.4, tick: 0.25 };
   const muted = { melody: false, tick: false };
+  let talaSound = 'click'; // click | tabla | off
   let onCursor = noop;
   let onStop = noop;
   let masterGains = null;
+
+  // Tabla samples are loaded once, decoded into the current AudioContext,
+  // and retained for the life of the player. If they are not ready for an
+  // early beat, that beat safely falls back to the synthesized click.
+  const tablaBuffers = new Map();
+  let tablaLoadPromise = null;
+  let tablaLoadError = null;
+  let gheIndex = 0;
 
   function ensureCtx() {
     if (!ctx) {
@@ -60,17 +103,50 @@ export function createPlayer(env) {
   }
 
   function applyGain(track) {
-    if (!masterGains) return;
+    if (!masterGains || !masterGains[track]) return;
     masterGains[track].gain.value = muted[track] ? 0 : gains[track];
+  }
+
+  async function prepareTabla() {
+    ensureCtx();
+    if (tablaBuffers.size === Object.keys(TABLA_SAMPLE_URLS).length) return true;
+    if (tablaLoadPromise) return tablaLoadPromise;
+    if (typeof env.fetchArrayBuffer !== 'function' || typeof ctx.decodeAudioData !== 'function') {
+      tablaLoadError = new Error('This browser cannot load the tabla sample library.');
+      return false;
+    }
+
+    tablaLoadPromise = Promise.all(
+      Object.entries(TABLA_SAMPLE_URLS).map(async ([id, url]) => {
+        const bytes = await env.fetchArrayBuffer(url);
+        const buffer = await decodeAudioData(ctx, bytes);
+        tablaBuffers.set(id, buffer);
+      })
+    )
+      .then(() => {
+        tablaLoadError = null;
+        return true;
+      })
+      .catch((err) => {
+        tablaLoadError = err;
+        tablaLoadPromise = null; // a later user gesture may retry
+        return false;
+      });
+
+    return tablaLoadPromise;
+  }
+
+  function nextGhe() {
+    const id = GHE_ROUND_ROBIN[gheIndex % GHE_ROUND_ROBIN.length];
+    gheIndex++;
+    return id;
   }
 
   function schedTime(ev) {
     return startedAt + (ev.t - offset);
   }
 
-  // ---- voices (Wave C: Karplus-Strong pluck; every constant is M's-ear
-  // territory). Buffers render deterministically in dsp.js and are cached
-  // per pitch; falls back to an oscillator if the context lacks buffers.
+  // ---- melody voices ----
 
   const PLUCK_S = 2.5; // rendered ring length; note-off is the gain fade
   const pluckCache = new Map();
@@ -126,7 +202,7 @@ export function createPlayer(env) {
     osc.stop(at + dur + 0.25);
   }
 
-  function playTick(ev, at) {
+  function playClick(ev, at) {
     if (!ctx.createBuffer || !ctx.createBufferSource) return;
     let buf = tickCache.get(ev.accent);
     if (!buf) {
@@ -142,6 +218,40 @@ export function createPlayer(env) {
     src.connect(g);
     g.gain.setValueAtTime(1, at);
     src.start(at);
+  }
+
+  function playTablaVoice(voice, at) {
+    const buffer = tablaBuffers.get(voice.sample);
+    if (!buffer || !ctx.createBufferSource) return false;
+    const g = ctx.createGain();
+    g.connect(masterGains.tick);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(g);
+    g.gain.setValueAtTime(clampGain(voice.gain, 0.75), at);
+    src.start(at);
+    if (src.stop && Number.isFinite(buffer.duration)) src.stop(at + buffer.duration + 0.02);
+    return true;
+  }
+
+  function playTick(ev, at) {
+    if (talaSound === 'off') return;
+
+    if (talaSound === 'tabla') {
+      const voices = tablaVoicesForTick(ev, nextGhe);
+      if (voices) {
+        const ready = voices.every((voice) => tablaBuffers.has(voice.sample));
+        if (ready) {
+          voices.forEach((voice) => playTablaVoice(voice, at));
+          return;
+        }
+        // Loading begins on the selector gesture or first Play. Keep the
+        // rhythm audible while it finishes rather than dropping beats.
+        if (!tablaLoadPromise) void prepareTabla();
+      }
+    }
+
+    playClick(ev, at);
   }
 
   // ---- the lookahead driver ----
@@ -202,6 +312,7 @@ export function createPlayer(env) {
     play({ from = null } = {}) {
       if (!schedule) return false;
       ensureCtx();
+      if (talaSound === 'tabla') void prepareTabla();
       if (from !== null) offset = from;
       startedAt = ctx.currentTime;
       nextIndex = seekIndex(offset);
@@ -230,13 +341,21 @@ export function createPlayer(env) {
         nextIndex = seekIndex(loop.from);
       }
     },
-    setGain(track, v) {
-      gains[track] = v;
+    setGain(track, value) {
+      if (!(track in gains)) return;
+      gains[track] = clampGain(value, gains[track]);
       applyGain(track);
     },
-    setMuted(track, v) {
-      muted[track] = v;
+    setMuted(track, value) {
+      if (!(track in muted)) return;
+      muted[track] = Boolean(value);
       applyGain(track);
+    },
+    setTalaSound(mode) {
+      talaSound = ['click', 'tabla', 'off'].includes(mode) ? mode : 'click';
+    },
+    prepareTalaSound() {
+      return talaSound === 'tabla' ? prepareTabla() : Promise.resolve(true);
     },
     onCursor(cb) {
       onCursor = cb || noop;
@@ -250,6 +369,18 @@ export function createPlayer(env) {
     get position() {
       if (!ctx) return offset;
       return playing ? offset + (ctx.currentTime - startedAt) : offset;
+    },
+    get talaSound() {
+      return talaSound;
+    },
+    get tablaReady() {
+      return tablaBuffers.size === Object.keys(TABLA_SAMPLE_URLS).length;
+    },
+    get tablaError() {
+      return tablaLoadError;
+    },
+    get gains() {
+      return { ...gains };
     },
   };
 }

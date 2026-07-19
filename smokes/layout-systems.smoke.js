@@ -73,7 +73,7 @@ export const smokes = [
       assert.equal(group.querySelectorAll('.sr-repeat-open').length, 1);
       assert.equal(group.querySelectorAll('.sr-repeat-close').length, 1);
       assert.equal(group.querySelectorAll('.sr-return-cue').length, 1);
-      assert.equal(group.querySelector('.sr-return-cue').textContent, 'gat!');
+      assert.equal(group.querySelector('.sr-return-cue').textContent, 'gat');
     },
   },
   {

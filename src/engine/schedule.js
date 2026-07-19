@@ -71,7 +71,7 @@ const GRACE_CAP = 1 / 2;
  * @returns {{events: object[], duration: number, lineStarts: object[]}}
  *   events (sorted by t):
  *     {kind:'note',  t, dur, ch, semitone, octave, freq, grace?, glideFrom?}
- *     {kind:'tick',  t, accent: 'sam'|'khali'|'vibhag'|'plain', cycleMatra}
+ *     {kind:'tick',  t, accent: 'sam'|'khali'|'vibhag'|'plain', cycleMatra, tal}
  *     {kind:'cursor',t, sectionIndex, lineIndex, matraIndex, sourceLine}
  *   lineStarts: [{sectionIndex, lineIndex, sourceLine, t}]
  */
@@ -202,7 +202,7 @@ export function scheduleDocument(doc, opts = {}) {
                   ? 'khali'
                   : 'vibhag';
           }
-          events.push({ kind: 'tick', t: matraStart, accent, cycleMatra });
+          events.push({ kind: 'tick', t: matraStart, accent, cycleMatra, tal: tal.name });
         }
 
         const evs = line.matras[matraIndex].events;
