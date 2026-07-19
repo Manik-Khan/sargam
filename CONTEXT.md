@@ -1,6 +1,33 @@
-# Sargam — Project Context & Handoff (updated 2026-07-18)
+# Sargam — Project Context & Handoff (updated 2026-07-19)
 
 **What this is:** a complete D&D-session-style handoff for Sargam — M's web app for writing, rendering, and hearing Hindustani classical notation. Written so that *anyone* can pick the project up cold: M working alone, a future AI assistant, a human collaborator. Read this with `docs/design-spec.md` (the requirements authority) and `docs/build-plan.md` (code contracts). If you are an AI assistant: the working rules at the bottom are binding; M is the authority on the tradition — never improvise raga/tala/notation semantics, ask him.
+
+## Authoritative recent-state update (2026-07-19)
+
+For the next session, read `SARGAM_NEXT_SESSION_CONTEXT_2026-07-19.md` first. It supersedes the 2026-07-18 handoff and older current-state/test-count prose below.
+
+Latest prepared and ear-confirmed checkpoint:
+
+```text
+sargam-sampled-voice-latency-fix-full-checkpoint.zip
+370 passed, 0 failed
+npm run build succeeded
+```
+
+Major additions since the prior context:
+
+- measured full-width print packing and Rupak continuation at sam;
+- preview click → playback seek + matching editor-line focus/highlight;
+- `gat@N` and `gat!` display/print simply as `gat`;
+- remembered melody/tala/tanpura gains and Click/Tabla/Off tala modes;
+- approved CC0 Rupak tabla prototype;
+- pitch-locked native and SpessaSynth/GeneralUser melody voices;
+- per-voice touch, brightness, attack, release, room, and chorus settings;
+- local SoundFont/AudioWorklet assets;
+- corrected sampled-voice/cursor latency, confirmed by M.
+
+The agreed next phase is **Vilambit Phase 2 — Player Core and Practice Bridge**: extract testable Vilambit state, add a narrow iframe message contract, and build a compact Notation-side practice bar before timestamp-linked notation and anchored annotations.
+
 
 ## Vilambit is inside Sargam (integration Phase 1, 2026-07-18)
 
