@@ -6,6 +6,38 @@
 // sam/khali/vibhag boundaries, are preferred over an arbitrary beat edge.
 import { markerAtMatra, vibhagOfMatra, wrapMatra } from './tala.js';
 
+// ExportView can measure the browser's real rendered matra widths before it
+// asks this pure planner to fold the line. A WeakMap keeps that short-lived
+// browser information out of the document model and out of saved files.
+const measuredLineLayouts = new WeakMap();
+
+/**
+ * Temporarily provide exact browser-measured widths for one source line.
+ * All values use the same em unit as maxEm.
+ */
+export function setMeasuredLineLayout(line, measurement) {
+  if (!line || !measurement) return;
+  const widths = Array.isArray(measurement.widths) ? measurement.widths.map(Number) : [];
+  if (
+    widths.length !== (line.matras?.length || 0) ||
+    widths.some((width) => !Number.isFinite(width) || width <= 0)
+  ) {
+    measuredLineLayouts.delete(line);
+    return;
+  }
+
+  measuredLineLayouts.set(line, {
+    widths,
+    prefixEm: Math.max(0, Number(measurement.prefixEm) || 0),
+    suffixEm: Math.max(0, Number(measurement.suffixEm) || 0),
+  });
+}
+
+/** Remove temporary browser measurements after an export render. */
+export function clearMeasuredLineLayout(line) {
+  if (line) measuredLineLayouts.delete(line);
+}
+
 /** Estimate the horizontal demand of one matra in em. This mirrors the
  * renderer's minimum cell and discrete-slot sizes without measuring pixels. */
 export function estimateMatraEm(matra) {
@@ -47,12 +79,74 @@ function boundaryPriority(line, tal, k) {
   return 2;
 }
 
+/** True when a continuation after `k` begins exactly on sam. */
+function isSamBoundary(line, tal, k) {
+  if (!tal) return false;
+  const nextMatra = wrapMatra(tal, (line.startMatra || 1) + k + 1);
+  return vibhagOfMatra(tal, nextMatra) === tal.samVibhag && markerAtMatra(tal, nextMatra) !== null;
+}
+
 function fixedEdgeEm(line) {
   let em = 0;
   if (line?.lineRepeat) em += 2.2;
   if (line?.returnCue) em += 3.2;
   em += (line?.passthrough?.length || 0) * 2;
   return em;
+}
+
+function planRupakAtSam(line, tal, widths, widthAfter, prefixEm, suffixEm, maxEm) {
+  const count = widths.length;
+  const ranges = [];
+  let from = 0;
+
+  while (from < count) {
+    let used = from === 0 ? prefixEm : 0;
+    let overflowAt = count;
+
+    for (let i = from; i < count; i++) {
+      used += widthAfter(i);
+      if (i === count - 1) used += suffixEm;
+      if (used > maxEm) {
+        overflowAt = i;
+        break;
+      }
+    }
+
+    if (overflowAt === count) {
+      ranges.push({ from, to: count - 1, reason: 'fits' });
+      break;
+    }
+
+    // Use the latest safe sam that genuinely fits. This fills the system as
+    // far as possible while ensuring the next printed row begins on Rupak sam.
+    let candidate = -1;
+    for (let k = from; k < overflowAt; k++) {
+      if (isSafeBreak(line, k) && isSamBoundary(line, tal, k)) candidate = k;
+    }
+
+    // A pickup, a very wide cycle, or a spanning ornament can leave no sam
+    // before the nominal edge. In that case preserve the musical cycle and
+    // walk forward to the first safe sam rather than cutting at marker 1/2.
+    if (candidate < from) {
+      candidate = overflowAt;
+      while (
+        candidate < count - 1 &&
+        (!isSafeBreak(line, candidate) || !isSamBoundary(line, tal, candidate))
+      ) {
+        candidate++;
+      }
+      if (candidate >= count) candidate = count - 1;
+    }
+
+    ranges.push({
+      from,
+      to: candidate,
+      reason: candidate < count - 1 ? 'sam' : 'tail',
+    });
+    from = candidate + 1;
+  }
+
+  return ranges;
 }
 
 /**
@@ -64,18 +158,32 @@ export function planLineSystems(line, tal, { maxEm = Infinity } = {}) {
   if (count === 0) return [{ from: 0, to: -1, reason: 'empty' }];
   if (!Number.isFinite(maxEm) || maxEm <= 0) return [{ from: 0, to: count - 1, reason: 'unbounded' }];
 
-  const widths = line.matras.map(estimateMatraEm);
+  const measured = measuredLineLayouts.get(line);
+  const widths = measured?.widths || line.matras.map(estimateMatraEm);
+  const prefixEm = measured ? measured.prefixEm : line.lineRepeat ? 1.1 : 0;
+  const suffixEm = measured ? measured.suffixEm : fixedEdgeEm(line);
+  const widthAfter = measured
+    ? (i) => widths[i]
+    : (i) =>
+        widths[i] +
+        (i < count - 1 && tal && markerAtMatra(tal, (line.startMatra || 1) + i + 1) !== null ? 0.5 : 0);
+
+  // Rupak is compact enough that an internal vibhag fold is both unnecessary
+  // and musically confusing. Its continuation rows begin only on sam.
+  if (tal?.name === 'rupak') {
+    return planRupakAtSam(line, tal, widths, widthAfter, prefixEm, suffixEm, maxEm);
+  }
+
   const ranges = [];
   let from = 0;
 
   while (from < count) {
-    let used = from === 0 ? (line.lineRepeat ? 1.1 : 0) : 0;
+    let used = from === 0 ? prefixEm : 0;
     let overflowAt = count;
 
     for (let i = from; i < count; i++) {
-      used += widths[i];
-      if (i < count - 1 && tal && markerAtMatra(tal, (line.startMatra || 1) + i + 1) !== null) used += 0.5;
-      if (i === count - 1) used += fixedEdgeEm(line);
+      used += widthAfter(i);
+      if (i === count - 1) used += suffixEm;
       if (used > maxEm) {
         overflowAt = i;
         break;
@@ -92,10 +200,10 @@ export function planLineSystems(line, tal, { maxEm = Infinity } = {}) {
     // tiny system when a later whole beat fits naturally.
     let candidate = -1;
     let candidateScore = -Infinity;
-    let cumulative = from === 0 ? (line.lineRepeat ? 1.1 : 0) : 0;
+    let cumulative = from === 0 ? prefixEm : 0;
 
     for (let k = from; k < overflowAt; k++) {
-      cumulative += widths[k];
+      cumulative += widthAfter(k);
       if (!isSafeBreak(line, k)) continue;
       const fill = cumulative / maxEm;
       const priority = boundaryPriority(line, tal, k);
