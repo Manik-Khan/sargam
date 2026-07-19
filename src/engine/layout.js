@@ -47,16 +47,6 @@ function boundaryPriority(line, tal, k) {
   return 2;
 }
 
-/** True when the next visual system would begin on sam. */
-function isSamBoundary(line, tal, k) {
-  if (!tal) return false;
-  const nextMatra = wrapMatra(tal, (line.startMatra || 1) + k + 1);
-  return (
-    markerAtMatra(tal, nextMatra) !== null &&
-    vibhagOfMatra(tal, nextMatra) === tal.samVibhag
-  );
-}
-
 function fixedEdgeEm(line) {
   let em = 0;
   if (line?.lineRepeat) em += 2.2;
@@ -95,40 +85,6 @@ export function planLineSystems(line, tal, { maxEm = Infinity } = {}) {
     if (overflowAt === count) {
       ranges.push({ from, to: count - 1, reason: 'fits' });
       break;
-    }
-
-    // Rupak is short enough that a folded continuation should preserve the
-    // cycle. Do not begin a new printed system on marker 1 or marker 2.
-    // Prefer the latest safe sam that fits. If one full cycle is wider than
-    // the nominal limit, allow that system to run wide until the next sam
-    // rather than splitting the tala at an internal vibhag.
-    if (tal?.name === 'rupak') {
-      let candidate = -1;
-
-      for (let k = from; k < overflowAt; k++) {
-        if (isSafeBreak(line, k) && isSamBoundary(line, tal, k)) {
-          candidate = k;
-        }
-      }
-
-      if (candidate < from) {
-        candidate = overflowAt;
-        while (
-          candidate < count - 1 &&
-          (!isSafeBreak(line, candidate) || !isSamBoundary(line, tal, candidate))
-        ) {
-          candidate++;
-        }
-        if (candidate >= count) candidate = count - 1;
-      }
-
-      ranges.push({
-        from,
-        to: candidate,
-        reason: candidate < count - 1 ? 'sam' : 'tail',
-      });
-      from = candidate + 1;
-      continue;
     }
 
     // Choose the most useful safe break that still keeps the system full.
