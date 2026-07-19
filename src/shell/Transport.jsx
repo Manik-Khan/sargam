@@ -2,6 +2,11 @@
 // Presentational: all playback and preference behavior is injected from App.
 
 import React, { useEffect, useState } from 'react';
+import {
+  isSoundfontVoice,
+  melodyVoiceLabel,
+  MELODY_VOICE_OPTIONS,
+} from './voices.js';
 
 function fmt(sec) {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -106,10 +111,10 @@ export default function Transport({
     chorus: 0,
     coupler: false,
     subOctave: false,
-    sineOctave: 1,
-    sineEnvelope: 'soft',
-    sineWaveform: 'sine',
+    neutralEnvelope: 'soft',
+    neutralWaveform: 'triangle',
   };
+  const sampledVoice = isSoundfontVoice(melodyVoice);
 
   return (
     <div className="transport">
@@ -171,48 +176,30 @@ export default function Transport({
         value={melodyVoice}
         onChange={(e) => onMelodyVoice(e.target.value)}
         onKeyDown={(e) => e.stopPropagation()}
-        title="Choose the notation melody voice"
+        title="Choose the notation melody voice; every choice preserves the written pitch"
       >
-        <option value="pluck">Current pluck</option>
-        <option value="practice">Soft practice</option>
-        <option value="sine">Sine / ear training</option>
-        <option value="harmonium">Sampled harmonium</option>
+        {MELODY_VOICE_OPTIONS.map(([value, label]) => (
+          <option key={value} value={value}>{label}</option>
+        ))}
       </select>
       <details className="tp-tone" onKeyDown={(e) => e.stopPropagation()}>
         <summary>Sound settings</summary>
         <div className="tp-tone-menu">
-          <div className="tp-tone-heading">
-            {melodyVoice === 'harmonium' ? 'Sampled harmonium' :
-              melodyVoice === 'practice' ? 'Soft practice' :
-                melodyVoice === 'sine' ? 'Sine / ear training' : 'Current pluck'}
-          </div>
+          <div className="tp-tone-heading">{melodyVoiceLabel(melodyVoice)}</div>
           <ToneSlider name="velocity" value={voiceTone.velocity} onChange={onToneChange} />
-          <ToneSlider
-            name="brightness"
-            value={voiceTone.brightness}
-            onChange={onToneChange}
-            disabled={melodyVoice === 'sine'}
-          />
+          <ToneSlider name="brightness" value={voiceTone.brightness} onChange={onToneChange} />
           <ToneSlider name="attack" value={voiceTone.attack} onChange={onToneChange} />
           <ToneSlider name="release" value={voiceTone.release} onChange={onToneChange} />
           <ToneSlider name="reverb" value={voiceTone.reverb} onChange={onToneChange} />
-          {melodyVoice === 'sine' && (
+          {sampledVoice && (
+            <ToneSlider name="chorus" value={voiceTone.chorus} onChange={onToneChange} />
+          )}
+          {melodyVoice === 'neutral' && (
             <div className="tp-tone-special">
               <ToneSelect
-                label="Register"
-                value={String(voiceTone.sineOctave ?? 1)}
-                onChange={(value) => onToneChange('sineOctave', Number(value))}
-                options={[
-                  ['-1', 'Lower (−1 octave)'],
-                  ['0', 'Written register'],
-                  ['1', 'Higher (+1 octave)'],
-                  ['2', 'Very high (+2 octaves)'],
-                ]}
-              />
-              <ToneSelect
                 label="Envelope"
-                value={voiceTone.sineEnvelope || 'soft'}
-                onChange={(value) => onToneChange('sineEnvelope', value)}
+                value={voiceTone.neutralEnvelope || 'soft'}
+                onChange={(value) => onToneChange('neutralEnvelope', value)}
                 options={[
                   ['soft', 'Soft and rounded'],
                   ['bell', 'Bell-like decay'],
@@ -222,21 +209,20 @@ export default function Transport({
               />
               <ToneSelect
                 label="Wave"
-                value={voiceTone.sineWaveform || 'sine'}
-                onChange={(value) => onToneChange('sineWaveform', value)}
+                value={voiceTone.neutralWaveform || 'triangle'}
+                onChange={(value) => onToneChange('neutralWaveform', value)}
                 options={[
                   ['sine', 'Pure sine'],
                   ['triangle', 'Rounded triangle'],
                 ]}
               />
               <p className="tp-tone-note">
-                Higher (+1 octave) is the default so the neutral tone does not sit like a bass drone.
+                The neutral tone always follows the composition's written pitch and octave.
               </p>
             </div>
           )}
           {melodyVoice === 'harmonium' && (
-            <>
-              <ToneSlider name="chorus" value={voiceTone.chorus} onChange={onToneChange} />
+            <div className="tp-tone-special">
               <div className="tp-tone-switches">
                 <label>
                   <input
@@ -244,7 +230,7 @@ export default function Transport({
                     checked={voiceTone.coupler}
                     onChange={(e) => onToneChange('coupler', e.target.checked)}
                   />
-                  Upper coupler
+                  Add upper-octave coupler
                 </label>
                 <label>
                   <input
@@ -252,17 +238,17 @@ export default function Transport({
                     checked={voiceTone.subOctave}
                     onChange={(e) => onToneChange('subOctave', e.target.checked)}
                   />
-                  Sub-octave
+                  Add sub-octave layer
                 </label>
               </div>
               <p className="tp-tone-note">
-                The first use loads the SoundFont online. Current Pluck remains the fallback.
+                These are optional layers; the written pitch remains present.
               </p>
-            </>
+            </div>
           )}
-          {melodyVoice === 'practice' && (
+          {sampledVoice && (
             <p className="tp-tone-note">
-              The fixed out-of-tune resonance has been removed; body tone now follows each note.
+              GeneralUser GS is bundled locally and played through SpessaSynth. Changing instruments never transposes the notation.
             </p>
           )}
         </div>

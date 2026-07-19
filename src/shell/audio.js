@@ -8,18 +8,18 @@
 // Every browser surface is injected (env), so the driver logic runs — and
 // is smoked — in bare node with a fake clock and a recording context.
 
-import {
-  renderPluck,
-  renderPracticePluck,
-  renderTanpuraPluck,
-  renderTick,
-} from './dsp.js';
+import { renderPluck, renderTanpuraPluck, renderTick } from './dsp.js';
 import {
   GHE_ROUND_ROBIN,
   TABLA_SAMPLE_URLS,
   tablaVoicesForTick,
 } from './tabla.js';
-import { createHarmoniumSoundfont } from './soundfont.js';
+import { createGeneralUserSoundfont } from './soundfont.js';
+import {
+  isSoundfontVoice,
+  MELODY_VOICES,
+  normalizeMelodyVoice,
+} from './voices.js';
 import {
   brightnessCutoff,
   normalizeToneMap,
@@ -33,7 +33,7 @@ const LOOKAHEAD_S = 0.1; // schedule this far ahead of the audio clock
 const TICK_MS = 25; // driver timer period
 const noop = () => {};
 
-export const MELODY_VOICES = Object.freeze(['pluck', 'practice', 'sine', 'harmonium']);
+export { MELODY_VOICES } from './voices.js';
 export const DRONE_MODES = Object.freeze(['off', 'sa-pa', 'sa-ma']);
 
 const clampGain = (value, fallback = 1) => {
@@ -91,7 +91,7 @@ export function createPlayer(env) {
   const gains = { melody: 0.4, tick: 0.25, drone: 0.16 };
   const muted = { melody: false, tick: false, drone: false };
   let talaSound = 'click'; // click | tabla | off
-  let melodyVoice = 'pluck'; // pluck | practice | sine | harmonium
+  let melodyVoice = 'pluck';
   let droneMode = 'off'; // off | sa-pa | sa-ma
   let onCursor = noop;
   let onStop = noop;
@@ -100,7 +100,7 @@ export function createPlayer(env) {
   let melodyFilter = null;
   let melodyRoomGain = null;
   let toneByVoice = normalizeToneMap(null);
-  let harmonium = null;
+  let soundfont = null;
 
   // Tabla samples are loaded once, decoded into the current AudioContext,
   // and retained for the life of the player. If they are not ready for an
@@ -149,16 +149,18 @@ export function createPlayer(env) {
       }
     }
     if (melodyRoomGain?.gain) {
-      // The sampled harmonium already has a proper MIDI reverb send. Avoid
-      // doubling it through Sargam's tiny room while retaining the same UI.
-      const wet = melodyVoice === 'harmonium' ? 0 : tone.reverb * 0.34;
+      // Sampled voices use SpessaSynth's MIDI reverb send. Avoid doubling
+      // them through Sargam's tiny local room.
+      const wet = isSoundfontVoice(melodyVoice) ? 0 : tone.reverb * 0.34;
       if (melodyRoomGain.gain.setTargetAtTime) {
         melodyRoomGain.gain.setTargetAtTime(wet, ctx.currentTime, 0.025);
       } else {
         melodyRoomGain.gain.value = wet;
       }
     }
-    if (harmonium) harmonium.setSettings(toneByVoice.harmonium);
+    if (soundfont && isSoundfontVoice(melodyVoice)) {
+      soundfont.setSettings(melodyVoice, toneByVoice[melodyVoice]);
+    }
   }
 
   function ensureCtx() {
@@ -218,25 +220,26 @@ export function createPlayer(env) {
     masterGains[track].gain.value = muted[track] ? 0 : gains[track];
   }
 
-  function ensureHarmoniumAdapter() {
+  function ensureSoundfontAdapter() {
     ensureCtx();
-    if (!harmonium) {
-      harmonium = createHarmoniumSoundfont({
+    if (!soundfont) {
+      soundfont = createGeneralUserSoundfont({
         context: ctx,
         destination: masterGains.melody,
-        importModule: env.importModule,
-        fetchText: env.fetchText,
         fetchArrayBuffer: env.fetchArrayBuffer,
-        createObjectURL: env.createObjectURL,
-        revokeObjectURL: env.revokeObjectURL,
       });
-      harmonium.setSettings(toneByVoice.harmonium);
+      if (isSoundfontVoice(melodyVoice)) soundfont.setVoice(melodyVoice);
+      for (const voice of MELODY_VOICES) {
+        if (isSoundfontVoice(voice)) soundfont.setSettings(voice, toneByVoice[voice]);
+      }
     }
-    return harmonium;
+    return soundfont;
   }
 
-  async function prepareHarmonium() {
-    return ensureHarmoniumAdapter().prepare();
+  async function prepareSoundfont() {
+    const adapter = ensureSoundfontAdapter();
+    if (isSoundfontVoice(melodyVoice)) adapter.setVoice(melodyVoice);
+    return adapter.prepare();
   }
 
   async function prepareTabla() {
@@ -281,13 +284,10 @@ export function createPlayer(env) {
   // ---- melody voices ----
 
   const PLUCK_S = 2.5; // rendered ring length; note-off is the gain fade
-  const PRACTICE_S = 3.2;
   const TANPURA_S = 4.8;
   const pluckCache = new Map();
-  const practiceCache = new Map();
   const tanpuraCache = new Map();
   const tickCache = new Map();
-  let practiceVariant = 0;
 
   function audioBuffer(data) {
     const buf = ctx.createBuffer(1, data.length, ctx.sampleRate || 44100);
@@ -313,25 +313,6 @@ export function createPlayer(env) {
     return buf;
   }
 
-  function practiceBuffer(freq, variant, tone) {
-    const v = Math.abs(variant) % 4;
-    const brightness = Math.round(tone.brightness * 100);
-    const key = `${Math.round(freq * 10)}:${v}:${brightness}`;
-    let buf = practiceCache.get(key);
-    if (!buf) {
-      buf = audioBuffer(
-        renderPracticePluck({
-          freq,
-          dur: PRACTICE_S,
-          sampleRate: ctx.sampleRate || 44100,
-          variant: v,
-          brightness: tone.brightness,
-        })
-      );
-      practiceCache.set(key, buf);
-    }
-    return buf;
-  }
 
   function tanpuraBuffer(freq, variant) {
     const v = Math.abs(variant) % 4;
@@ -380,19 +361,11 @@ export function createPlayer(env) {
   }
 
   function playCurrentPluck(ev, at) {
-    if (!ctx.createBuffer || !ctx.createBufferSource) return playSine(ev, at);
+    if (!ctx.createBuffer || !ctx.createBufferSource) return playNeutralTone(ev, at);
     const tone = toneByVoice.pluck;
     return playBufferNote(ev, at, pluckBuffer(ev.freq, tone), tone, { baseLevel: 0.92 });
   }
 
-  function playPracticeTone(ev, at) {
-    if (!ctx.createBuffer || !ctx.createBufferSource) return playSine(ev, at);
-    const tone = toneByVoice.practice;
-    const variant = practiceVariant++ % 4;
-    return playBufferNote(ev, at, practiceBuffer(ev.freq, variant, tone), tone, {
-      baseLevel: 0.76,
-    });
-  }
 
   function setOscPitch(osc, target, from, at, dur) {
     if (!osc.frequency) return;
@@ -400,22 +373,21 @@ export function createPlayer(env) {
     if (from) osc.frequency.setTargetAtTime(target, at, Math.min(0.16, dur * 0.45));
   }
 
-  function playSine(ev, at) {
+  function playNeutralTone(ev, at) {
     if (typeof ctx.createOscillator !== 'function') return false;
-    const tone = toneByVoice.sine;
+    const tone = toneByVoice.neutral;
     const g = ctx.createGain();
     g.connect(masterGains.melody);
     const osc = ctx.createOscillator();
-    osc.type = tone.sineWaveform === 'triangle' ? 'triangle' : 'sine';
+    osc.type = tone.neutralWaveform === 'triangle' ? 'triangle' : 'sine';
     osc.connect(g);
 
     const dur = Math.max(0.03, ev.dur);
     const release = toneReleaseSeconds(tone.release);
     const level = 0.5 * toneVelocity(tone.velocity, ev.grace);
-    const octaveRatio = 2 ** (Number(tone.sineOctave) || 0);
-    const targetFreq = ev.freq * octaveRatio;
-    const startFreq = ev.glideFrom ? ev.glideFrom * octaveRatio : null;
-    const envelope = tone.sineEnvelope || 'soft';
+    const targetFreq = ev.freq;
+    const startFreq = ev.glideFrom || null;
+    const envelope = tone.neutralEnvelope || 'soft';
 
     g.gain.setValueAtTime(0.0001, at);
     if (envelope === 'bell') {
@@ -446,19 +418,21 @@ export function createPlayer(env) {
     return true;
   }
 
-  function playHarmonium(ev, at) {
-    const adapter = ensureHarmoniumAdapter();
-    if (adapter.ready) return adapter.play(ev, at, toneByVoice.harmonium);
-    // Loading is intentionally lazy and may take a moment on first use. Keep
-    // playback audible with the reliable pluck until the SoundFont is ready.
+  function playSoundfontVoice(ev, at) {
+    const adapter = ensureSoundfontAdapter();
+    adapter.setVoice(melodyVoice);
+    if (adapter.ready) {
+      return adapter.play(ev, at, melodyVoice, toneByVoice[melodyVoice]);
+    }
+    // Loading is lazy and may take a moment on first use. Keep playback
+    // audible with the reliable pluck until the local SoundFont is ready.
     void adapter.prepare();
     return playCurrentPluck(ev, at);
   }
 
   function playNote(ev, at) {
-    if (melodyVoice === 'practice') return playPracticeTone(ev, at);
-    if (melodyVoice === 'sine') return playSine(ev, at);
-    if (melodyVoice === 'harmonium') return playHarmonium(ev, at);
+    if (melodyVoice === 'neutral') return playNeutralTone(ev, at);
+    if (isSoundfontVoice(melodyVoice)) return playSoundfontVoice(ev, at);
     return playCurrentPluck(ev, at);
   }
 
@@ -598,7 +572,7 @@ export function createPlayer(env) {
       clearI(timer);
       timer = null;
     }
-    if (harmonium) harmonium.stopAll(true);
+    if (soundfont) soundfont.stopAll(true);
     offset = 0;
     nextIndex = 0;
     nextDroneAt = null;
@@ -615,7 +589,7 @@ export function createPlayer(env) {
       if (!schedule) return false;
       ensureCtx();
       if (talaSound === 'tabla') void prepareTabla();
-      if (melodyVoice === 'harmonium') void prepareHarmonium();
+      if (isSoundfontVoice(melodyVoice)) void prepareSoundfont();
       if (from !== null) offset = from;
       startedAt = ctx.currentTime;
       nextIndex = seekIndex(offset);
@@ -630,7 +604,7 @@ export function createPlayer(env) {
       if (!playing) return;
       offset = offset + (ctx.currentTime - startedAt);
       playing = false;
-      if (harmonium) harmonium.stopAll(true);
+      if (soundfont) soundfont.stopAll(true);
       nextDroneAt = null;
       droneStep = 0;
       if (timer !== null) {
@@ -663,17 +637,18 @@ export function createPlayer(env) {
       talaSound = ['click', 'tabla', 'off'].includes(mode) ? mode : 'click';
     },
     setMelodyVoice(mode) {
-      melodyVoice = MELODY_VOICES.includes(mode) ? mode : 'pluck';
+      melodyVoice = normalizeMelodyVoice(mode);
+      if (soundfont && isSoundfontVoice(melodyVoice)) soundfont.setVoice(melodyVoice);
       applyToneBus();
     },
     setToneSettings(voice, settings) {
-      const mode = MELODY_VOICES.includes(voice) ? voice : 'pluck';
+      const mode = normalizeMelodyVoice(voice);
       toneByVoice = {
         ...toneByVoice,
         [mode]: normalizeToneSettings(settings, mode),
       };
-      if (mode === 'harmonium' && harmonium) {
-        harmonium.setSettings(toneByVoice.harmonium);
+      if (soundfont && isSoundfontVoice(mode)) {
+        soundfont.setSettings(mode, toneByVoice[mode]);
       }
       if (mode === melodyVoice) applyToneBus();
     },
@@ -686,7 +661,7 @@ export function createPlayer(env) {
       return talaSound === 'tabla' ? prepareTabla() : Promise.resolve(true);
     },
     prepareMelodyVoice() {
-      return melodyVoice === 'harmonium' ? prepareHarmonium() : Promise.resolve(true);
+      return isSoundfontVoice(melodyVoice) ? prepareSoundfont() : Promise.resolve(true);
     },
     onCursor(cb) {
       onCursor = cb || noop;
@@ -713,11 +688,18 @@ export function createPlayer(env) {
     get toneSettings() {
       return normalizeToneMap(toneByVoice);
     },
+    get soundfontReady() {
+      return Boolean(soundfont?.ready);
+    },
+    get soundfontError() {
+      return soundfont?.error || null;
+    },
+    // Compatibility aliases for the first sampled-harmonium prototype.
     get harmoniumReady() {
-      return Boolean(harmonium?.ready);
+      return Boolean(soundfont?.ready);
     },
     get harmoniumError() {
-      return harmonium?.error || null;
+      return soundfont?.error || null;
     },
     get tablaReady() {
       return tablaBuffers.size === Object.keys(TABLA_SAMPLE_URLS).length;

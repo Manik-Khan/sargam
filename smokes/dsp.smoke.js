@@ -5,7 +5,6 @@
 import assert from 'node:assert/strict';
 import {
   renderPluck,
-  renderPracticePluck,
   renderTanpuraPluck,
   renderTick,
 } from '../src/shell/dsp.js';
@@ -75,38 +74,6 @@ export const smokes = [
       const a = renderPluck({ freq: 220, dur: 0.5, sampleRate: SR });
       const b = renderPluck({ freq: 220, dur: 0.5, sampleRate: SR });
       assert.deepEqual(Array.from(a.slice(0, 200)), Array.from(b.slice(0, 200)));
-    },
-  },
-  {
-    name: 'practice voice: body follows the requested pitch instead of a fixed resonance',
-    fn() {
-      for (const f of [131, 220, 440]) {
-        const buf = renderPracticePluck({
-          freq: f,
-          dur: 1.2,
-          sampleRate: SR,
-          variant: 0,
-          brightness: 0.3,
-        });
-        const got = dominantPeriod(buf, SR);
-        assert.ok(
-          Math.abs(got - f) / f < 0.035,
-          `asked ${f}, practice voice rings at ${got.toFixed(1)}`
-        );
-      }
-    },
-  },
-  {
-    name: 'practice voice: softer variants remain audible, bounded and repeatably different',
-    fn() {
-      const a = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 0 });
-      const b = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 1 });
-      const a2 = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 0 });
-      assert.equal(a.length, Math.round(1.2 * SR));
-      assert.ok(rms(a, 0, SR * 0.2) > 0.005, 'practice voice audible');
-      assert.deepEqual(Array.from(a.slice(0, 200)), Array.from(a2.slice(0, 200)));
-      assert.notDeepEqual(Array.from(a.slice(100, 300)), Array.from(b.slice(100, 300)));
-      for (let i = 0; i < a.length; i += 11) assert.ok(Math.abs(a[i]) <= 1);
     },
   },
   {

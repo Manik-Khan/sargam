@@ -2,9 +2,10 @@
 // synthesized voices, and the SoundFont adapter. Values are normalized to
 // 0..1 so each engine can translate them into meaningful controls.
 
-export const SINE_OCTAVES = Object.freeze([-1, 0, 1, 2]);
-export const SINE_ENVELOPES = Object.freeze(['soft', 'bell', 'sustain', 'pluck']);
-export const SINE_WAVEFORMS = Object.freeze(['sine', 'triangle']);
+import { MELODY_VOICES, normalizeMelodyVoice } from './voices.js';
+
+export const NEUTRAL_ENVELOPES = Object.freeze(['soft', 'bell', 'sustain', 'pluck']);
+export const NEUTRAL_WAVEFORMS = Object.freeze(['sine', 'triangle']);
 
 export const TONE_SLIDERS = Object.freeze([
   'velocity',
@@ -15,49 +16,92 @@ export const TONE_SLIDERS = Object.freeze([
   'chorus',
 ]);
 
+const base = (overrides = {}) => Object.freeze({
+  velocity: 0.65,
+  brightness: 0.5,
+  attack: 0.12,
+  release: 0.4,
+  reverb: 0.12,
+  chorus: 0.03,
+  coupler: false,
+  subOctave: false,
+  ...overrides,
+});
+
 export const DEFAULT_TONE_BY_VOICE = Object.freeze({
-  pluck: Object.freeze({
+  pluck: base({
     velocity: 0.76,
     brightness: 0.62,
     attack: 0.04,
     release: 0.22,
     reverb: 0.05,
     chorus: 0,
-    coupler: false,
-    subOctave: false,
   }),
-  practice: Object.freeze({
-    velocity: 0.64,
-    brightness: 0.3,
-    attack: 0.16,
-    release: 0.46,
-    reverb: 0.11,
-    chorus: 0,
-    coupler: false,
-    subOctave: false,
-  }),
-  sine: Object.freeze({
+  neutral: base({
     velocity: 0.52,
-    brightness: 0,
+    brightness: 0.38,
     attack: 0.16,
     release: 0.32,
     reverb: 0.025,
     chorus: 0,
-    coupler: false,
-    subOctave: false,
-    sineOctave: 1,
-    sineEnvelope: 'soft',
-    sineWaveform: 'sine',
+    neutralEnvelope: 'soft',
+    neutralWaveform: 'triangle',
   }),
-  harmonium: Object.freeze({
-    velocity: 0.67,
-    brightness: 0.54,
-    attack: 0.2,
+  harmonium: base({
+    velocity: 0.64,
+    brightness: 0.46,
+    attack: 0.14,
+    release: 0.55,
+    reverb: 0.15,
+    chorus: 0.06,
+  }),
+  violin: base({
+    velocity: 0.61,
+    brightness: 0.48,
+    attack: 0.24,
     release: 0.58,
     reverb: 0.18,
-    chorus: 0.09,
-    coupler: false,
-    subOctave: false,
+    chorus: 0.05,
+  }),
+  cello: base({
+    velocity: 0.64,
+    brightness: 0.36,
+    attack: 0.22,
+    release: 0.62,
+    reverb: 0.19,
+    chorus: 0.04,
+  }),
+  'english-horn': base({
+    velocity: 0.58,
+    brightness: 0.42,
+    attack: 0.18,
+    release: 0.5,
+    reverb: 0.16,
+    chorus: 0.025,
+  }),
+  sitar: base({
+    velocity: 0.66,
+    brightness: 0.64,
+    attack: 0.025,
+    release: 0.32,
+    reverb: 0.08,
+    chorus: 0,
+  }),
+  shamisen: base({
+    velocity: 0.68,
+    brightness: 0.58,
+    attack: 0.02,
+    release: 0.22,
+    reverb: 0.055,
+    chorus: 0,
+  }),
+  koto: base({
+    velocity: 0.62,
+    brightness: 0.56,
+    attack: 0.025,
+    release: 0.3,
+    reverb: 0.075,
+    chorus: 0,
   }),
 });
 
@@ -67,21 +111,24 @@ export function clamp01(value, fallback = 0) {
 }
 
 export function normalizeToneSettings(value, voice = 'pluck') {
-  const defaults = DEFAULT_TONE_BY_VOICE[voice] || DEFAULT_TONE_BY_VOICE.pluck;
+  const mode = normalizeMelodyVoice(voice);
+  const defaults = DEFAULT_TONE_BY_VOICE[mode] || DEFAULT_TONE_BY_VOICE.pluck;
   const source = value && typeof value === 'object' ? value : {};
   const out = {};
   for (const key of TONE_SLIDERS) out[key] = clamp01(source[key], defaults[key]);
   out.coupler = Boolean(source.coupler ?? defaults.coupler);
   out.subOctave = Boolean(source.subOctave ?? defaults.subOctave);
-  if (voice === 'sine') {
-    const octave = Number(source.sineOctave);
-    out.sineOctave = SINE_OCTAVES.includes(octave) ? octave : defaults.sineOctave;
-    out.sineEnvelope = SINE_ENVELOPES.includes(source.sineEnvelope)
-      ? source.sineEnvelope
-      : defaults.sineEnvelope;
-    out.sineWaveform = SINE_WAVEFORMS.includes(source.sineWaveform)
-      ? source.sineWaveform
-      : defaults.sineWaveform;
+  if (mode === 'neutral') {
+    // Migrate the first prototype's sine keys while removing all octave
+    // transposition. The oscillator always follows the written frequency.
+    const envelope = source.neutralEnvelope ?? source.sineEnvelope;
+    const waveform = source.neutralWaveform ?? source.sineWaveform;
+    out.neutralEnvelope = NEUTRAL_ENVELOPES.includes(envelope)
+      ? envelope
+      : defaults.neutralEnvelope;
+    out.neutralWaveform = NEUTRAL_WAVEFORMS.includes(waveform)
+      ? waveform
+      : defaults.neutralWaveform;
   }
   return out;
 }
@@ -89,17 +136,19 @@ export function normalizeToneSettings(value, voice = 'pluck') {
 export function normalizeToneMap(value) {
   const source = value && typeof value === 'object' ? value : {};
   const out = {};
-  for (const voice of Object.keys(DEFAULT_TONE_BY_VOICE)) {
-    out[voice] = normalizeToneSettings(source[voice], voice);
+  for (const voice of MELODY_VOICES) {
+    const legacy = voice === 'neutral' ? source.sine : undefined;
+    out[voice] = normalizeToneSettings(source[voice] ?? legacy, voice);
   }
   return out;
 }
 
 export function updateToneMap(map, voice, patch) {
+  const mode = normalizeMelodyVoice(voice);
   const normalized = normalizeToneMap(map);
-  normalized[voice] = normalizeToneSettings(
-    { ...normalized[voice], ...(patch || {}) },
-    voice
+  normalized[mode] = normalizeToneSettings(
+    { ...normalized[mode], ...(patch || {}) },
+    mode
   );
   return normalized;
 }

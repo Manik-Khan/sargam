@@ -1,9 +1,12 @@
-// src/shell/soundfont.js — SpessaSynth/SoundFont adapter.
+// src/shell/soundfont.js — SpessaSynth/GeneralUser GS adapter.
 //
-// The library is bundled by Vite from npm. SpessaSynth's AudioWorklet
-// processor is copied into public/vendor/spessasynth so the browser can load
-// it as a normal same-origin asset. The harmonium SoundFont itself remains an
-// online prototype until its redistribution provenance is confirmed.
+// SpessaSynth is the playback engine. GeneralUser GS supplies the sampled
+// instrument presets. The bank is bundled locally under public/ so selected
+// voices work without a network connection once Sargam itself is available.
+//
+// Pitch is non-negotiable: the scheduler supplies a concert-pitch frequency,
+// and every preset receives the exact corresponding MIDI key plus pitch bend.
+// There are no per-instrument transpositions or hidden octave changes.
 
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import {
@@ -12,12 +15,18 @@ import {
   toneReleaseSeconds,
   toneVelocity,
 } from './tone.js';
+import {
+  isSoundfontVoice,
+  melodyVoiceDef,
+  normalizeMelodyVoice,
+  SOUNDFONT_VOICES,
+} from './voices.js';
 
 export const SPESSA_VERSION = '4.3.0';
 export const SPESSA_PROCESSOR_URL =
   `${import.meta.env?.BASE_URL || '/'}vendor/spessasynth/spessasynth_processor.min.js`;
-export const HARMONIUM_SF2_URL =
-  'https://raw.githubusercontent.com/ledlaux/harmonium-companion/refs/heads/soundfont/harmonium.sf2';
+export const GENERALUSER_SOUNDFONT_URL =
+  `${import.meta.env?.BASE_URL || '/'}audio/soundfonts/generaluser/GeneralUser-GS-v1.471.sf2`;
 
 const CHANNELS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15]);
 const PITCH_RANGE = 12;
@@ -51,28 +60,50 @@ function inMidiRange(note) {
  *   fetchArrayBuffer?: (url:string)=>Promise<ArrayBuffer>,
  *   WorkletSynthesizerClass?: typeof WorkletSynthesizer,
  *   processorUrl?: string,
+ *   soundfontUrl?: string,
  * }} env
  */
-export function createHarmoniumSoundfont(env) {
+export function createGeneralUserSoundfont(env) {
   const context = env.context;
   const SynthClass = env.WorkletSynthesizerClass || WorkletSynthesizer;
   const processorUrl = env.processorUrl || SPESSA_PROCESSOR_URL;
+  const soundfontUrl = env.soundfontUrl || GENERALUSER_SOUNDFONT_URL;
 
   let synth = null;
   let preparePromise = null;
   let error = null;
   let nextChannel = 0;
-  let currentSettings = normalizeToneSettings(null, 'harmonium');
+  let currentVoice = 'harmonium';
+  const currentSettings = new Map();
+  const channelVoice = new Map();
+
+  for (const voice of SOUNDFONT_VOICES) {
+    currentSettings.set(voice, normalizeToneSettings(null, voice));
+  }
+
+  function opts(at) {
+    return Number.isFinite(at) ? { time: at } : undefined;
+  }
 
   function controller(channel, number, value, at = null) {
     if (!synth) return;
-    const opts = Number.isFinite(at) ? { time: at } : undefined;
-    synth.controllerChange(channel, number, value, opts);
+    synth.controllerChange(channel, number, value, opts(at));
   }
 
-  function applyChannelSettings(channel, settings, at = null) {
-    const s = normalizeToneSettings(settings, 'harmonium');
-    controller(channel, 11, 127, at); // steady bellows/expression
+  function applyPreset(channel, voice, at = null) {
+    if (!synth) return;
+    const mode = isSoundfontVoice(voice) ? normalizeMelodyVoice(voice) : 'harmonium';
+    const preset = melodyVoiceDef(mode);
+    controller(channel, 0, preset.bankMSB || 0, at);
+    controller(channel, 32, preset.bankLSB || 0, at);
+    synth.programChange(channel, preset.program, opts(at));
+    channelVoice.set(channel, mode);
+  }
+
+  function applyChannelSettings(channel, voice, settings, at = null) {
+    const mode = isSoundfontVoice(voice) ? normalizeMelodyVoice(voice) : 'harmonium';
+    const s = normalizeToneSettings(settings, mode);
+    controller(channel, 11, 127, at); // steady expression/bellows
     controller(channel, 7, 112, at); // headroom; Sargam owns master volume
     controller(channel, 72, midiValue(s.release), at);
     controller(channel, 73, midiValue(s.attack), at);
@@ -88,27 +119,31 @@ export function createHarmoniumSoundfont(env) {
       !context?.audioWorklet?.addModule ||
       typeof env.fetchArrayBuffer !== 'function'
     ) {
-      error = new Error('Sampled harmonium requires AudioWorklet and SoundFont loading.');
+      error = new Error('Sampled instruments require AudioWorklet and SoundFont loading.');
       return false;
     }
 
     preparePromise = (async () => {
       try {
-        const soundBank = await env.fetchArrayBuffer(HARMONIUM_SF2_URL);
+        const soundBank = await env.fetchArrayBuffer(soundfontUrl);
         await context.audioWorklet.addModule(processorUrl);
 
         const next = new SynthClass(context);
-        await next.soundBankManager.addSoundBank(soundBank, 'main');
+        await next.soundBankManager.addSoundBank(soundBank, 'generaluser');
         await next.isReady;
         if (typeof next.setLogLevel === 'function') next.setLogLevel(false, false, false);
         next.connect(env.destination);
 
-        for (const channel of CHANNELS) {
-          next.programChange(channel, 0);
-          next.pitchWheelRange(channel, PITCH_RANGE);
-        }
         synth = next;
-        for (const channel of CHANNELS) applyChannelSettings(channel, currentSettings);
+        for (const channel of CHANNELS) {
+          synth.pitchWheelRange(channel, PITCH_RANGE);
+          applyPreset(channel, currentVoice);
+          applyChannelSettings(
+            channel,
+            currentVoice,
+            currentSettings.get(currentVoice)
+          );
+        }
         error = null;
         return true;
       } catch (err) {
@@ -123,7 +158,6 @@ export function createHarmoniumSoundfont(env) {
 
   function scheduleBend(channel, fromSemitones, toSemitones, at, duration) {
     if (!synth) return;
-    const opts = (time) => ({ time });
     synth.pitchWheel(channel, bendValue(fromSemitones), opts(at));
     const steps = Math.max(1, Math.min(8, Math.round(duration / 0.018)));
     for (let i = 1; i <= steps; i++) {
@@ -134,9 +168,10 @@ export function createHarmoniumSoundfont(env) {
     }
   }
 
-  function play(ev, at, settings = currentSettings) {
+  function play(ev, at, voice = currentVoice, settings = null) {
     if (!synth) return false;
-    const s = normalizeToneSettings(settings, 'harmonium');
+    const mode = isSoundfontVoice(voice) ? normalizeMelodyVoice(voice) : currentVoice;
+    const s = normalizeToneSettings(settings || currentSettings.get(mode), mode);
     const target = frequencyToMidi(ev.freq);
     const start = frequencyToMidi(ev.glideFrom || ev.freq);
     const channel = CHANNELS[nextChannel++ % CHANNELS.length];
@@ -144,30 +179,55 @@ export function createHarmoniumSoundfont(env) {
     const glideDuration = ev.glideFrom ? Math.min(0.17, duration * 0.48) : 0;
     const startRelative = start.midiFloat - target.midi;
     const targetRelative = target.midiFloat - target.midi;
-    const velocity = Math.max(1, Math.min(127, Math.round(toneVelocity(s.velocity, ev.grace) * 127)));
+    const velocity = Math.max(
+      1,
+      Math.min(127, Math.round(toneVelocity(s.velocity, ev.grace) * 127))
+    );
 
-    applyChannelSettings(channel, s, at);
+    if (channelVoice.get(channel) !== mode) applyPreset(channel, mode, at);
+    applyChannelSettings(channel, mode, s, at);
     if (glideDuration > 0.005) {
       scheduleBend(channel, startRelative, targetRelative, at, glideDuration);
     } else {
-      synth.pitchWheel(channel, bendValue(targetRelative), { time: at });
+      synth.pitchWheel(channel, bendValue(targetRelative), opts(at));
     }
 
     const notes = [target.midi];
-    if (s.coupler && inMidiRange(target.midi + 12)) notes.push(target.midi + 12);
-    if (s.subOctave && inMidiRange(target.midi - 12)) notes.push(target.midi - 12);
-    for (const note of notes) synth.noteOn(channel, note, velocity, { time: at });
-    for (const note of notes) synth.noteOff(channel, note, { time: at + duration });
+    if (mode === 'harmonium' && s.coupler && inMidiRange(target.midi + 12)) {
+      notes.push(target.midi + 12);
+    }
+    if (mode === 'harmonium' && s.subOctave && inMidiRange(target.midi - 12)) {
+      notes.push(target.midi - 12);
+    }
+    for (const note of notes) synth.noteOn(channel, note, velocity, opts(at));
+    for (const note of notes) synth.noteOff(channel, note, opts(at + duration));
 
     const resetAt = at + duration + toneReleaseSeconds(s.release) + 0.04;
-    synth.pitchWheel(channel, 8192, { time: resetAt });
+    synth.pitchWheel(channel, 8192, opts(resetAt));
     return true;
   }
 
-  function setSettings(settings) {
-    currentSettings = normalizeToneSettings(settings, 'harmonium');
+  function setVoice(voice) {
+    if (!isSoundfontVoice(voice)) return;
+    currentVoice = normalizeMelodyVoice(voice);
     if (!synth) return;
-    for (const channel of CHANNELS) applyChannelSettings(channel, currentSettings);
+    for (const channel of CHANNELS) {
+      applyPreset(channel, currentVoice);
+      applyChannelSettings(
+        channel,
+        currentVoice,
+        currentSettings.get(currentVoice)
+      );
+    }
+  }
+
+  function setSettings(voice, settings) {
+    if (!isSoundfontVoice(voice)) return;
+    const mode = normalizeMelodyVoice(voice);
+    const normalized = normalizeToneSettings(settings, mode);
+    currentSettings.set(mode, normalized);
+    if (!synth || mode !== currentVoice) return;
+    for (const channel of CHANNELS) applyChannelSettings(channel, mode, normalized);
   }
 
   function stopAll(force = true) {
@@ -178,11 +238,13 @@ export function createHarmoniumSoundfont(env) {
     if (synth && typeof synth.destroy === 'function') synth.destroy();
     synth = null;
     preparePromise = null;
+    channelVoice.clear();
   }
 
   return {
     prepare,
     play,
+    setVoice,
     setSettings,
     stopAll,
     destroy,
@@ -192,5 +254,11 @@ export function createHarmoniumSoundfont(env) {
     get error() {
       return error;
     },
+    get voice() {
+      return currentVoice;
+    },
   };
 }
+
+// Temporary compatibility alias for callers/tests from the first prototype.
+export const createHarmoniumSoundfont = createGeneralUserSoundfont;

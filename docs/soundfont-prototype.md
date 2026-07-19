@@ -1,69 +1,66 @@
-# Sampled harmonium prototype
+# Pitch-locked sampled instrument bank
 
-## Purpose
+## Binding rule
 
-The first Sargam SoundFont voice replaces the earlier saw-oscillator
-“Harmonium-like” patch with a sampled harmonium played through SpessaSynth. The
-notation scheduler remains responsible for note timing, duration, grace notes,
-repeats, jumps, and meend.
+Changing the melody instrument changes timbre only. It must never transpose the
+composition. Every engine receives the same concert-pitch frequency emitted by
+the notation scheduler.
 
-## Current loading model
+Examples:
 
-SpessaSynth 4.3.0 is installed as a pinned npm dependency and bundled by Vite.
-Its matching AudioWorklet processor is committed at:
+- `Sa A` remains A in Current Pluck, Neutral Tone, violin, cello, English horn,
+  reed organ, sitar, shamisen, and koto.
+- Neutral Tone has envelope and waveform controls but no octave/register
+  selector.
+- The reed-organ coupler and sub-octave switches add optional layers while the
+  written fundamental remains present.
 
-```text
-public/vendor/spessasynth/spessasynth_processor.min.js
-```
+## Architecture
 
-This is required because SpessaSynth's browser documentation instructs projects
-to bundle the npm package and expose the matching processor as a same-origin
-browser asset. Keep the npm package and processor file on the same version.
+Two lightweight voices remain native to Sargam:
 
-The harmonium SoundFont itself is still fetched only when the user chooses
-**Sampled harmonium**:
+- Current Pluck: deterministic Karplus-Strong physical model.
+- Neutral Tone: sine or rounded-triangle oscillator with selectable envelope.
 
-```text
-https://raw.githubusercontent.com/ledlaux/harmonium-companion/refs/heads/soundfont/harmonium.sf2
-```
+All sampled voices use one local GeneralUser GS SoundFont through SpessaSynth:
 
-Until the SoundFont finishes loading, Current Pluck is used as a safe fallback.
-The other melody voices, tabla assets, tanpura, notation editing, and printing do
-not depend on that remote file.
+- Reed organ / harmonium
+- Violin
+- Cello
+- English horn
+- Sitar
+- Shamisen
+- Koto
 
-## Why the SoundFont is not bundled yet
+The SoundFont and AudioWorklet processor are stored under `public/`, so the
+sampled voices no longer depend on a runtime CDN request. The later PWA phase
+can cache the same files for reliable offline startup.
 
-SpessaSynth is Apache-2.0 licensed. Harmonium Companion's repository is MIT
-licensed, but the repository did not provide separate provenance for the
-SoundFont binary when this prototype was prepared. Sargam therefore references
-the existing file for auditioning instead of redistributing it.
+## Pitch mapping
 
-Before an offline release:
+`frequencyToMidi()` converts the scheduler frequency into the nearest MIDI note
+and the fractional remainder into pitch bend. The adapter uses a 12-semitone
+bend range so meend can begin from `glideFrom` and settle on the exact target.
+There are no preset-specific transpose constants.
 
-1. Confirm that the SoundFont itself may be redistributed.
-2. Store the approved SoundFont under `public/audio/harmonium/`.
-3. Change `src/shell/soundfont.js` to the local SoundFont URL.
-4. Include the engine, processor, and SoundFont in the future PWA cache.
+## Tone controls
 
-## Controls
+Each voice has independent remembered settings:
 
-Shared controls are stored separately for each voice:
+- Touch/velocity
+- Brightness
+- Attack
+- Release
+- Room/reverb
+- Chorus for sampled voices
 
-- touch/velocity
-- brightness
-- attack
-- release
-- room/reverb
+Neutral Tone additionally offers envelope and waveform. Reed organ additionally
+offers additive upper-coupler and sub-octave layers.
 
-The sampled harmonium additionally supports chorus, upper coupler, and
-sub-octave.
+## Bundled bank
 
-The sine/ear-training voice additionally supports:
-
-- register from one octave below through two octaves above the written pitch
-- soft, bell, sustained, and short-pluck envelopes
-- pure sine or rounded-triangle waveform
-
-The sine voice defaults to one octave above the written pitch so it does not sit
-like a bass drone. Settings are browser preferences and are not written into the
-composition document.
+This checkpoint carries GeneralUser GS 1.471 from the npm package
+`generaluser@1.47.1`, together with its license text. The code isolates the bank
+URL and preset catalogue so a newer compatible GeneralUser release can replace
+it later without touching notation syntax, playback scheduling, or saved
+compositions.

@@ -11,7 +11,12 @@ import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
 import { documentToMusicXML } from '../engine/western.js';
-import { createPlayer, DRONE_MODES, MELODY_VOICES } from './audio.js';
+import { createPlayer, DRONE_MODES } from './audio.js';
+import {
+  isSoundfontVoice,
+  melodyVoiceLabel,
+  normalizeMelodyVoice,
+} from './voices.js';
 import { normalizeToneMap, updateToneMap } from './tone.js';
 import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
@@ -95,10 +100,9 @@ export default function App() {
   const [toneByVoice, setToneByVoice] = useState(() =>
     normalizeToneMap(store.getPref('melodyToneSettings', null))
   );
-  const [melodyVoice, setMelodyVoice] = useState(() => {
-    const saved = store.getPref('melodyVoice', 'pluck');
-    return MELODY_VOICES.includes(saved) ? saved : 'pluck';
-  });
+  const [melodyVoice, setMelodyVoice] = useState(() =>
+    normalizeMelodyVoice(store.getPref('melodyVoice', 'pluck'))
+  );
   const [droneMode, setDroneMode] = useState(() => {
     const saved = store.getPref('droneMode', 'off');
     return DRONE_MODES.includes(saved) ? saved : 'off';
@@ -301,20 +305,21 @@ export default function App() {
   };
 
   const doMelodyVoice = (mode) => {
-    const next = MELODY_VOICES.includes(mode) ? mode : 'pluck';
+    const next = normalizeMelodyVoice(mode);
     setMelodyVoice(next);
     player.setMelodyVoice(next);
     store.setPref('melodyVoice', next);
 
-    if (next === 'harmonium') {
-      setNotice('Loading the sampled harmonium for its first use…');
+    if (isSoundfontVoice(next)) {
+      const label = melodyVoiceLabel(next);
+      setNotice(`Loading ${label} for its first use…`);
       void player.prepareMelodyVoice().then((ready) => {
         if (ready) {
-          setNotice('Sampled harmonium is ready.');
+          setNotice(`${label} is ready.`);
         } else {
-          const detail = player.harmoniumError?.message;
+          const detail = player.soundfontError?.message;
           setNotice(
-            `Sampled harmonium could not load${detail ? `: ${detail}` : ''}. ` +
+            `${label} could not load${detail ? `: ${detail}` : ''}. ` +
               'Current Pluck will be used as the fallback.'
           );
         }

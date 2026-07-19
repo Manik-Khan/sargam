@@ -222,9 +222,9 @@ export const smokes = [
       const player = createPlayer({ createContext: mockCtx });
       assert.equal(player.melodyVoice, 'pluck');
       assert.equal(player.droneMode, 'off');
-      player.setMelodyVoice('harmonium');
+      player.setMelodyVoice('violin');
       player.setDroneMode('sa-ma');
-      assert.equal(player.melodyVoice, 'harmonium');
+      assert.equal(player.melodyVoice, 'violin');
       assert.equal(player.droneMode, 'sa-ma');
       player.setMelodyVoice('unknown');
       player.setDroneMode('unknown');
@@ -243,7 +243,7 @@ export const smokes = [
       assert.equal(player.toneSettings.harmonium.brightness, 0.8);
       assert.equal(player.toneSettings.harmonium.coupler, true);
       assert.notEqual(
-        player.toneSettings.practice.brightness,
+        player.toneSettings.violin.brightness,
         player.toneSettings.harmonium.brightness
       );
     },
@@ -253,34 +253,35 @@ export const smokes = [
     fn() {
       const { ctx, player } = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
       player.setTalaSound('off');
-      player.setMelodyVoice('sine');
+      player.setMelodyVoice('neutral');
       player.setDroneMode('sa-pa');
       player.play();
       assert.ok(ctx._started.some((s) => s.kind === 'buffer'), 'drone pluck scheduled');
-      assert.ok(ctx._started.some((s) => s.freq === 440), 'sine defaults one octave above written Sa');
+      assert.ok(ctx._started.some((s) => s.freq === 220), 'neutral tone matches written Sa exactly');
     },
   },
   {
-    name: 'audio: sine register and waveform can be changed per user setting',
+    name: 'audio: neutral envelopes and waveforms never alter the written pitch',
     fn() {
-      const first = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
-      first.player.setTalaSound('off');
-      first.player.setMelodyVoice('sine');
-      first.player.setToneSettings('sine', {
-        sineOctave: 0,
-        sineEnvelope: 'bell',
-        sineWaveform: 'triangle',
-      });
-      first.player.play();
-      assert.ok(first.ctx._started.some((s) => s.freq === 220));
-      assert.ok(first.ctx._started.some((s) => s.oscillatorType === 'triangle'));
-
-      const second = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
-      second.player.setTalaSound('off');
-      second.player.setMelodyVoice('sine');
-      second.player.setToneSettings('sine', { sineOctave: 2 });
-      second.player.play();
-      assert.ok(second.ctx._started.some((s) => s.freq === 880));
+      for (const [envelope, waveform] of [
+        ['soft', 'sine'],
+        ['bell', 'triangle'],
+        ['sustain', 'sine'],
+        ['pluck', 'triangle'],
+      ]) {
+        const current = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
+        current.player.setTalaSound('off');
+        current.player.setMelodyVoice('neutral');
+        current.player.setToneSettings('neutral', {
+          neutralEnvelope: envelope,
+          neutralWaveform: waveform,
+          sineOctave: 2,
+        });
+        current.player.play();
+        const oscillator = current.ctx._started.find((s) => s.freq);
+        assert.equal(oscillator.freq, 220, `${envelope}/${waveform} stays at written A3`);
+        assert.equal(oscillator.oscillatorType, waveform);
+      }
     },
   },
   {

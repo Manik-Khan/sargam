@@ -81,51 +81,6 @@ function normalize(out, peakTarget = 0.82) {
   return out;
 }
 
-/**
- * A rounder practice voice built entirely from the requested pluck pitch.
- * The earlier prototype mixed fixed 155/285 Hz oscillators into every note;
- * those unrelated tones were audibly out of tune. This version uses only
- * filtered and delayed copies of the source string, so all colour remains
- * harmonically tied to the played note.
- */
-export function renderPracticePluck({
-  freq,
-  dur,
-  sampleRate,
-  variant = 0,
-  brightness = 0.3,
-}) {
-  const b = Math.min(1, Math.max(0, Number(brightness) || 0));
-  const base = renderPluck({
-    freq,
-    dur,
-    sampleRate,
-    bright: 0.12 + b * 0.52 + (Math.abs(variant) % 4) * 0.012,
-    variant,
-  });
-  const out = new Float32Array(base.length);
-  const attack = Math.max(1, Math.round(0.008 * sampleRate));
-  const reflectionA = Math.round((0.029 + (Math.abs(variant) % 3) * 0.002) * sampleRate);
-  const reflectionB = Math.round((0.061 + (Math.abs(variant + 1) % 3) * 0.003) * sampleRate);
-  const bodyDelay = Math.max(1, Math.round(sampleRate / Math.max(60, freq * 2)));
-  let low = 0;
-  let lower = 0;
-
-  for (let i = 0; i < out.length; i++) {
-    // Two cascaded one-pole filters soften the transient without creating a
-    // new pitch. A tiny period-related delayed copy adds body that follows
-    // the actual note rather than imposing a fixed resonance.
-    low += (0.12 + b * 0.11) * (base[i] - low);
-    lower += 0.075 * (low - lower);
-    const body = i >= bodyDelay ? base[i - bodyDelay] * 0.055 : 0;
-    const roomA = i >= reflectionA ? base[i - reflectionA] * 0.06 : 0;
-    const roomB = i >= reflectionB ? base[i - reflectionB] * 0.032 : 0;
-    const ramp = i < attack ? i / attack : 1;
-    out[i] = (0.72 * low + 0.22 * lower + body + roomA + roomB) * ramp;
-  }
-
-  return normalize(out, 0.76);
-}
 
 /**
  * A light tanpura-like pluck for the optional tonic drone. The subtle
