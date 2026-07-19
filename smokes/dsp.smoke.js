@@ -3,7 +3,12 @@
 // hears it: length, energy, decay, and — via autocorrelation — that the
 // pluck actually rings at the requested pitch. Timbre judgment stays M's.
 import assert from 'node:assert/strict';
-import { renderPluck, renderTick } from '../src/shell/dsp.js';
+import {
+  renderPluck,
+  renderPracticePluck,
+  renderTanpuraPluck,
+  renderTick,
+} from '../src/shell/dsp.js';
 
 const SR = 44100;
 
@@ -70,6 +75,29 @@ export const smokes = [
       const a = renderPluck({ freq: 220, dur: 0.5, sampleRate: SR });
       const b = renderPluck({ freq: 220, dur: 0.5, sampleRate: SR });
       assert.deepEqual(Array.from(a.slice(0, 200)), Array.from(b.slice(0, 200)));
+    },
+  },
+  {
+    name: 'practice voice: softer variants remain audible, bounded and repeatably different',
+    fn() {
+      const a = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 0 });
+      const b = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 1 });
+      const a2 = renderPracticePluck({ freq: 220, dur: 1.2, sampleRate: SR, variant: 0 });
+      assert.equal(a.length, Math.round(1.2 * SR));
+      assert.ok(rms(a, 0, SR * 0.2) > 0.005, 'practice voice audible');
+      assert.deepEqual(Array.from(a.slice(0, 200)), Array.from(a2.slice(0, 200)));
+      assert.notDeepEqual(Array.from(a.slice(100, 300)), Array.from(b.slice(100, 300)));
+      for (let i = 0; i < a.length; i += 11) assert.ok(Math.abs(a[i]) <= 1);
+    },
+  },
+  {
+    name: 'tanpura voice: long pluck renders safely with sustained energy',
+    fn() {
+      const buf = renderTanpuraPluck({ freq: 220, dur: 2.5, sampleRate: SR, variant: 2 });
+      assert.equal(buf.length, Math.round(2.5 * SR));
+      assert.ok(rms(buf, 0, SR * 0.25) > 0.005, 'audible attack');
+      assert.ok(rms(buf, SR * 1.5, SR * 2.2) > 0.0001, 'drone keeps a tail');
+      for (let i = 0; i < buf.length; i += 13) assert.ok(Math.abs(buf[i]) <= 1);
     },
   },
   {

@@ -570,6 +570,16 @@
   border: 1px solid var(--sr-line); border-radius: 6px;
   background: var(--sr-paper); color: var(--sr-ink); text-align: center;
 }
+.tp-select {
+  max-width: 170px;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 24px 3px 7px;
+  border: 1px solid var(--sr-line);
+  border-radius: 6px;
+  background: var(--sr-paper);
+  color: var(--sr-ink);
+}
 .tp-seg { display: flex; border: 1px solid var(--sr-line); border-radius: 6px; overflow: hidden; }
 .tp-seg button {
   font: inherit; font-size: 12px; padding: 3px 10px;
@@ -593,6 +603,15 @@
   font-size: 11px;
   color: var(--sr-ink-soft);
   text-align: right;
+}
+.tp-drone-volume {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tp-drone-volume .tp-volume:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* live playback cursor — driven by the same event list as the sound */

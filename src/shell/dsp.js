@@ -28,7 +28,7 @@ function prng(seed) {
  *   bright 0..1 — how much high end survives the initial excitation.
  * @returns {Float32Array}
  */
-export function renderPluck({ freq, dur, sampleRate, bright = 0.55 }) {
+export function renderPluck({ freq, dur, sampleRate, bright = 0.55, variant = 0 }) {
   const n = Math.max(1, Math.round(dur * sampleRate));
   const out = new Float32Array(n);
   const period = sampleRate / freq;
@@ -38,7 +38,7 @@ export function renderPluck({ freq, dur, sampleRate, bright = 0.55 }) {
   const delay = new Float32Array(N);
 
   // excitation: noise, one-pole low-passed by (1-bright) for a rounder attack
-  const rand = prng(Math.round(freq * 1000));
+  const rand = prng(Math.round(freq * 1000) + Math.round(variant) * 104729);
   let lp = 0;
   for (let i = 0; i < N; i++) {
     const white = rand() * 2 - 1;
@@ -70,6 +70,89 @@ export function renderPluck({ freq, dur, sampleRate, bright = 0.55 }) {
     out[i] *= g * a;
   }
   return out;
+}
+
+/** Normalize a rendered voice without changing its shape. */
+function normalize(out, peakTarget = 0.82) {
+  let peak = 0;
+  for (let i = 0; i < out.length; i++) peak = Math.max(peak, Math.abs(out[i]));
+  const gain = peak > 0 ? peakTarget / peak : 1;
+  for (let i = 0; i < out.length; i++) out[i] *= gain;
+  return out;
+}
+
+/**
+ * A rounder practice voice built from the physical-model pluck rather than
+ * pretending to be a literal sarod sample. It keeps the requested pitch and
+ * attack, but adds a softer excitation, fixed instrument-body resonances,
+ * and two restrained early reflections so it sits beside real tabla more
+ * naturally. `variant` supplies repeat-to-repeat timbral variation while
+ * remaining deterministic and cacheable.
+ */
+export function renderPracticePluck({ freq, dur, sampleRate, variant = 0 }) {
+  const base = renderPluck({
+    freq,
+    dur,
+    sampleRate,
+    bright: 0.24 + (Math.abs(variant) % 4) * 0.025,
+    variant,
+  });
+  const out = new Float32Array(base.length);
+  const attack = Math.max(1, Math.round(0.009 * sampleRate));
+  const roomA = Math.round(0.037 * sampleRate);
+  const roomB = Math.round(0.071 * sampleRate);
+  const bodyA = 155 + (Math.abs(variant) % 3) * 7;
+  const bodyB = 285 + (Math.abs(variant + 1) % 3) * 11;
+  let low = 0;
+
+  for (let i = 0; i < out.length; i++) {
+    const t = i / sampleRate;
+    // Gentle one-pole smoothing removes the brittle edge without erasing
+    // the plucked identity.
+    low += 0.19 * (base[i] - low);
+    const bodyEnv = Math.exp(-3.4 * t);
+    const body =
+      0.045 * Math.sin(2 * Math.PI * bodyA * t) * bodyEnv +
+      0.025 * Math.sin(2 * Math.PI * bodyB * t) * Math.exp(-4.8 * t);
+    const reflectionA = i >= roomA ? base[i - roomA] * 0.075 : 0;
+    const reflectionB = i >= roomB ? base[i - roomB] * 0.04 : 0;
+    const ramp = i < attack ? i / attack : 1;
+    out[i] = (0.88 * low + body + reflectionA + reflectionB) * ramp;
+  }
+
+  return normalize(out, 0.78);
+}
+
+/**
+ * A light tanpura-like pluck for the optional tonic drone. The subtle
+ * nonlinear shimmer suggests jawari without baking a large audio library
+ * into the app. It is accompaniment, not a claim of literal instrument
+ * emulation.
+ */
+export function renderTanpuraPluck({ freq, dur, sampleRate, variant = 0 }) {
+  const base = renderPluck({
+    freq,
+    dur,
+    sampleRate,
+    bright: 0.38 + (Math.abs(variant) % 3) * 0.035,
+    variant: 31 + variant,
+  });
+  const out = new Float32Array(base.length);
+  const attack = Math.max(1, Math.round(0.005 * sampleRate));
+  const haloDelay = Math.round(0.021 * sampleRate);
+
+  for (let i = 0; i < out.length; i++) {
+    const t = i / sampleRate;
+    const x = base[i];
+    const jawari = Math.tanh(x * 2.2) * 0.62 + x * 0.38;
+    const shimmer =
+      0.035 * Math.sin(2 * Math.PI * freq * 2 * t) * Math.exp(-1.7 * t);
+    const halo = i >= haloDelay ? base[i - haloDelay] * 0.055 : 0;
+    const ramp = i < attack ? i / attack : 1;
+    out[i] = (jawari + shimmer + halo) * ramp;
+  }
+
+  return normalize(out, 0.7);
 }
 
 /**

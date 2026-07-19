@@ -11,7 +11,7 @@ import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
 import { documentToMusicXML } from '../engine/western.js';
-import { createPlayer } from './audio.js';
+import { createPlayer, DRONE_MODES, MELODY_VOICES } from './audio.js';
 import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
@@ -89,7 +89,16 @@ export default function App() {
   const [volumes, setVolumes] = useState(() => ({
     melody: prefGain(store.getPref('volumeMelody', 0.4), 0.4),
     tick: prefGain(store.getPref('volumeTala', 0.25), 0.25),
+    drone: prefGain(store.getPref('volumeTanpura', 0.16), 0.16),
   }));
+  const [melodyVoice, setMelodyVoice] = useState(() => {
+    const saved = store.getPref('melodyVoice', 'pluck');
+    return MELODY_VOICES.includes(saved) ? saved : 'pluck';
+  });
+  const [droneMode, setDroneMode] = useState(() => {
+    const saved = store.getPref('droneMode', 'off');
+    return DRONE_MODES.includes(saved) ? saved : 'off';
+  });
   const [talaSound, setTalaSound] = useState(() => {
     const saved = store.getPref('talaSound', 'click');
     return ['click', 'tabla', 'off'].includes(saved) ? saved : 'click';
@@ -107,8 +116,11 @@ export default function App() {
   useEffect(() => {
     player.setGain('melody', volumes.melody);
     player.setGain('tick', volumes.tick);
+    player.setGain('drone', volumes.drone);
     player.setMuted('melody', mutes.melody);
     player.setMuted('tick', mutes.tick);
+    player.setMelodyVoice(melodyVoice);
+    player.setDroneMode(droneMode);
     player.setTalaSound(talaSound);
   }, [player]); // restore the saved transport preferences once
 
@@ -268,10 +280,31 @@ export default function App() {
   };
 
   const doTrackGain = (track, value) => {
-    const next = prefGain(value, track === 'melody' ? 0.4 : 0.25);
+    const fallback = track === 'melody' ? 0.4 : track === 'drone' ? 0.16 : 0.25;
+    const next = prefGain(value, fallback);
     setVolumes((prev) => ({ ...prev, [track]: next }));
     player.setGain(track, next);
-    store.setPref(track === 'melody' ? 'volumeMelody' : 'volumeTala', next);
+    const key =
+      track === 'melody'
+        ? 'volumeMelody'
+        : track === 'drone'
+          ? 'volumeTanpura'
+          : 'volumeTala';
+    store.setPref(key, next);
+  };
+
+  const doMelodyVoice = (mode) => {
+    const next = MELODY_VOICES.includes(mode) ? mode : 'pluck';
+    setMelodyVoice(next);
+    player.setMelodyVoice(next);
+    store.setPref('melodyVoice', next);
+  };
+
+  const doDroneMode = (mode) => {
+    const next = DRONE_MODES.includes(mode) ? mode : 'off';
+    setDroneMode(next);
+    player.setDroneMode(next);
+    store.setPref('droneMode', next);
   };
 
   const doTalaSound = (mode) => {
@@ -524,6 +557,8 @@ export default function App() {
         loopMode={loopMode}
         tracks={mutes}
         volumes={volumes}
+        melodyVoice={melodyVoice}
+        droneMode={droneMode}
         talaSound={talaSound}
         onPlayPause={doPlayPause}
         onStop={doStop}
@@ -531,6 +566,8 @@ export default function App() {
         onLoopMode={doLoopMode}
         onTrackMute={doTrackMute}
         onTrackGain={doTrackGain}
+        onMelodyVoice={doMelodyVoice}
+        onDroneMode={doDroneMode}
         onTalaSound={doTalaSound}
       />
       {showLegend && view === 'notation' && <Legend onClose={() => setShowLegend(false)} />}

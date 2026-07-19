@@ -279,6 +279,14 @@ export const smokes = [
       close(s.duration, 0);
     },
   },
+  {
+    name: 'schedule: carries the document tonic for tanpura support',
+    fn() {
+      const s = sched('sa: A\ntal: tintal\n\nS\n');
+      close(s.saFreq, 220);
+      assert.equal(s.saMidi, 57);
+    },
+  },
 {
     name: 'kan xbeat: {dP} m — graces sound BEFORE the beat, trimming the ringing note',
     fn() {

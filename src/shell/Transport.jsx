@@ -22,6 +22,8 @@ export default function Transport({
   loopMode,
   tracks,
   volumes,
+  melodyVoice,
+  droneMode,
   talaSound,
   onPlayPause,
   onStop,
@@ -29,6 +31,8 @@ export default function Transport({
   onLoopMode,
   onTrackMute,
   onTrackGain,
+  onMelodyVoice,
+  onDroneMode,
   onTalaSound,
 }) {
   const [bpmDraft, setBpmDraft] = useState(String(bpm));
@@ -90,6 +94,62 @@ export default function Transport({
           </button>
         ))}
       </span>
+      <span className="tp-sep" />
+      <label className="tp-label" htmlFor="tp-melody-voice">
+        Melody sound
+      </label>
+      <select
+        id="tp-melody-voice"
+        className="tp-select"
+        value={melodyVoice}
+        onChange={(e) => onMelodyVoice(e.target.value)}
+        onKeyDown={(e) => e.stopPropagation()}
+        title="Choose the notation melody voice"
+      >
+        <option value="pluck">Current pluck</option>
+        <option value="practice">Soft practice</option>
+        <option value="sine">Sine / ear training</option>
+        <option value="harmonium">Harmonium-like</option>
+      </select>
+      <span className="tp-sep" />
+      <span className="tp-label">Tanpura</span>
+      <span className="tp-seg" role="group" aria-label="Tanpura support">
+        {[
+          ['off', 'off'],
+          ['sa-pa', 'Sa–Pa'],
+          ['sa-ma', 'Sa–ma'],
+        ].map(([mode, label]) => (
+          <button
+            key={mode}
+            className={droneMode === mode ? 'on' : ''}
+            aria-pressed={droneMode === mode}
+            onClick={() => onDroneMode(mode)}
+            title={
+              mode === 'off'
+                ? 'No tanpura support'
+                : `Synthesized four-string ${label} drone tuned from the document's Sa`
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </span>
+      <div className="tp-drone-volume">
+        <input
+          className="tp-volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={volumes.drone}
+          disabled={droneMode === 'off'}
+          onChange={(e) => onTrackGain('drone', Number(e.target.value))}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label="Tanpura volume"
+          title={`Tanpura volume: ${pct(volumes.drone)}`}
+        />
+        <output className="tp-volume-value">{pct(volumes.drone)}</output>
+      </div>
       <span className="tp-sep" />
       <span className="tp-label">Tala sound</span>
       <span className="tp-seg" role="group" aria-label="Tala sound">

@@ -209,10 +209,39 @@ export const smokes = [
     name: 'audio: notation starts quieter and independent gains clamp safely',
     fn() {
       const player = createPlayer({ createContext: mockCtx });
-      assert.deepEqual(player.gains, { melody: 0.4, tick: 0.25 });
+      assert.deepEqual(player.gains, { melody: 0.4, tick: 0.25, drone: 0.16 });
       player.setGain('melody', 0.62);
       player.setGain('tick', 9);
-      assert.deepEqual(player.gains, { melody: 0.62, tick: 1 });
+      player.setGain('drone', -2);
+      assert.deepEqual(player.gains, { melody: 0.62, tick: 1, drone: 0 });
+    },
+  },
+  {
+    name: 'audio: melody voices and tanpura modes validate safely',
+    fn() {
+      const player = createPlayer({ createContext: mockCtx });
+      assert.equal(player.melodyVoice, 'pluck');
+      assert.equal(player.droneMode, 'off');
+      player.setMelodyVoice('harmonium');
+      player.setDroneMode('sa-ma');
+      assert.equal(player.melodyVoice, 'harmonium');
+      assert.equal(player.droneMode, 'sa-ma');
+      player.setMelodyVoice('unknown');
+      player.setDroneMode('unknown');
+      assert.equal(player.melodyVoice, 'pluck');
+      assert.equal(player.droneMode, 'off');
+    },
+  },
+  {
+    name: 'audio: tanpura support schedules a tonic-relative drone beside the melody',
+    fn() {
+      const { ctx, player } = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
+      player.setTalaSound('off');
+      player.setMelodyVoice('sine');
+      player.setDroneMode('sa-pa');
+      player.play();
+      assert.ok(ctx._started.some((s) => s.kind === 'buffer'), 'drone pluck scheduled');
+      assert.ok(ctx._started.some((s) => s.freq === 220), 'melody still plays at Sa');
     },
   },
   {

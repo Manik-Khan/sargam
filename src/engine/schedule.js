@@ -68,7 +68,7 @@ const GRACE_CAP = 1 / 2;
 /**
  * @param {Document} doc  parsed model (parse.js)
  * @param {{tempo?: number}} [opts]  tempo overrides the tempo: directive
- * @returns {{events: object[], duration: number, lineStarts: object[]}}
+ * @returns {{events: object[], duration: number, lineStarts: object[], saFreq: number, saMidi: number}}
  *   events (sorted by t):
  *     {kind:'note',  t, dur, ch, semitone, octave, freq, grace?, glideFrom?}
  *     {kind:'tick',  t, accent: 'sam'|'khali'|'vibhag'|'plain', cycleMatra, tal}
@@ -355,7 +355,7 @@ export function scheduleDocument(doc, opts = {}) {
   });
 
   events.sort((a, b) => a.t - b.t);
-  return { events, duration: t, lineStarts };
+  return { events, duration: t, lineStarts, saFreq: sa.freq, saMidi: sa.midi };
 }
 
 /**

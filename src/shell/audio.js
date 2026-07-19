@@ -8,7 +8,12 @@
 // Every browser surface is injected (env), so the driver logic runs — and
 // is smoked — in bare node with a fake clock and a recording context.
 
-import { renderPluck, renderTick } from './dsp.js';
+import {
+  renderPluck,
+  renderPracticePluck,
+  renderTanpuraPluck,
+  renderTick,
+} from './dsp.js';
 import {
   GHE_ROUND_ROBIN,
   TABLA_SAMPLE_URLS,
@@ -18,6 +23,9 @@ import {
 const LOOKAHEAD_S = 0.1; // schedule this far ahead of the audio clock
 const TICK_MS = 25; // driver timer period
 const noop = () => {};
+
+export const MELODY_VOICES = Object.freeze(['pluck', 'practice', 'sine', 'harmonium']);
+export const DRONE_MODES = Object.freeze(['off', 'sa-pa', 'sa-ma']);
 
 const clampGain = (value, fallback = 1) => {
   const n = Number(value);
@@ -71,12 +79,15 @@ export function createPlayer(env) {
   let loop = null; // {from, to} in schedule seconds, or null
   // Quieter defaults keep notation playback in the same useful range as
   // class recordings. App.jsx restores each user's saved preferences.
-  const gains = { melody: 0.4, tick: 0.25 };
-  const muted = { melody: false, tick: false };
+  const gains = { melody: 0.4, tick: 0.25, drone: 0.16 };
+  const muted = { melody: false, tick: false, drone: false };
   let talaSound = 'click'; // click | tabla | off
+  let melodyVoice = 'pluck'; // pluck | practice | sine | harmonium
+  let droneMode = 'off'; // off | sa-pa | sa-ma
   let onCursor = noop;
   let onStop = noop;
   let masterGains = null;
+  let mixBus = null;
 
   // Tabla samples are loaded once, decoded into the current AudioContext,
   // and retained for the life of the player. If they are not ready for an
@@ -86,15 +97,32 @@ export function createPlayer(env) {
   let tablaLoadError = null;
   let gheIndex = 0;
 
+  // The tanpura support is intentionally independent of tala and tempo: a
+  // slow four-string cycle keeps ringing while the notation transport runs.
+  let nextDroneAt = null;
+  let droneStep = 0;
+
   function ensureCtx() {
     if (!ctx) {
       ctx = env.createContext();
+      mixBus = ctx.destination;
+      if (typeof ctx.createDynamicsCompressor === 'function') {
+        const limiter = ctx.createDynamicsCompressor();
+        if (limiter.threshold) limiter.threshold.value = -10;
+        if (limiter.knee) limiter.knee.value = 18;
+        if (limiter.ratio) limiter.ratio.value = 5;
+        if (limiter.attack) limiter.attack.value = 0.004;
+        if (limiter.release) limiter.release.value = 0.16;
+        limiter.connect(ctx.destination);
+        mixBus = limiter;
+      }
       masterGains = {
         melody: ctx.createGain(),
         tick: ctx.createGain(),
+        drone: ctx.createGain(),
       };
       for (const k of Object.keys(masterGains)) {
-        masterGains[k].connect(ctx.destination);
+        masterGains[k].connect(mixBus);
         applyGain(k);
       }
     }
@@ -149,57 +177,222 @@ export function createPlayer(env) {
   // ---- melody voices ----
 
   const PLUCK_S = 2.5; // rendered ring length; note-off is the gain fade
+  const PRACTICE_S = 3.2;
+  const TANPURA_S = 4.8;
   const pluckCache = new Map();
+  const practiceCache = new Map();
+  const tanpuraCache = new Map();
   const tickCache = new Map();
+  let practiceVariant = 0;
+
+  function audioBuffer(data) {
+    const buf = ctx.createBuffer(1, data.length, ctx.sampleRate || 44100);
+    buf.copyToChannel ? buf.copyToChannel(data, 0) : buf.getChannelData(0).set(data);
+    return buf;
+  }
 
   function pluckBuffer(freq) {
     const key = Math.round(freq * 10);
     let buf = pluckCache.get(key);
     if (!buf) {
-      const data = renderPluck({ freq, dur: PLUCK_S, sampleRate: ctx.sampleRate || 44100 });
-      buf = ctx.createBuffer(1, data.length, ctx.sampleRate || 44100);
-      buf.copyToChannel ? buf.copyToChannel(data, 0) : buf.getChannelData(0).set(data);
+      buf = audioBuffer(
+        renderPluck({ freq, dur: PLUCK_S, sampleRate: ctx.sampleRate || 44100 })
+      );
       pluckCache.set(key, buf);
     }
     return buf;
   }
 
-  function playNote(ev, at) {
-    if (!ctx.createBuffer || !ctx.createBufferSource) return playNoteOsc(ev, at);
+  function practiceBuffer(freq, variant) {
+    const v = Math.abs(variant) % 4;
+    const key = `${Math.round(freq * 10)}:${v}`;
+    let buf = practiceCache.get(key);
+    if (!buf) {
+      buf = audioBuffer(
+        renderPracticePluck({
+          freq,
+          dur: PRACTICE_S,
+          sampleRate: ctx.sampleRate || 44100,
+          variant: v,
+        })
+      );
+      practiceCache.set(key, buf);
+    }
+    return buf;
+  }
+
+  function tanpuraBuffer(freq, variant) {
+    const v = Math.abs(variant) % 4;
+    const key = `${Math.round(freq * 10)}:${v}`;
+    let buf = tanpuraCache.get(key);
+    if (!buf) {
+      buf = audioBuffer(
+        renderTanpuraPluck({
+          freq,
+          dur: TANPURA_S,
+          sampleRate: ctx.sampleRate || 44100,
+          variant: v,
+        })
+      );
+      tanpuraCache.set(key, buf);
+    }
+    return buf;
+  }
+
+  function bendBufferSource(src, ev, at, dur) {
+    if (!ev.glideFrom || !src.playbackRate) return;
+    const ratio = ev.glideFrom / ev.freq;
+    src.playbackRate.setValueAtTime(ratio, at);
+    src.playbackRate.setTargetAtTime(1, at, Math.min(0.16, dur * 0.45));
+  }
+
+  function playBufferNote(ev, at, buffer, { level, release = 0.07 } = {}) {
+    if (!ctx.createBufferSource) return false;
     const g = ctx.createGain();
     g.connect(masterGains.melody);
     const src = ctx.createBufferSource();
-    src.buffer = pluckBuffer(ev.freq);
+    src.buffer = buffer;
     src.connect(g);
     const dur = Math.max(0.03, ev.dur);
-    const level = ev.grace ? 0.55 : 0.9;
     g.gain.setValueAtTime(level, at);
-    // let the string ring through the note, then fade at note-off
-    g.gain.setTargetAtTime(0.0001, at + dur, 0.06);
-    if (ev.glideFrom) {
-      // meend on a pluck: strike, then bend — playbackRate ramps from the
-      // source pitch's ratio up to 1, which is how a sarod meend works.
-      const ratio = ev.glideFrom / ev.freq;
-      src.playbackRate.setValueAtTime(ratio, at);
-      src.playbackRate.setTargetAtTime(1, at, Math.min(0.14, dur * 0.45));
-    }
+    g.gain.setTargetAtTime(0.0001, at + dur, release);
+    bendBufferSource(src, ev, at, dur);
     src.start(at);
-    src.stop(at + dur + 0.4);
+    src.stop(at + dur + Math.max(0.4, release * 7));
+    return true;
   }
 
-  function playNoteOsc(ev, at) {
+  function playCurrentPluck(ev, at) {
+    if (!ctx.createBuffer || !ctx.createBufferSource) return playSine(ev, at);
+    return playBufferNote(ev, at, pluckBuffer(ev.freq), {
+      level: ev.grace ? 0.55 : 0.9,
+      release: 0.06,
+    });
+  }
+
+  function playPracticeTone(ev, at) {
+    if (!ctx.createBuffer || !ctx.createBufferSource) return playSine(ev, at);
+    const variant = practiceVariant++ % 4;
+    return playBufferNote(ev, at, practiceBuffer(ev.freq, variant), {
+      level: ev.grace ? 0.38 : 0.68,
+      release: 0.11,
+    });
+  }
+
+  function setOscPitch(osc, target, from, at, dur) {
+    if (!osc.frequency) return;
+    osc.frequency.setValueAtTime(from || target, at);
+    if (from) osc.frequency.setTargetAtTime(target, at, Math.min(0.16, dur * 0.45));
+  }
+
+  function playSine(ev, at) {
+    if (typeof ctx.createOscillator !== 'function') return false;
     const g = ctx.createGain();
     g.connect(masterGains.melody);
     const osc = ctx.createOscillator();
-    osc.type = 'triangle';
+    osc.type = 'sine';
     osc.connect(g);
     const dur = Math.max(0.03, ev.dur);
+    const level = ev.grace ? 0.28 : 0.48;
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.linearRampToValueAtTime(ev.grace ? 0.5 : 0.85, at + 0.008);
-    g.gain.setTargetAtTime(0.0001, at + 0.008, Math.max(0.05, dur * 0.35));
-    osc.frequency.setValueAtTime(ev.freq, at);
+    g.gain.linearRampToValueAtTime(level, at + Math.min(0.012, dur * 0.25));
+    g.gain.setValueAtTime(level, at + Math.max(0.012, dur - 0.045));
+    g.gain.setTargetAtTime(0.0001, at + dur, 0.035);
+    setOscPitch(osc, ev.freq, ev.glideFrom, at, dur);
     osc.start(at);
-    osc.stop(at + dur + 0.25);
+    osc.stop(at + dur + 0.22);
+    return true;
+  }
+
+  function playHarmonium(ev, at) {
+    if (typeof ctx.createOscillator !== 'function') return playCurrentPluck(ev, at);
+    const g = ctx.createGain();
+    g.connect(masterGains.melody);
+    const dur = Math.max(0.04, ev.dur);
+    const level = ev.grace ? 0.16 : 0.29;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(level, at + Math.min(0.035, dur * 0.3));
+    g.gain.setValueAtTime(level, at + Math.max(0.035, dur - 0.06));
+    g.gain.setTargetAtTime(0.0001, at + dur, 0.055);
+
+    let destination = g;
+    if (typeof ctx.createBiquadFilter === 'function') {
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      if (filter.frequency?.setValueAtTime) filter.frequency.setValueAtTime(2500, at);
+      if (filter.Q?.setValueAtTime) filter.Q.setValueAtTime(0.7, at);
+      filter.connect(g);
+      destination = filter;
+    }
+
+    const partials = [
+      { type: 'sawtooth', ratio: 0.997, gain: 1 },
+      { type: 'sawtooth', ratio: 1.003, gain: 1 },
+      { type: 'triangle', ratio: 2, gain: 0.42 },
+    ];
+    partials.forEach((partial) => {
+      const osc = ctx.createOscillator();
+      const og = ctx.createGain();
+      osc.type = partial.type;
+      og.gain.setValueAtTime(partial.gain, at);
+      osc.connect(og);
+      og.connect(destination);
+      setOscPitch(
+        osc,
+        ev.freq * partial.ratio,
+        ev.glideFrom ? ev.glideFrom * partial.ratio : null,
+        at,
+        dur
+      );
+      osc.start(at);
+      osc.stop(at + dur + 0.3);
+    });
+    return true;
+  }
+
+  function playNote(ev, at) {
+    if (melodyVoice === 'practice') return playPracticeTone(ev, at);
+    if (melodyVoice === 'sine') return playSine(ev, at);
+    if (melodyVoice === 'harmonium') return playHarmonium(ev, at);
+    return playCurrentPluck(ev, at);
+  }
+
+  // ---- tanpura support ----
+
+  const DRONE_STEP_S = 0.72;
+
+  function droneSequence() {
+    const sa = Number(schedule?.saFreq) || 130.81278265;
+    const upperSa = sa;
+    const lowSa = sa / 2;
+    const lead = droneMode === 'sa-ma' ? sa * 2 ** (5 / 12) : sa * 2 ** (7 / 12);
+    return [lead, lowSa, upperSa, upperSa];
+  }
+
+  function playDronePluck(freq, at, variant) {
+    if (!ctx.createBuffer || !ctx.createBufferSource) return false;
+    const src = ctx.createBufferSource();
+    const g = ctx.createGain();
+    src.buffer = tanpuraBuffer(freq, variant);
+    src.connect(g);
+    g.connect(masterGains.drone);
+    g.gain.setValueAtTime(variant === 0 ? 0.7 : 0.56, at);
+    g.gain.setTargetAtTime(0.0001, at + 3.7, 0.28);
+    src.start(at);
+    src.stop(at + TANPURA_S + 0.1);
+    return true;
+  }
+
+  function pumpDrone(horizon) {
+    if (droneMode === 'off' || !schedule) return;
+    if (nextDroneAt === null) nextDroneAt = ctx.currentTime;
+    const pitches = droneSequence();
+    while (nextDroneAt <= horizon) {
+      const step = droneStep % pitches.length;
+      playDronePluck(pitches[step], Math.max(nextDroneAt, ctx.currentTime), step);
+      droneStep++;
+      nextDroneAt += DRONE_STEP_S;
+    }
   }
 
   function playClick(ev, at) {
@@ -259,6 +452,7 @@ export function createPlayer(env) {
   function pump() {
     if (!playing) return;
     const horizon = ctx.currentTime + LOOKAHEAD_S;
+    pumpDrone(horizon);
     const evs = schedule.events;
     while (nextIndex < evs.length && schedTime(evs[nextIndex]) <= horizon) {
       const ev = evs[nextIndex];
@@ -301,6 +495,8 @@ export function createPlayer(env) {
     }
     offset = 0;
     nextIndex = 0;
+    nextDroneAt = null;
+    droneStep = 0;
   }
 
   return {
@@ -316,6 +512,8 @@ export function createPlayer(env) {
       if (from !== null) offset = from;
       startedAt = ctx.currentTime;
       nextIndex = seekIndex(offset);
+      nextDroneAt = ctx.currentTime;
+      droneStep = 0;
       playing = true;
       if (timer === null) timer = setI(pump, TICK_MS);
       pump(); // schedule the first horizon immediately, inside the gesture
@@ -325,6 +523,8 @@ export function createPlayer(env) {
       if (!playing) return;
       offset = offset + (ctx.currentTime - startedAt);
       playing = false;
+      nextDroneAt = null;
+      droneStep = 0;
       if (timer !== null) {
         clearI(timer);
         timer = null;
@@ -354,6 +554,14 @@ export function createPlayer(env) {
     setTalaSound(mode) {
       talaSound = ['click', 'tabla', 'off'].includes(mode) ? mode : 'click';
     },
+    setMelodyVoice(mode) {
+      melodyVoice = MELODY_VOICES.includes(mode) ? mode : 'pluck';
+    },
+    setDroneMode(mode) {
+      droneMode = DRONE_MODES.includes(mode) ? mode : 'off';
+      nextDroneAt = playing && droneMode !== 'off' && ctx ? ctx.currentTime : null;
+      droneStep = 0;
+    },
     prepareTalaSound() {
       return talaSound === 'tabla' ? prepareTabla() : Promise.resolve(true);
     },
@@ -372,6 +580,12 @@ export function createPlayer(env) {
     },
     get talaSound() {
       return talaSound;
+    },
+    get melodyVoice() {
+      return melodyVoice;
+    },
+    get droneMode() {
+      return droneMode;
     },
     get tablaReady() {
       return tablaBuffers.size === Object.keys(TABLA_SAMPLE_URLS).length;
