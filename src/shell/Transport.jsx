@@ -23,6 +23,25 @@ const TONE_LABELS = Object.freeze({
   chorus: ['Chorus', 'None', 'Wide'],
 });
 
+
+function ToneSelect({ label, value, onChange, options }) {
+  return (
+    <label className="tp-tone-select-row">
+      <span className="tp-tone-name">{label}</span>
+      <select
+        className="tp-tone-select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function ToneSlider({ name, value, onChange, disabled = false }) {
   const [label, low, high] = TONE_LABELS[name];
   return (
@@ -87,6 +106,9 @@ export default function Transport({
     chorus: 0,
     coupler: false,
     subOctave: false,
+    sineOctave: 1,
+    sineEnvelope: 'soft',
+    sineWaveform: 'sine',
   };
 
   return (
@@ -174,6 +196,44 @@ export default function Transport({
           <ToneSlider name="attack" value={voiceTone.attack} onChange={onToneChange} />
           <ToneSlider name="release" value={voiceTone.release} onChange={onToneChange} />
           <ToneSlider name="reverb" value={voiceTone.reverb} onChange={onToneChange} />
+          {melodyVoice === 'sine' && (
+            <div className="tp-tone-special">
+              <ToneSelect
+                label="Register"
+                value={String(voiceTone.sineOctave ?? 1)}
+                onChange={(value) => onToneChange('sineOctave', Number(value))}
+                options={[
+                  ['-1', 'Lower (−1 octave)'],
+                  ['0', 'Written register'],
+                  ['1', 'Higher (+1 octave)'],
+                  ['2', 'Very high (+2 octaves)'],
+                ]}
+              />
+              <ToneSelect
+                label="Envelope"
+                value={voiceTone.sineEnvelope || 'soft'}
+                onChange={(value) => onToneChange('sineEnvelope', value)}
+                options={[
+                  ['soft', 'Soft and rounded'],
+                  ['bell', 'Bell-like decay'],
+                  ['sustain', 'Sustained'],
+                  ['pluck', 'Short pluck'],
+                ]}
+              />
+              <ToneSelect
+                label="Wave"
+                value={voiceTone.sineWaveform || 'sine'}
+                onChange={(value) => onToneChange('sineWaveform', value)}
+                options={[
+                  ['sine', 'Pure sine'],
+                  ['triangle', 'Rounded triangle'],
+                ]}
+              />
+              <p className="tp-tone-note">
+                Higher (+1 octave) is the default so the neutral tone does not sit like a bass drone.
+              </p>
+            </div>
+          )}
           {melodyVoice === 'harmonium' && (
             <>
               <ToneSlider name="chorus" value={voiceTone.chorus} onChange={onToneChange} />

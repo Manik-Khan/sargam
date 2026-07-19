@@ -2,6 +2,10 @@
 // synthesized voices, and the SoundFont adapter. Values are normalized to
 // 0..1 so each engine can translate them into meaningful controls.
 
+export const SINE_OCTAVES = Object.freeze([-1, 0, 1, 2]);
+export const SINE_ENVELOPES = Object.freeze(['soft', 'bell', 'sustain', 'pluck']);
+export const SINE_WAVEFORMS = Object.freeze(['sine', 'triangle']);
+
 export const TONE_SLIDERS = Object.freeze([
   'velocity',
   'brightness',
@@ -41,6 +45,9 @@ export const DEFAULT_TONE_BY_VOICE = Object.freeze({
     chorus: 0,
     coupler: false,
     subOctave: false,
+    sineOctave: 1,
+    sineEnvelope: 'soft',
+    sineWaveform: 'sine',
   }),
   harmonium: Object.freeze({
     velocity: 0.67,
@@ -66,6 +73,16 @@ export function normalizeToneSettings(value, voice = 'pluck') {
   for (const key of TONE_SLIDERS) out[key] = clamp01(source[key], defaults[key]);
   out.coupler = Boolean(source.coupler ?? defaults.coupler);
   out.subOctave = Boolean(source.subOctave ?? defaults.subOctave);
+  if (voice === 'sine') {
+    const octave = Number(source.sineOctave);
+    out.sineOctave = SINE_OCTAVES.includes(octave) ? octave : defaults.sineOctave;
+    out.sineEnvelope = SINE_ENVELOPES.includes(source.sineEnvelope)
+      ? source.sineEnvelope
+      : defaults.sineEnvelope;
+    out.sineWaveform = SINE_WAVEFORMS.includes(source.sineWaveform)
+      ? source.sineWaveform
+      : defaults.sineWaveform;
+  }
   return out;
 }
 

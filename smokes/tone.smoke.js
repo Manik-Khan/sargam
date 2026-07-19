@@ -35,6 +35,25 @@ export const smokes = [
     },
   },
   {
+    name: 'tone: sine register, envelope and waveform are validated',
+    fn() {
+      const sine = normalizeToneSettings(
+        { sineOctave: 2, sineEnvelope: 'bell', sineWaveform: 'triangle' },
+        'sine'
+      );
+      assert.equal(sine.sineOctave, 2);
+      assert.equal(sine.sineEnvelope, 'bell');
+      assert.equal(sine.sineWaveform, 'triangle');
+      const fallback = normalizeToneSettings(
+        { sineOctave: 99, sineEnvelope: 'bad', sineWaveform: 'square' },
+        'sine'
+      );
+      assert.equal(fallback.sineOctave, 1);
+      assert.equal(fallback.sineEnvelope, 'soft');
+      assert.equal(fallback.sineWaveform, 'sine');
+    },
+  },
+  {
     name: 'tone: one voice can be edited without changing the others',
     fn() {
       const before = normalizeToneMap(null);
@@ -103,11 +122,9 @@ export const smokes = [
       const adapter = createHarmoniumSoundfont({
         context,
         destination: { name: 'melody' },
-        importModule: async () => ({ WorkletSynthesizer: FakeSynth }),
-        fetchText: async () => 'registerProcessor("fake", class {});',
+        WorkletSynthesizerClass: FakeSynth,
+        processorUrl: '/vendor/spessasynth/test-processor.js',
         fetchArrayBuffer: async () => new ArrayBuffer(12),
-        createObjectURL: () => 'blob:test-worklet',
-        revokeObjectURL: (url) => calls.push(['revoke', url]),
       });
 
       assert.equal(await adapter.prepare(), true);
@@ -127,6 +144,10 @@ export const smokes = [
       assert.ok(noteOffs.every((c) => c[3]?.time === 2.5), 'note-offs retain duration');
       assert.ok(calls.some((c) => c[0] === 'bend' && c[3]?.time === 2), 'meend begins on time');
       assert.equal(calls.filter((c) => c[0] === 'construct').length, 1);
+      assert.ok(
+        calls.some((c) => c[0] === 'worklet' && c[1] === '/vendor/spessasynth/test-processor.js'),
+        'same-origin processor is loaded directly'
+      );
     },
   },
   {

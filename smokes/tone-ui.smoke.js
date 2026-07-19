@@ -16,13 +16,16 @@ export const smokes = [
         'Room',
         'Upper coupler',
         'Sub-octave',
+        'Register',
+        'Envelope',
+        'Rounded triangle',
       ]) {
         assert.ok(src.includes(phrase), `missing ${phrase}`);
       }
     },
   },
   {
-    name: 'tone UI: accurately labels the first harmonium load as online',
+    name: 'tone UI: accurately labels the SoundFont load as online',
     async fn() {
       const src = await readFile(new URL('../src/shell/Transport.jsx', import.meta.url), 'utf8');
       assert.ok(src.includes('first use loads the SoundFont online'));

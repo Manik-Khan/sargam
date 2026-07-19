@@ -1,10 +1,11 @@
-// src/shell/soundfont.js — lazy SpessaSynth/SoundFont adapter.
+// src/shell/soundfont.js — SpessaSynth/SoundFont adapter.
 //
-// The first prototype intentionally loads the engine and Harmonium Companion
-// sound bank over HTTPS so Manik can judge the instrument before Sargam ships
-// a 6+ MB binary. The wrapper is isolated so the same API can later point at
-// local `/audio/...` assets for full offline/PWA use.
+// The library is bundled by Vite from npm. SpessaSynth's AudioWorklet
+// processor is copied into public/vendor/spessasynth so the browser can load
+// it as a normal same-origin asset. The harmonium SoundFont itself remains an
+// online prototype until its redistribution provenance is confirmed.
 
+import { WorkletSynthesizer } from 'spessasynth_lib';
 import {
   clamp01,
   normalizeToneSettings,
@@ -13,10 +14,8 @@ import {
 } from './tone.js';
 
 export const SPESSA_VERSION = '4.3.0';
-export const SPESSA_MODULE_URL =
-  `https://unpkg.com/spessasynth_lib@${SPESSA_VERSION}/dist/index.js`;
 export const SPESSA_PROCESSOR_URL =
-  `https://unpkg.com/spessasynth_lib@${SPESSA_VERSION}/dist/spessasynth_processor.min.js`;
+  `${import.meta.env?.BASE_URL || '/'}vendor/spessasynth/spessasynth_processor.min.js`;
 export const HARMONIUM_SF2_URL =
   'https://raw.githubusercontent.com/ledlaux/harmonium-companion/refs/heads/soundfont/harmonium.sf2';
 
@@ -49,21 +48,15 @@ function inMidiRange(note) {
  * @param {{
  *   context: BaseAudioContext-like,
  *   destination: AudioNode-like,
- *   importModule?: (url:string)=>Promise<any>,
- *   fetchText?: (url:string)=>Promise<string>,
  *   fetchArrayBuffer?: (url:string)=>Promise<ArrayBuffer>,
- *   createObjectURL?: (blob:Blob)=>string,
- *   revokeObjectURL?: (url:string)=>void,
+ *   WorkletSynthesizerClass?: typeof WorkletSynthesizer,
+ *   processorUrl?: string,
  * }} env
  */
 export function createHarmoniumSoundfont(env) {
   const context = env.context;
-  const importModule =
-    env.importModule || ((url) => import(/* @vite-ignore */ url));
-  const createObjectURL =
-    env.createObjectURL || ((blob) => URL.createObjectURL(blob));
-  const revokeObjectURL =
-    env.revokeObjectURL || ((url) => URL.revokeObjectURL(url));
+  const SynthClass = env.WorkletSynthesizerClass || WorkletSynthesizer;
+  const processorUrl = env.processorUrl || SPESSA_PROCESSOR_URL;
 
   let synth = null;
   let preparePromise = null;
@@ -93,31 +86,18 @@ export function createHarmoniumSoundfont(env) {
     if (preparePromise) return preparePromise;
     if (
       !context?.audioWorklet?.addModule ||
-      typeof env.fetchText !== 'function' ||
       typeof env.fetchArrayBuffer !== 'function'
     ) {
-      error = new Error('Sampled harmonium requires AudioWorklet and network loading.');
+      error = new Error('Sampled harmonium requires AudioWorklet and SoundFont loading.');
       return false;
     }
 
     preparePromise = (async () => {
-      let blobUrl = null;
       try {
-        const [{ WorkletSynthesizer }, processorCode, soundBank] = await Promise.all([
-          importModule(SPESSA_MODULE_URL),
-          env.fetchText(SPESSA_PROCESSOR_URL),
-          env.fetchArrayBuffer(HARMONIUM_SF2_URL),
-        ]);
-        if (typeof WorkletSynthesizer !== 'function') {
-          throw new Error('SpessaSynth did not expose WorkletSynthesizer.');
-        }
+        const soundBank = await env.fetchArrayBuffer(HARMONIUM_SF2_URL);
+        await context.audioWorklet.addModule(processorUrl);
 
-        blobUrl = createObjectURL(
-          new Blob([processorCode], { type: 'application/javascript' })
-        );
-        await context.audioWorklet.addModule(blobUrl);
-
-        const next = new WorkletSynthesizer(context);
+        const next = new SynthClass(context);
         await next.soundBankManager.addSoundBank(soundBank, 'main');
         await next.isReady;
         if (typeof next.setLogLevel === 'function') next.setLogLevel(false, false, false);
@@ -135,8 +115,6 @@ export function createHarmoniumSoundfont(env) {
         error = err instanceof Error ? err : new Error(String(err));
         preparePromise = null;
         return false;
-      } finally {
-        if (blobUrl) revokeObjectURL(blobUrl);
       }
     })();
 

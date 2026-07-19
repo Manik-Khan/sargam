@@ -48,7 +48,7 @@ function mockCtx() {
         frequency: mkParam(),
         connect() {},
         start(at) {
-          started.push({ at, freq: osc._freq });
+          started.push({ at, freq: osc._freq, oscillatorType: osc.type });
         },
         stop() {},
       };
@@ -257,7 +257,30 @@ export const smokes = [
       player.setDroneMode('sa-pa');
       player.play();
       assert.ok(ctx._started.some((s) => s.kind === 'buffer'), 'drone pluck scheduled');
-      assert.ok(ctx._started.some((s) => s.freq === 220), 'melody still plays at Sa');
+      assert.ok(ctx._started.some((s) => s.freq === 440), 'sine defaults one octave above written Sa');
+    },
+  },
+  {
+    name: 'audio: sine register and waveform can be changed per user setting',
+    fn() {
+      const first = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
+      first.player.setTalaSound('off');
+      first.player.setMelodyVoice('sine');
+      first.player.setToneSettings('sine', {
+        sineOctave: 0,
+        sineEnvelope: 'bell',
+        sineWaveform: 'triangle',
+      });
+      first.player.play();
+      assert.ok(first.ctx._started.some((s) => s.freq === 220));
+      assert.ok(first.ctx._started.some((s) => s.oscillatorType === 'triangle'));
+
+      const second = make('sa: A\ntal: tintal\ntempo: 60\n\nS\n');
+      second.player.setTalaSound('off');
+      second.player.setMelodyVoice('sine');
+      second.player.setToneSettings('sine', { sineOctave: 2 });
+      second.player.play();
+      assert.ok(second.ctx._started.some((s) => s.freq === 880));
     },
   },
   {

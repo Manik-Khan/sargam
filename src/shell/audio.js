@@ -406,19 +406,43 @@ export function createPlayer(env) {
     const g = ctx.createGain();
     g.connect(masterGains.melody);
     const osc = ctx.createOscillator();
-    osc.type = 'sine';
+    osc.type = tone.sineWaveform === 'triangle' ? 'triangle' : 'sine';
     osc.connect(g);
+
     const dur = Math.max(0.03, ev.dur);
-    const attack = Math.min(dur * 0.42, toneAttackSeconds(tone.attack));
     const release = toneReleaseSeconds(tone.release);
-    const level = 0.54 * toneVelocity(tone.velocity, ev.grace);
+    const level = 0.5 * toneVelocity(tone.velocity, ev.grace);
+    const octaveRatio = 2 ** (Number(tone.sineOctave) || 0);
+    const targetFreq = ev.freq * octaveRatio;
+    const startFreq = ev.glideFrom ? ev.glideFrom * octaveRatio : null;
+    const envelope = tone.sineEnvelope || 'soft';
+
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.linearRampToValueAtTime(level, at + attack);
-    g.gain.setValueAtTime(level, at + Math.max(attack, dur - 0.025));
-    g.gain.setTargetAtTime(0.0001, at + dur, release);
-    setOscPitch(osc, ev.freq, ev.glideFrom, at, dur);
+    if (envelope === 'bell') {
+      const attack = Math.min(0.018, Math.max(0.004, dur * 0.08));
+      const decay = 0.08 + dur * 0.34 + release * 0.45;
+      g.gain.linearRampToValueAtTime(level, at + attack);
+      g.gain.setTargetAtTime(0.0001, at + attack, decay);
+    } else if (envelope === 'pluck') {
+      const attack = Math.min(0.009, Math.max(0.002, dur * 0.04));
+      const decay = 0.035 + release * 0.22;
+      g.gain.linearRampToValueAtTime(level, at + attack);
+      g.gain.setTargetAtTime(0.0001, at + attack, decay);
+    } else {
+      const attackScale = envelope === 'sustain' ? 0.72 : 1;
+      const attack = Math.min(
+        dur * 0.42,
+        toneAttackSeconds(tone.attack) * attackScale
+      );
+      const releaseScale = envelope === 'sustain' ? 1.45 : 1;
+      g.gain.linearRampToValueAtTime(level, at + attack);
+      g.gain.setValueAtTime(level, at + Math.max(attack, dur - 0.025));
+      g.gain.setTargetAtTime(0.0001, at + dur, release * releaseScale);
+    }
+
+    setOscPitch(osc, targetFreq, startFreq, at, dur);
     osc.start(at);
-    osc.stop(at + dur + Math.max(0.22, release * 6));
+    osc.stop(at + dur + Math.max(0.28, release * 8));
     return true;
   }
 
