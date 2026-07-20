@@ -690,7 +690,10 @@ export default function App() {
   return (
     <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
       {showExport && (
-        <ExportView doc={doc} noteNames={noteNames} onClose={() => setShowExport(false)} />
+        <ExportView doc={doc} noteNames={noteNames} onClose={() => setShowExport(false)}
+  sourceText={text}
+  anchorMarks={anchorModel.marks}
+/>
       )}
       {showNew && <NewDocDialog onCreate={createDoc} onCancel={() => setShowNew(false)} />}
       <Toolbar

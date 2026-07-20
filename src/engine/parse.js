@@ -17,6 +17,8 @@
 
 import { frac, fracReduce, fracAdd } from './model.js';
 import { getTal, wrapMatra, vibhagOfMatra } from './tala.js';
+import { scanRepeatedSlideAt } from './repeated-slide.js';
+import { extractTerminalReturnCue, isReturnCueToken } from './return-cue.js';
 
 const NOTE_CHARS = new Set(['S', 'r', 'R', 'g', 'G', 'm', 'M', 'P', 'd', 'D', 'n', 'N']);
 const CLUSTER_RE = /^[SrRgGmMPdDnN.'~-]+$/;
@@ -275,36 +277,12 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
   //   gat!    replay the complete Gat from its written beginning
   // Only the final token is structural; an interior form receives a precise
   // clickable diagnostic in parseToken.
-  const returnMatch = body.match(/(?:^|[\s|])(gat(?:@\d+|!)?)\s*$/i);
-  if (returnMatch) {
-    const token = returnMatch[1];
-    const cueOffset = returnMatch[0].toLowerCase().indexOf('gat');
-    const cueStart = (returnMatch.index ?? 0) + cueOffset;
-    if (/!$/.test(token)) {
-      line.returnCue = { target: 'gat', mode: 'full' };
-    } else {
-      const explicit = token.match(/@(\d+)$/);
-      if (explicit) {
-        const matra = Number(explicit[1]);
-        if (!Number.isInteger(matra) || matra < 1 || (tal && matra > tal.matras)) {
-          problems.push({
-            line: lineNo,
-            col: cueStart + 1,
-            msg: tal
-              ? `gat@${explicit[1]} is outside ${tal.name}'s 1–${tal.matras} matra cycle`
-              : `gat@${explicit[1]} needs a positive matra number`,
-          });
-        } else {
-          line.returnCue = { target: 'gat', mode: 'matra', matra };
-        }
-      } else {
-        line.returnCue = { target: 'gat', mode: 'align' };
-      }
-    }
-    body = body.slice(0, cueStart).trimEnd();
+  // SARGAM_REPEATED_APPROACH_SLIDE_2026_07_20
+  const returnResult = extractTerminalReturnCue(body, tal, lineNo, problems);
+  if (returnResult) {
+    line.returnCue = returnResult.cue;
+    body = body.slice(0, returnResult.cueStart).trimEnd();
   }
-
-  // ||: ... :||
   if (body.startsWith('||:')) {
     if (/:\|\|\s*$/.test(body)) {
       line.lineRepeat = true;
@@ -470,6 +448,19 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     // the grace run; the cluster immediately after the closing brace is the
     // destination and owns the beat. Spaces and / inside the braces are
     // allowed and ignored — it is one ornament either way.
+    // A sequence such as {n~}D--{n~}D is one written matra.
+    // Each destination keeps the D--D slot ratio; its own n→D approach
+    // adds no grid duration and no separate strike.
+    const repeatedSlide = scanRepeatedSlideAt(body, i);
+    if (repeatedSlide) {
+      const matraIndex = line.matras.length;
+      line.matras.push({ events: repeatedSlide.events });
+      repeatedSlide.events.forEach((event, eventIndex) => {
+        if (event.type === 'note') clusterCtx.notePlaced({ matraIndex, eventIndex });
+      });
+      i = repeatedSlide.next;
+      continue;
+    }
     if (c === '{') {
       const close = body.indexOf('}', i + 1);
       if (close === -1) {
@@ -668,7 +659,7 @@ function parseToken(tok, col, ctx) {
 
   // Gat return forms are structural only as the final token. Keeping this
   // diagnostic in the token parser makes an accidental interior cue exact.
-  if (/^gat(?:@\d+|!)?$/i.test(tok)) {
+  if (isReturnCueToken(tok)) {
     line.passthrough.push({ col: col + 1, text: tok });
     problems.push({
       line: lineNo,

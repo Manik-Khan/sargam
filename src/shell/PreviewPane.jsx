@@ -14,7 +14,9 @@ import {
 function widthInEm(el) {
   if (!el || !el.clientWidth) return 56;
   const fontSize = Number.parseFloat(getComputedStyle(el).fontSize) || 16;
-  return Math.max(18, Math.floor(el.clientWidth / fontSize) - 2);
+  // SARGAM_REPEAT_GUTTER_WIDTH_2026_07_20 — the semantic planner receives
+  // only the shared inner notation width; repeat punctuation lives outside it.
+  return Math.max(18, Math.floor(el.clientWidth / fontSize) - 6);
 }
 
 export default function PreviewPane({

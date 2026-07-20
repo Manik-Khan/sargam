@@ -139,12 +139,32 @@ export function scheduleDocument(doc, opts = {}) {
     return null;
   };
 
+  // SARGAM_BOUNDED_GAT_RETURN_2026_07_20 — locate a stop only after the selected entry.
+  // Therefore 8..1 in Jhaptal means 8,9,10 and stops exclusively before
+  // the following sam, even when both boundaries occur on one written line.
+  const findRange = (section, startMatra, stopMatra) => {
+    const targetTal = section?.tal === 'free' ? null : getTal(section?.tal);
+    if (!targetTal) return null;
+    let start = null;
+    for (let lineIndex = 0; lineIndex < (section.lines || []).length; lineIndex++) {
+      const candidate = section.lines[lineIndex];
+      for (let matraIndex = 0; matraIndex < (candidate.matras || []).length; matraIndex++) {
+        const cycleMatra = wrapMatra(targetTal, (candidate.startMatra || 1) + matraIndex);
+        if (!start && cycleMatra === startMatra) {
+          start = { lineIndex, matraIndex };
+          continue;
+        }
+        if (start && cycleMatra === stopMatra) return { start, stop: { lineIndex, matraIndex } };
+      }
+    }
+    return null;
+  };
   const scheduleLine = (
     section,
     sectionIndex,
     line,
     lineIndex,
-    { recordLineStart = true, allowReturnCue = true, startMatraIndex = null } = {}
+    { recordLineStart = true, allowReturnCue = true, startMatraIndex = null, endMatraIndexExclusive = null, singlePass = false } = {}
   ) => {
     if (!line.matras || line.matras.length === 0) return;
     const isFree = section.tal === 'free';
@@ -156,7 +176,7 @@ export function scheduleDocument(doc, opts = {}) {
 
     // Unroll phrase repeats into the played order of matra indices.
     const order = writtenOrder(line);
-    const passes = line.lineRepeat ? 2 : 1;
+    const passes = singlePass ? 1 : line.lineRepeat ? 2 : 1;
     const endingCut = Number.isInteger(line.firstEndingFrom)
       ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
       : -1;
@@ -172,6 +192,10 @@ export function scheduleDocument(doc, opts = {}) {
           entryOrderOffset = entry;
           passOrder = passOrder.slice(entry);
         }
+      }
+      if (pass === 0 && Number.isInteger(endMatraIndexExclusive)) {
+        const endAt = passOrder.findIndex((matraIndex) => matraIndex === endMatraIndexExclusive);
+        if (endAt >= 0) passOrder = passOrder.slice(0, endAt);
       }
       // (matraIndex:eventIndex) → scheduled note, for span resolution.
       const placed = new Map();
@@ -285,7 +309,10 @@ export function scheduleDocument(doc, opts = {}) {
               octave: e.octave || 0,
               freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
             };
-            events.push(ev);
+            if (e.approachSlide) {
+            ev.glideFrom = degreeFreq(sa, SEMITONES[e.approachSlide.ch], e.approachSlide.octave || 0);
+          }
+          events.push(ev);
             placed.set(`${matraIndex}:${eventIndex}`, ev);
             ringing = ev;
             cursor += dur;
@@ -323,26 +350,37 @@ export function scheduleDocument(doc, opts = {}) {
       const targetSectionIndex = cueTargetIndex(line.returnCue, sectionIndex);
       const target = sections[targetSectionIndex];
       if (target && targetSectionIndex < sectionIndex) {
-        const sourceTal = section.tal === 'free' ? null : getTal(section.tal);
-        let desiredMatra = null;
-        if (line.returnCue.mode === 'matra') {
-          desiredMatra = line.returnCue.matra;
-        } else if (line.returnCue.mode !== 'full' && sourceTal) {
-          desiredMatra = wrapMatra(
-            sourceTal,
-            (line.startMatra || 1) + performedMatraCount(line)
-          );
-        }
-        const entry = line.returnCue.mode === 'full' ? null : findEntry(target, desiredMatra);
-        (target.lines || []).forEach((targetLine, targetLineIndex) => {
-          if (entry && targetLineIndex < entry.lineIndex) return;
-          scheduleLine(target, targetSectionIndex, targetLine, targetLineIndex, {
-            recordLineStart: false,
-            allowReturnCue: false,
-            startMatraIndex:
-              entry && targetLineIndex === entry.lineIndex ? entry.matraIndex : null,
+        if (line.returnCue.mode === 'range') {
+          const range = findRange(target, line.returnCue.matra, line.returnCue.stopMatra);
+          if (range) {
+            for (let targetLineIndex = range.start.lineIndex; targetLineIndex <= range.stop.lineIndex; targetLineIndex++) {
+              const targetLine = target.lines[targetLineIndex];
+              scheduleLine(target, targetSectionIndex, targetLine, targetLineIndex, {
+                recordLineStart: false,
+                allowReturnCue: false,
+                singlePass: true,
+                startMatraIndex: targetLineIndex === range.start.lineIndex ? range.start.matraIndex : null,
+                endMatraIndexExclusive: targetLineIndex === range.stop.lineIndex ? range.stop.matraIndex : null,
+              });
+            }
+          }
+        } else {
+          const sourceTal = section.tal === 'free' ? null : getTal(section.tal);
+          let desiredMatra = null;
+          if (line.returnCue.mode === 'matra') desiredMatra = line.returnCue.matra;
+          else if (line.returnCue.mode !== 'full' && sourceTal) {
+            desiredMatra = wrapMatra(sourceTal, (line.startMatra || 1) + performedMatraCount(line));
+          }
+          const entry = line.returnCue.mode === 'full' ? null : findEntry(target, desiredMatra);
+          (target.lines || []).forEach((targetLine, targetLineIndex) => {
+            if (entry && targetLineIndex < entry.lineIndex) return;
+            scheduleLine(target, targetSectionIndex, targetLine, targetLineIndex, {
+              recordLineStart: false,
+              allowReturnCue: false,
+              startMatraIndex: entry && targetLineIndex === entry.lineIndex ? entry.matraIndex : null,
+            });
           });
-        });
+        }
       }
     }
 

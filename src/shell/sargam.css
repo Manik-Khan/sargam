@@ -1082,4 +1082,53 @@
 @media print {
   .app-editor-mode, .sr-anchor-handle { display: none !important; }
 }
+/* SARGAM_NOTATION_CONTINUITY_WAVE_2026_07_20 */
+/* Playback recreates the rendered DOM as the cursor advances. A transition
+   replayed the same marker correction on every render; geometry is static. */
+.sr-marker { transition: none !important; }
 
+/* Every system reserves the same outside punctuation gutters. */
+.sr-line-block { position: relative; padding-inline: 1.65em; box-sizing: border-box; }
+.sr-row { position: relative; }
+.sr-repeat-open, .sr-repeat-close {
+  position: absolute;
+  z-index: 4;
+  width: max-content;
+  padding-inline: 0;
+  pointer-events: none;
+}
+.sr-repeat-open { left: -1.5em; }
+.sr-repeat-close { right: -1.5em; }
+
+/* Two local n→D approaches can occupy one matra without changing its slots. */
+.sr-approach-slide-body {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: minmax(0.58em, max-content) minmax(0.9em, max-content);
+  align-items: end;
+  min-width: 1.55em;
+}
+.sr-approach-source {
+  align-self: start;
+  font-size: 0.68em;
+  line-height: 1;
+  transform: translateY(-0.18em);
+}
+.sr-svg-approach {
+  position: absolute;
+  left: 0.18em;
+  right: 0.08em;
+  top: -0.08em;
+  width: calc(100% - 0.18em);
+  height: 0.72em;
+  overflow: visible;
+}
+.sr-svg-approach path { stroke: currentColor; stroke-width: 1.25; fill: none; }
+.sr-approach-destination { grid-column: 2; }
+
+/* Generated articulations are essential score content in Export and print. */
+.sr-export .sr-anchor-handle { display: none !important; }
+.sr-export .sr-anchor-mark,
+.sr-export .sr-diri-mark,
+.sr-export .sr-anchored-meter { pointer-events: none; }
+@media print { .sr-anchor-handle { display: none !important; } }

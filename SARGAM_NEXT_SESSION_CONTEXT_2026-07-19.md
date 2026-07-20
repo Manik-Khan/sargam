@@ -826,3 +826,13 @@ This section records exact current identifiers that must be inspected before fut
 - `ExportView.jsx` uses measured two-pass rendering: an initial render for width measurement, then a final render with `maxSystemEm`.
 - Future installers must be tested against verbatim files from the current clone, not rewritten fixtures. Avoid guards based on variable names, exact whitespace, headings, test titles, or UI prose unless those are the actual contract.
 - All edits must be computed and validated before any file is written.
+## Notation continuity + exact current contracts (2026-07-20)
+
+- Essential anchor marks, including Diri V connectors, must appear in Preview, Export preview, Print, and Save as PDF.
+- Repeat glyphs `||:` / `:||` live in equal outside gutters and never narrow or offset shared matra columns.
+- Tala-marker alignment is static; never animate its correction during playback rerenders.
+- `{n~}D--{n~}D` is one matra with the timing of `D--D`: 3/4 + 1/4. Each D has its own untimed local n→D approach.
+- `gat@8..@1` replays the preceding Gat from matra 8 up to, but not including, the next matra 1, then resumes the next written line. It displays simply as `gat`.
+- Current score symbols: Da `|`, Ra `—`, Diri `V` spanning two attacks, chikari `^`.
+- Current source contracts: ExportView is measured/two-pass and anchor overlays mount only after the final packed render; meter input ID is `cmd-anchor-meter`.
+- Installer rule: inspect current files and match semantic behavior. Do not require variable names, smoke titles, placeholder prose, or exact whitespace; test against current-source-shaped fixtures before handoff.

@@ -12,6 +12,8 @@
 //   - Krintan interiors join with `/`.
 
 import { getTal, wrapMatra, vibhagOfMatra, markerAtMatra } from './tala.js';
+import { serializeRepeatedSlideMatra } from './repeated-slide.js';
+import { serializeReturnCue } from './return-cue.js';
 
 // Canonical header order. `composition`/`type`/`laya` added 2026-07-16 (M2.5)
 // after `tempo` and before identity — Appendix A's relative order is
@@ -157,11 +159,7 @@ function serializeMusicLine(line, tal) {
   }
   body = body.replace(/\s+/g, ' ').replace(/\/ /g, '/').replace(/ \//g, '/').trim();
   if (line.returnCue?.target) {
-    const cue = line.returnCue.mode === 'full'
-      ? `${line.returnCue.target}!`
-      : line.returnCue.mode === 'matra' && Number.isInteger(line.returnCue.matra)
-        ? `${line.returnCue.target}@${line.returnCue.matra}`
-        : line.returnCue.target;
+    const cue = serializeReturnCue(line.returnCue);
     body = `${body} ${cue}`.trim();
   }
 
@@ -231,6 +229,8 @@ function lcm(a, b) {
 function matraToken(line, k) {
   const matraIndex = k;
   const all = line.matras[k].events;
+  const repeatedSlideToken = serializeRepeatedSlideMatra(all);
+  if (repeatedSlideToken) return repeatedSlideToken;
   // Graces (kan) serialize as the canonical brace form: {graces}dest.
   // The tilde shorthand parses IN but braces come OUT — one canonical
   // spelling, and the curve is encoded by the braces, not a span mark.

@@ -7,10 +7,11 @@
 // @media print in sargam.css hides everything except .app-export-paper.
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { renderExport } from '../engine/render.js';
-import { alignTalaMarkers } from './anchor-overlay.js';
+import { alignTalaMarkers, stampAnchorTargets, mountAnchorOverlays } from './anchor-overlay.js';
 import { clearMeasuredLineLayout, setMeasuredLineLayout } from '../engine/layout.js';
 
 const RIGHT_EDGE_BREATH_EM = 0.75;
+const SCORE_GUTTER_EM = 3.5;
 const FALLBACK_SYSTEM_EM = 40;
 
 function allMusicLines(doc) {
@@ -27,7 +28,7 @@ function contentWidthInEm(el) {
     (Number.parseFloat(style.paddingRight) || 0);
   const contentWidth = Math.max(0, el.clientWidth - padding);
 
-  return Math.max(18, contentWidth / fontSize - RIGHT_EDGE_BREATH_EM);
+  return Math.max(18, contentWidth / fontSize - RIGHT_EDGE_BREATH_EM - SCORE_GUTTER_EM);
 }
 
 function measureLine(line, group) {
@@ -65,7 +66,7 @@ function installBrowserMeasurements(doc, mountEl) {
   return () => lines.forEach(clearMeasuredLineLayout);
 }
 
-export default function ExportView({ doc, noteNames, onClose }) {
+export default function ExportView({ doc, noteNames, onClose, sourceText, anchorMarks = [] }) {
   const mount = useRef(null);
 
   useLayoutEffect(() => {
@@ -91,6 +92,10 @@ export default function ExportView({ doc, noteNames, onClose }) {
       // SARGAM_EXPORT_MARKER_ALIGNMENT — align tala numerals to the
       // struck attack (or a true boundary tick) after final print packing.
       alignTalaMarkers(mountEl);
+      // SARGAM_EXPORT_ANCHOR_PARITY_2026_07_20 — generated articulations and meter spans are
+      // essential notation. Mount them only after the final packed render.
+      stampAnchorTargets(mountEl, sourceText);
+      mountAnchorOverlays(mountEl, anchorMarks, { readOnly: true });
       } finally {
         // Measurements are only a one-render layout aid. They never become
         // document data and cannot affect editing, playback, or later saves.
@@ -147,7 +152,7 @@ export default function ExportView({ doc, noteNames, onClose }) {
       printMedia?.removeEventListener?.('change', mediaChange);
       allMusicLines(doc).forEach(clearMeasuredLineLayout);
     };
-  }, [doc, noteNames]);
+  }, [doc, noteNames, sourceText, anchorMarks]);
 
   useEffect(() => {
     const esc = (e) => {

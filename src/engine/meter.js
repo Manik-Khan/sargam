@@ -1,3 +1,4 @@
+import { scanRepeatedSlideAt } from './repeated-slide.js';
 // src/engine/meter.js — local meter/layakari spans authored from a text
 // selection. The written music remains the rhythmic authority in v1: meter
 // spans describe, validate, highlight, and print the local grid without
@@ -178,6 +179,24 @@ export function scanMusicLine(source) {
       i = close + 1;
       continue;
     }
+    // SARGAM_REPEATED_SLIDE_ANCHOR_SCAN_2026_07_20 — keep score anchors and meter selections aware
+    // that repeated local approaches still form one timed matra.
+    const repeatedSlide = scanRepeatedSlideAt(text, i);
+    if (repeatedSlide) {
+      const totalSlots = repeatedSlide.groups.reduce((sum, group) => sum + group.slots, 0);
+      let slot = 0;
+      for (const group of repeatedSlide.groups) {
+        attacks.push({
+          index: group.destinationIndex,
+          ch: group.destination.ch,
+          time: addRational(time, rational(slot, totalSlots)),
+        });
+        slot += group.slots;
+      }
+      time = addRational(time, rational(1, 1));
+      i = repeatedSlide.next;
+      continue;
+    }
     if (c === '{') {
       const close = text.indexOf('}', i + 1);
       if (close === -1) return { attacks, duration: time, error: '{ without closing } in meter selection.' };
@@ -192,7 +211,7 @@ export function scanMusicLine(source) {
     while (j < text.length && !' \t/|[](){}'.includes(text[j])) j++;
     if (j === i) { i++; continue; }
     const token = text.slice(i, j).replace(/:\|\|$/, '');
-    if (/^gat(?:@\d+|!)?$/i.test(token) || token === ':||' || token === '') { i = j; continue; }
+    if (/^gat(?:@\d+(?:\.\.@\d+)?|!)?$/i.test(token) || token === ':||' || token === '') { i = j; continue; }
     if (token === '.') {
       time = addRational(time, rational(1, 1));
       i = j;

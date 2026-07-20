@@ -197,7 +197,8 @@ function renderLineBlock(line, tal, ctx) {
   const colOf = []; // grid column (1-based) of each matra cell
   const showRepeatOpen = line.repeatOpen ?? line.lineRepeat;
   const showRepeatClose = line.repeatClose ?? line.lineRepeat;
-  if (showRepeatOpen) cols.push('max-content');
+  // SARGAM_REPEAT_GUTTERS_2026_07_20 — repeat punctuation is placed in equal outside
+  // gutters and never creates a grid track or shifts matra columns.
   for (let k = 0; k < line.matras.length; k++) {
     colOf[k] = cols.length + 1;
     cols.push(tal ? 'minmax(2.6em, max-content)' : 'max-content');
@@ -205,12 +206,8 @@ function renderLineBlock(line, tal, ctx) {
       cols.push('max-content'); // barline column
     }
   }
-  let repeatCloseCol = null;
+  const repeatCloseCol = showRepeatClose ? 0 : null; // sentinel; no grid track
   let returnCueCol = null;
-  if (showRepeatClose) {
-    cols.push('max-content');
-    repeatCloseCol = cols.length;
-  }
   if (line.returnCue) {
     cols.push('max-content');
     returnCueCol = cols.length;
@@ -267,7 +264,6 @@ function renderLineBlock(line, tal, ctx) {
   if (showRepeatOpen) {
     const open = h('div', 'sr-repeat-open sr-glyphcol', '||:');
     open.style.gridRow = '2';
-    open.style.gridColumn = '1';
     row.appendChild(open);
   }
 
@@ -296,7 +292,6 @@ function renderLineBlock(line, tal, ctx) {
   if (showRepeatClose && repeatCloseCol !== null) {
     const close = h('div', 'sr-repeat-close sr-glyphcol', ':||');
     close.style.gridRow = '2';
-    close.style.gridColumn = String(repeatCloseCol);
     row.appendChild(close);
   }
 
@@ -530,7 +525,29 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
 // a plain madhya note sat lower than a mandra or subdivided neighbour and
 // dragged its marker down with it (M, 2026-07-16). Reserved lanes make
 // every cell the same height, so glyphs and markers line up across a row.
+// SARGAM_APPROACH_SLIDE_RENDER_2026_07_20 — one untimed source pitch bends into one timed
+// destination. It is not a separate strike and not a whole-span meend.
+function renderApproachSlideEvent(e, ctx) {
+  const o = e.octave || 0;
+  const reg = o < 0 ? ' sr-reg-cool' : o > 0 ? ' sr-reg-warm' : '';
+  const ev = h('span', 'sr-ev sr-note sr-approach-slide' + reg);
+  const above = h('span', 'sr-dots sr-dots-above');
+  for (let i = 0; i < Math.max(0, o); i++) above.appendChild(h('span', 'sr-dot sr-dot-above', '•'));
+  ev.appendChild(above);
+  const body = h('span', 'sr-approach-slide-body');
+  const approach = { type: 'note', ch: e.approachSlide.ch, octave: e.approachSlide.octave || 0 };
+  body.appendChild(h('span', 'sr-approach-source', chOf(approach, ctx)));
+  body.appendChild(svgEl('sr-svg-approach', 'M4,16 Q48,1 96,15'));
+  body.appendChild(h('span', 'sr-ch sr-approach-destination', chOf(e, ctx)));
+  ev.appendChild(body);
+  const below = h('span', 'sr-dots sr-dots-below');
+  for (let i = 0; i < Math.max(0, -o); i++) below.appendChild(h('span', 'sr-dot sr-dot-below', '•'));
+  ev.appendChild(below);
+  return ev;
+}
+
 function renderEvent(e, ctx, microHold = false) {
+  if (!microHold && e.type === 'note' && e.approachSlide) return renderApproachSlideEvent(e, ctx);
   const isNote = e.type === 'note';
   const o = isNote ? e.octave || 0 : 0;
   const reg = o < 0 ? ' sr-reg-cool' : o > 0 ? ' sr-reg-warm' : '';
