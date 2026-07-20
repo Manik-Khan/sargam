@@ -18,6 +18,7 @@ import { getTal, wrapMatra, markerAtMatra, landing } from './tala.js';
 import { spellDegree } from './western.js';
 import { DEFAULT_SA } from './schedule.js';
 import { planLineSystems } from './layout.js';
+import { buildLineGeometry } from './notation-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -168,10 +169,11 @@ function renderSection(section, sectionIndex, opts) {
 function renderLine(line, tal, ctx) {
   const group = h('div', 'sr-line-group');
   if (line.sourceLine !== undefined) group.setAttribute('data-source-line', String(line.sourceLine));
+  const geometry = buildLineGeometry(line);
   const ranges = planLineSystems(line, tal, { maxEm: ctx.maxSystemEm });
   ranges.forEach((range, systemIndex) => {
     const systemLine = sliceLineForSystem(line, tal, range.from, range.to, systemIndex, ranges.length);
-    const block = renderLineBlock(systemLine, tal, ctx);
+    const block = renderLineBlock(systemLine, tal, { ...ctx, geometry });
     block.setAttribute('data-system-index', String(systemIndex));
     block.setAttribute('data-system-count', String(ranges.length));
     block.setAttribute('data-system-from', String(range.from));
@@ -345,6 +347,16 @@ function renderLineBlock(line, tal, ctx) {
     row.appendChild(el);
   }
 
+  // SARGAM_SHARED_GEOMETRY_LANES_2026_07_20 — every attachment uses a
+  // deterministic lane origin beneath the notation row. Empty lanes collapse,
+  // but their order never changes, so a meter span cannot push Diri lower and
+  // Preview/Export share the same coordinate space.
+  const stack = h('div', 'sr-annotation-stack');
+  stack.appendChild(h('div', 'sr-articulation-lane'));
+  stack.appendChild(h('div', 'sr-meter-lane'));
+  stack.appendChild(h('div', 'sr-anchored-meter-lane'));
+  block.appendChild(stack);
+
   // --- landing reports (derived; spec §3.9 wording, §4 cursor scoping).
   // Shown only while the cursor is on this line — it is a check you run,
   // not part of the notation. Scoping is line-level (spec says "inside a
@@ -463,7 +475,9 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
     'div',
     'sr-cell' + (allSustain ? ' sr-dim' : '') + (evs[0]?.holdToVibhag ? ' sr-hold' : '')
   );
-  cell.setAttribute('data-matra', String((Number(line._matraOffset) || 0) + k));
+  const globalMatraIndex = (Number(line._matraOffset) || 0) + k;
+  const geometryMatra = ctx.geometry?.matras?.[globalMatraIndex] || null;
+  cell.setAttribute('data-matra', String(globalMatraIndex));
 
   // Marker lane: derived from tal + start offset; empty node keeps rows aligned.
   const markerText = tal ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + k)) : null;
@@ -477,11 +491,14 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   for (const e of evs.filter((event) => event.grace)) glyphs.appendChild(renderEvent(e, ctx));
 
   const visualSlots = [];
-  for (const e of evs.filter((event) => !event.grace)) {
-    visualSlots.push({ event: e, hold: false });
+  let geometrySlotIndex = 0;
+  for (let eventIndex = 0; eventIndex < evs.length; eventIndex++) {
+    const e = evs[eventIndex];
+    if (e.grace) continue;
+    visualSlots.push({ event: e, hold: false, geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null });
     const writtenSlots = Math.max(1, Number(e.writtenSlots) || 1);
     for (let slot = 1; slot < writtenSlots; slot++) {
-      visualSlots.push({ event: { type: 'sustain' }, hold: true });
+      visualSlots.push({ event: { type: 'sustain' }, hold: true, geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null });
     }
   }
   if (visualSlots.length > 0) {
@@ -498,6 +515,20 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
       const slot = h('span', 'sr-slot' + (item.hold ? ' sr-hold-slot' : ''));
       slot.setAttribute('data-slot-index', String(slotIndex));
       slot.setAttribute('data-slot-kind', item.hold ? 'hold' : 'attack');
+      if (item.geometry) {
+        slot.setAttribute('data-geometry-start', item.geometry.startLabel);
+        slot.setAttribute('data-geometry-end', item.geometry.endLabel);
+        slot.setAttribute('data-geometry-event', String(item.geometry.eventIndex));
+      }
+      if (item.geometry?.kind === 'attack') {
+        slot.classList.add('sr-anchor-target');
+        slot.setAttribute('data-anchor-kind', 'attack');
+        slot.setAttribute('data-anchor-line', String(item.geometry.sourceLine));
+        slot.setAttribute('data-anchor-time', item.geometry.startLabel);
+        slot.setAttribute('data-anchor-ordinal', String(item.geometry.attackOrdinal));
+        slot.setAttribute('data-anchor-note', item.geometry.note || '');
+        slot.setAttribute('data-anchor-octave', String(item.geometry.octave || 0));
+      }
       slot.appendChild(renderEvent(item.event, ctx, item.hold));
       slots.appendChild(slot);
     }
@@ -516,7 +547,27 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   const writtenSlotCount = visualSlots.length;
   cell.appendChild(writtenSlotCount > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
 
+  // Exact metric boundaries are part of the core render geometry. The left
+  // edge exists on every matra; the final right edge exists once, on the last
+  // source-line cell. Anchor handles and folded meter continuations snap here.
+  const startBoundary = h('span', 'sr-boundary-target sr-boundary-start');
+  stampBoundary(startBoundary, line.sourceLine, geometryMatra?.startLabel ?? String(globalMatraIndex));
+  glyphs.appendChild(startBoundary);
+  if (globalMatraIndex === (ctx.geometry?.matras?.length || 0) - 1) {
+    const endBoundary = h('span', 'sr-boundary-target sr-boundary-end');
+    stampBoundary(endBoundary, line.sourceLine, geometryMatra?.endLabel ?? String(globalMatraIndex + 1));
+    glyphs.appendChild(endBoundary);
+  }
+
   return cell;
+}
+
+function stampBoundary(node, sourceLine, time) {
+  node.setAttribute('aria-hidden', 'true');
+  node.setAttribute('data-anchor-kind', 'boundary');
+  node.setAttribute('data-anchor-line', String(sourceLine));
+  node.setAttribute('data-anchor-time', String(time));
+  node.setAttribute('data-anchor-boundary', String(time));
 }
 
 // Every event carries the same three lanes — dots above, character, dots

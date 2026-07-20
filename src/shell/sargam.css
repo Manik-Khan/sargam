@@ -1017,7 +1017,7 @@
 .cmd-meter-input:focus { outline: 2px solid currentColor; outline-offset: 1px; }
 .cmd-meter-message { min-height: 1.15rem; padding: 0.16rem 0.45rem 0.28rem; font-size: 0.72rem; opacity: 0.78; }
 .sr-line-block { position: relative; }
-.sr-meter-lane { position: relative; height: 2.05em; margin-top: -0.12em; pointer-events: none; }
+.sr-meter-lane { position: relative; height: 2.05em; pointer-events: none; }
 .sr-meter-span { position: absolute; top: 0; height: 1.95em; color: currentColor; }
 .sr-meter-svg { display: block; width: 100%; height: 0.9em; overflow: visible; }
 .sr-meter-svg path { fill: none; stroke: currentColor; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; opacity: 0.82; }
@@ -1055,10 +1055,17 @@
 .app-preview-anchoring .sr-anchor-target, .app-preview-anchoring .sr-boundary-target { cursor: crosshair; }
 .app-preview-anchoring .sr-anchor-target:hover, .sr-anchor-gesture-start { border-radius: 0.22em; background: color-mix(in srgb, currentColor 16%, transparent); }
 .sr-cell { position: relative; }
-.sr-boundary-target { position: absolute; left: -0.22rem; top: 0.65rem; bottom: 0.35rem; width: 0.44rem; z-index: 6; }
+.sr-boundary-target { position: absolute; top: 0.65rem; bottom: 0.35rem; width: 0.44rem; z-index: 6; }
+.sr-boundary-start { left: -0.22rem; }
+.sr-boundary-end { right: -0.22rem; }
 .sr-marker { transform: translateX(var(--sr-marker-shift, 0px)); transition: transform 80ms linear; }
 .sr-marker-on-boundary::after { content: ''; position: absolute; left: 50%; top: 1.05em; height: 0.58em; border-left: 1px solid currentColor; opacity: 0.55; }
 .sr-line-block { position: relative; }
+/* Core render owns one fixed lower-lane stack. Children measure themselves
+   against their own lane origin, which matches the padded notation origin;
+   no overlay may use the outer block's border-box coordinates. */
+.sr-annotation-stack { position: relative; width: 100%; }
+.sr-annotation-stack > :empty { height: 0; margin-top: 0; }
 .sr-articulation-lane { position: relative; height: 1.5em; margin-top: 0.08em; pointer-events: none; }
 .sr-anchor-mark { position: absolute; top: 0; transform: translateX(-50%); border: 0; background: transparent; color: inherit; font: 600 0.95em/1 Charter, Georgia, 'Times New Roman', serif; padding: 0.05em 0.2em; pointer-events: auto; }
 .sr-anchor-mark.selected, .sr-diri-mark.selected, .sr-anchored-meter.selected { color: var(--sr-accent); }
@@ -1109,16 +1116,16 @@
   min-width: 1.55em;
 }
 .sr-approach-source {
-  align-self: start;
+  align-self: end;
   font-size: 0.68em;
   line-height: 1;
-  transform: translateY(-0.18em);
+  transform: translateY(-0.02em);
 }
 .sr-svg-approach {
   position: absolute;
   left: 0.18em;
   right: 0.08em;
-  top: -0.08em;
+  top: 0.08em;
   width: calc(100% - 0.18em);
   height: 0.72em;
   overflow: visible;

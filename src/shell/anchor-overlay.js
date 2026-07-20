@@ -2,7 +2,12 @@
 // musical targets, aligns tala markers to the real boundary attack, and draws
 // articulation and meter annotations in separate lower lanes.
 
-import { formatRational, rationalNumber, scanMusicLine } from '../engine/meter.js';
+import { rationalNumber } from '../engine/meter.js';
+import {
+  attackCenterX,
+  endpointEdgeX,
+  xForMetricTime,
+} from './score-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -24,14 +29,9 @@ function targetPayload(node) {
     time: node.getAttribute('data-anchor-time'),
     ordinal: Number(node.getAttribute('data-anchor-ordinal')),
     note: node.getAttribute('data-anchor-note'),
+    octave: Number(node.getAttribute('data-anchor-octave') || 0),
     boundary: node.getAttribute('data-anchor-boundary'),
   };
-}
-
-function xWithin(block, node) {
-  const br = block.getBoundingClientRect();
-  const nr = node.getBoundingClientRect();
-  return nr.left + nr.width / 2 - br.left;
 }
 
 function systemForNode(node) {
@@ -52,43 +52,6 @@ function findTarget(root, endpoint) {
   return selector ? root.querySelector(selector) : null;
 }
 
-function stampLine(group, sourceText) {
-  const sourceLine = Number(group.getAttribute('data-source-line'));
-  const line = String(sourceText ?? '').split(/\r?\n/)[sourceLine - 1] ?? '';
-  // Repeat glyphs are structural wrappers, not attack syntax. Strip them
-  // before using the meter scanner so repeated lines expose anchors too.
-  const scanLine = line.replace(/\|\|:|:\|\|/g, ' ');
-  const scanned = scanMusicLine(scanLine);
-  if (scanned.error) return;
-  const slots = [...group.querySelectorAll('.sr-slot[data-slot-kind="attack"]')]
-    .filter((slot) => slot.querySelector('.sr-note:not(.sr-grace)'));
-  const count = Math.min(slots.length, scanned.attacks.length);
-  for (let i = 0; i < count; i++) {
-    const slot = slots[i];
-    const attack = scanned.attacks[i];
-    slot.classList.add('sr-anchor-target');
-    slot.setAttribute('data-anchor-kind', 'attack');
-    slot.setAttribute('data-anchor-line', String(sourceLine));
-    slot.setAttribute('data-anchor-time', formatRational(attack.time));
-    slot.setAttribute('data-anchor-ordinal', String(i));
-    slot.setAttribute('data-anchor-note', attack.ch || '');
-  }
-  for (const cell of group.querySelectorAll('.sr-cell[data-matra]')) {
-    const time = String(cell.getAttribute('data-matra') || 0);
-    let target = cell.querySelector(':scope > .sr-boundary-target');
-    if (!target) {
-      target = document.createElement('span');
-      target.className = 'sr-boundary-target';
-      target.setAttribute('aria-hidden', 'true');
-      cell.appendChild(target);
-    }
-    target.setAttribute('data-anchor-kind', 'boundary');
-    target.setAttribute('data-anchor-line', String(sourceLine));
-    target.setAttribute('data-anchor-time', time);
-    target.setAttribute('data-anchor-boundary', time);
-  }
-}
-
 export function alignTalaMarkers(root) {
   for (const cell of root.querySelectorAll('.sr-cell')) {
     const marker = cell.querySelector(':scope > .sr-marker');
@@ -100,7 +63,7 @@ export function alignTalaMarkers(root) {
     const cellRect = cell.getBoundingClientRect();
     const markerRect = marker.getBoundingClientRect();
     if (attack) {
-      const attackRect = attack.getBoundingClientRect();
+      const attackRect = (attack.querySelector('.sr-approach-destination, .sr-ch') || attack).getBoundingClientRect();
       const target = attackRect.left + attackRect.width / 2;
       const current = markerRect.left + markerRect.width / 2;
       marker.style.setProperty('--sr-marker-shift', `${target - current}px`);
@@ -114,11 +77,18 @@ export function alignTalaMarkers(root) {
 }
 
 function ensureLane(block, className) {
-  let lane = block.querySelector(`:scope > .${className}`);
+  let lane = block.querySelector(`:scope > .sr-annotation-stack > .${className}`)
+    || block.querySelector(`:scope > .${className}`);
   if (!lane) {
+    let stack = block.querySelector(':scope > .sr-annotation-stack');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'sr-annotation-stack';
+      block.appendChild(stack);
+    }
     lane = document.createElement('div');
     lane.className = className;
-    block.appendChild(lane);
+    stack.appendChild(lane);
   }
   return lane;
 }
@@ -128,7 +98,7 @@ function pointGlyph(mark, block, node, selected, onSelect) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `sr-anchor-mark sr-anchor-${mark.kind}${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
-  el.style.left = `${xWithin(block, node)}px`;
+  el.style.left = `${attackCenterX(lane, node)}px`;
   el.dataset.markId = mark.id;
   el.title = `${mark.kind} annotation`;
   el.textContent = mark.kind === 'da' ? '|' : mark.kind === 'ra' ? '—' : '^';
@@ -138,8 +108,9 @@ function pointGlyph(mark, block, node, selected, onSelect) {
 
 function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
   const lane = ensureLane(block, 'sr-articulation-lane');
-  const left = xWithin(block, a);
-  const right = xWithin(block, b);
+  const left = attackCenterX(lane, a);
+  const right = attackCenterX(lane, b);
+  if (left == null || right == null) return;
   const holder = document.createElement('div');
   holder.className = `sr-diri-mark${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
   holder.style.left = `${Math.min(left, right)}px`;
@@ -195,28 +166,18 @@ function parseFraction(value) {
   return { n: Number(match[1]), d: Number(match[2] || 1) };
 }
 
-function xForTime(block, time) {
-  const cell = [...block.querySelectorAll('.sr-cell[data-matra]')]
-    .find((node) => Number(node.getAttribute('data-matra')) === Math.floor(time + 1e-8));
-  if (!cell) {
-    const cells = [...block.querySelectorAll('.sr-cell[data-matra]')];
-    const last = cells[cells.length - 1];
-    if (!last) return null;
-    const br = block.getBoundingClientRect();
-    const lr = last.getBoundingClientRect();
-    return lr.right - br.left;
-  }
-  const br = block.getBoundingClientRect();
-  const cr = cell.getBoundingClientRect();
-  const fraction = Math.max(0, Math.min(1, time - Math.floor(time)));
-  return cr.left - br.left + cr.width * fraction;
-}
-
 function meterGlyph(mark, segment, selected, onSelect, onHandleStart) {
   const { block, from, to, continuation, final, startNode, endNode } = segment;
   const lane = ensureLane(block, 'sr-anchored-meter-lane');
-  const left = startNode ? xWithin(block, startNode) : xForTime(block, from);
-  const right = endNode ? xWithin(block, endNode) : xForTime(block, to);
+  // Attack spans use the outside edges of the selected written slots—the
+  // same geometry that the one-beat under-arc encloses. Fold continuations
+  // land on exact core-rendered metric boundaries.
+  const left = startNode
+    ? endpointEdgeX(lane, startNode, 'start')
+    : xForMetricTime(lane, block, from, 'start');
+  const right = endNode
+    ? endpointEdgeX(lane, endNode, 'end')
+    : xForMetricTime(lane, block, to, 'end');
   if (left == null || right == null) return;
   const el = document.createElement('div');
   el.className = `sr-anchored-meter${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
@@ -256,13 +217,16 @@ function meterGlyph(mark, segment, selected, onSelect, onHandleStart) {
 }
 
 export function stampAnchorTargets(root, sourceText) {
-  for (const group of root.querySelectorAll('.sr-line-group[data-source-line]')) stampLine(group, sourceText);
+  // render.js now stamps exact attacks, slot edges, and boundaries directly
+  // from the parsed model. Keep this public seam for Preview/Export callers and
+  // for static marker alignment; sourceText is intentionally no longer parsed.
+  void sourceText;
   alignTalaMarkers(root);
 }
 
 export function mountAnchorOverlays(root, marks = [], options = {}) {
   if (!root) return () => {};
-  root.querySelectorAll('.sr-articulation-lane,.sr-anchored-meter-lane').forEach((node) => node.remove());
+  root.querySelectorAll('.sr-articulation-lane,.sr-anchored-meter-lane').forEach((node) => node.replaceChildren());
   for (const mark of marks) {
     if (!mark.resolvedStart || mark.status === 'missing' || mark.status === 'ambiguous') continue;
     const startNode = findTarget(root, mark.resolvedStart);
