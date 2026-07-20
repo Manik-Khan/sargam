@@ -1,9 +1,8 @@
-// src/shell/CommandBar.jsx — M4 selection commands as buttons (M's ask,
-// 2026-07-16). Select notes in the editor, press a button, the grammar is
-// applied — "so you don't have to remember all of the commands". Thin
-// shell: every transform is a pure, smoked function in engine/commands.js.
+// src/shell/CommandBar.jsx — selection commands plus a musician-facing meter
+// field. The meter syntax is generated from the editor selection so writers do
+// not have to coordinate nested brackets or count a parallel event lane.
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   applySlide,
   applyKan,
@@ -25,14 +24,53 @@ const COMMANDS = [
   ['. oct −', 'Every selected note down one octave', (s) => shiftOctave(s, -1)],
 ];
 
-export default function CommandBar({ onApply }) {
+export default function CommandBar({
+  onApply,
+  onMeterApply,
+  onMeterClear,
+  onMeterPreview,
+  meterMessage,
+}) {
+  const [meter, setMeter] = useState('');
+  const applyMeter = () => onMeterApply?.(meter);
   return (
-    <div className="cmdbar">
-      {COMMANDS.map(([label, title, fn]) => (
-        <button key={label} className="cmd-btn" title={title} onClick={() => onApply(fn)}>
-          {label}
-        </button>
-      ))}
+    <div className="cmdbar-wrap">
+      <div className="cmdbar">
+        {COMMANDS.map(([label, title, fn]) => (
+          <button key={label} type="button" className="cmd-btn" title={title} onClick={() => onApply(fn)}>
+            {label}
+          </button>
+        ))}
+        <div className="cmd-meter" role="group" aria-label="Local meter">
+          <label className="cmd-meter-label" htmlFor="cmd-meter-input">Meter</label>
+          <input
+            id="cmd-meter-input"
+            className="cmd-meter-input"
+            value={meter}
+            placeholder="3, 6, 5/7, 4/3"
+            inputMode="text"
+            onFocus={() => onMeterPreview?.(meter)}
+            onChange={(event) => {
+              setMeter(event.target.value);
+              onMeterPreview?.(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                applyMeter();
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                setMeter('');
+                onMeterPreview?.('');
+              }
+            }}
+          />
+          <button type="button" className="cmd-btn cmd-meter-apply" onClick={applyMeter}>Apply</button>
+          <button type="button" className="cmd-btn" onClick={() => onMeterClear?.()}>Clear</button>
+        </div>
+      </div>
+      {meterMessage && <div className="cmd-meter-message" aria-live="polite">{meterMessage}</div>}
     </div>
   );
 }

@@ -120,6 +120,10 @@ export function parseDocument(text) {
       }
       continue;
     }
+    // SARGAM_METER_LANE_SKIP — generated local-meter metadata belongs to
+    // the preceding music line. meter.js parses it separately; it must not
+    // be mistaken for a bol line merely because both begin with >.
+    if (trimmed.startsWith('>>')) continue;
 
     // Bol line?
     if (trimmed.startsWith('>')) {

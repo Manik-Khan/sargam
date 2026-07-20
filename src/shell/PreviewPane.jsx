@@ -1,23 +1,29 @@
 // src/shell/PreviewPane.jsx — mounts the engine's detached DOM in a ref.
 // Long semantic lines are re-rendered as readable musical systems rather
-// than globally shrunk. The renderer plans only whole-matra breaks and keeps
-// ornaments/repeats intact.
+// than globally shrunk. Meter spans are measured after render and placed in
+// their own lower lane, including across folded systems.
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderDocument } from '../engine/render.js';
+import { mountMeterOverlays } from './meter-overlay.js';
 
 function widthInEm(el) {
   if (!el || !el.clientWidth) return 56;
   const fontSize = Number.parseFloat(getComputedStyle(el).fontSize) || 16;
-  // Leave a small breath at the right edge; very narrow panes still receive
-  // enough room for a useful phrase rather than one beat per system.
   return Math.max(18, Math.floor(el.clientWidth / fontSize) - 2);
 }
 
-export default function PreviewPane({ doc, activeLine, activeCursor, noteNames, onSeek }) {
+export default function PreviewPane({
+  doc,
+  activeLine,
+  activeCursor,
+  noteNames,
+  onSeek,
+  meterSpans = [],
+  meterDraft = null,
+}) {
   const mount = useRef(null);
   const [maxSystemEm, setMaxSystemEm] = useState(56);
-
   useLayoutEffect(() => {
     if (!mount.current) return;
     const update = () => setMaxSystemEm((old) => {
@@ -35,10 +41,9 @@ export default function PreviewPane({ doc, activeLine, activeCursor, noteNames, 
     if (!mount.current) return;
     const el = renderDocument(doc, { activeLine, activeCursor, noteNames, maxSystemEm });
     mount.current.replaceChildren(el);
-  }, [doc, activeLine, activeCursor, noteNames, maxSystemEm]);
+    mountMeterOverlays(mount.current, meterSpans, meterDraft);
+  }, [doc, activeLine, activeCursor, noteNames, maxSystemEm, meterSpans, meterDraft]);
 
-  // Click a matra in any folded system to put the playhead at its ORIGINAL
-  // matra index. data-matra remains absolute across visual system breaks.
   const handleClick = (e) => {
     if (!onSeek) return;
     const cell = e.target.closest('.sr-cell');

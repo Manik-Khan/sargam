@@ -19,6 +19,12 @@ import {
 } from './voices.js';
 import { normalizeToneMap, updateToneMap } from './tone.js';
 import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
+import {
+  applyMeterToSelection,
+  clearMeterFromSelection,
+  parseMeterDocument,
+  previewMeterSelection,
+} from '../engine/meter.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
@@ -78,12 +84,21 @@ export default function App() {
   // while you notate (M, 2026-07-16 — the transcription workflow).
   const [view, setView] = useState('notation');
   const [cursorPos, setCursorPos] = useState(0);
+  const [meterDraft, setMeterDraft] = useState(null);
+  const [meterMessage, setMeterMessage] = useState(
+    'Select the first through last note of a local meter span.'
+  );
   const editorRef = useRef(null);
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
 
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
+  const meterModel = useMemo(() => parseMeterDocument(text), [text]);
+  const allProblems = useMemo(
+    () => [...problems, ...meterModel.problems],
+    [problems, meterModel]
+  );
   const dirty = text !== lastSaved;
 
   // ---- playback (M3) ----
@@ -527,6 +542,61 @@ export default function App() {
       setTimeout(restore, 0);
     }
   };
+  // Local meter authoring: the textarea selection supplies the musical range;
+  // the app writes exact line-relative matra anchors into a generated >> lane.
+  const restoreMeterSelection = (result) => {
+    if (!result?.selectionStart && result?.selectionStart !== 0) return;
+    const restore = () => {
+      const el = editorRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(result.selectionStart, result.selectionEnd);
+    };
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) window.requestAnimationFrame(restore);
+    else setTimeout(restore, 0);
+  };
+  const liveMeterSelection = () => {
+    const el = editorRef.current;
+    return el ? { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 } : null;
+  };
+  const doMeterPreview = (value) => {
+    const selection = liveMeterSelection();
+    if (!selection) return;
+    const result = previewMeterSelection(text, selection.start, selection.end, value);
+    if (!result.ok) {
+      setMeterDraft(null);
+      setMeterMessage(result.message);
+      return;
+    }
+    setMeterDraft(result);
+    setMeterMessage(result.message || 'Dashed preview: press Enter or Apply to write the meter span.');
+  };
+  const doMeterApply = (value) => {
+    const selection = liveMeterSelection();
+    if (!selection) return;
+    const result = applyMeterToSelection(text, selection.start, selection.end, value);
+    if (!result.ok) {
+      setMeterMessage(result.message);
+      return;
+    }
+    setText(result.text);
+    setMeterDraft(null);
+    setMeterMessage(result.message);
+    restoreMeterSelection(result);
+  };
+  const doMeterClear = () => {
+    const selection = liveMeterSelection();
+    if (!selection) return;
+    const result = clearMeterFromSelection(text, selection.start, selection.end);
+    if (!result.ok) {
+      setMeterMessage(result.message);
+      return;
+    }
+    setText(result.text);
+    setMeterDraft(null);
+    setMeterMessage(result.message);
+    restoreMeterSelection(result);
+  };
 
   const toggleLayout = () => {
     const next = layout === 'side' ? 'stacked' : 'side';
@@ -668,9 +738,17 @@ export default function App() {
             activeCursor={playCursor}
             noteNames={noteNames}
             onSeek={doSeek}
+            meterSpans={meterModel.spans}
+            meterDraft={meterDraft}
           />
           <div className="app-editor-col">
-            <CommandBar onApply={doCommand} />
+            <CommandBar
+            onApply={doCommand}
+            onMeterApply={doMeterApply}
+            onMeterClear={doMeterClear}
+            onMeterPreview={doMeterPreview}
+            meterMessage={meterMessage}
+          />
             <EditorPane
               text={text}
               onChange={setText}
@@ -682,7 +760,7 @@ export default function App() {
           </div>
         </div>
       </div>
-  <ProblemsPanel problems={problems} text={text} editorRef={editorRef} />
+  <ProblemsPanel problems={allProblems} text={text} editorRef={editorRef} />
     </div>
   );
 }
