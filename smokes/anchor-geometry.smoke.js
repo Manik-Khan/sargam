@@ -63,7 +63,9 @@ export const smokes = [
       assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-source')?.textContent), ['n', 'n']);
       assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-destination')?.textContent), ['D', 'D']);
       for (const approach of approaches) {
-        assert.equal(approach.querySelector('.sr-svg-approach path')?.getAttribute('d'), 'M4,18 Q50,2 96,18');
+        const arc = approach.querySelector('.sr-approach-arc.sr-arc.sr-arc-kan');
+        assert.ok(arc, 'local approach reuses the ordinary kan arc wrapper');
+        assert.equal(arc.querySelector('.sr-svg-meend path')?.getAttribute('d'), 'M4,18 Q50,2 96,18');
       }
     },
   },

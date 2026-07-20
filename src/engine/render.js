@@ -588,7 +588,9 @@ function renderApproachSlideEvent(e, ctx) {
   const body = h('span', 'sr-approach-slide-body');
   const approach = { type: 'note', ch: e.approachSlide.ch, octave: e.approachSlide.octave || 0 };
   body.appendChild(h('span', 'sr-approach-source', chOf(approach, ctx)));
-  body.appendChild(approachSlideSvg());
+  const arc = h('span', 'sr-approach-arc sr-arc sr-arc-kan');
+  arc.appendChild(meendSvg());
+  body.appendChild(arc);
   body.appendChild(h('span', 'sr-ch sr-approach-destination', chOf(e, ctx)));
   ev.appendChild(body);
   const below = h('span', 'sr-dots sr-dots-below');
@@ -650,12 +652,6 @@ function meendSvg() {
 /** Square over-bracket: the krintan mark, crossing barlines when it does. */
 function krintanSvg() {
   return svgEl('sr-svg-krintan', 'M4,18 L4,5 L96,5 L96,18');
-}
-
-/** Rounded over-arc for one local untimed approach into one timed
- * destination. It deliberately uses the same shape as an ordinary meend. */
-function approachSlideSvg() {
-  return svgEl('sr-svg-approach', 'M4,18 Q50,2 96,18');
 }
 
 /** Under-arc: automatic on subdivided matras. Shares .sr-arc-lane metrics
