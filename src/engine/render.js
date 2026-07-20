@@ -330,7 +330,9 @@ function renderLineBlock(line, tal, ctx) {
 
   // --- bol ticks (grid row 4), grouped per matra in event order.
   // Typed as words, rendered as the handwriting's symbols (spec §3.8).
-  const BOL_SYMBOL = { da: '|', ra: '—', diri: '^', chikari: 'v' };
+  // SARGAM_CORRECT_BOL_GLYPHS_2026_07_20 — legacy bol lanes use the
+      // traditional symbols; score-side Diri uses a two-attack V connector.
+      const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
   const bolsByMatra = new Map();
   for (const b of line.bols) {
     if (!bolsByMatra.has(b.ref.matraIndex)) bolsByMatra.set(b.ref.matraIndex, []);

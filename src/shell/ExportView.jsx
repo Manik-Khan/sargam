@@ -7,6 +7,7 @@
 // @media print in sargam.css hides everything except .app-export-paper.
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { renderExport } from '../engine/render.js';
+import { alignTalaMarkers } from './anchor-overlay.js';
 import { clearMeasuredLineLayout, setMeasuredLineLayout } from '../engine/layout.js';
 
 const RIGHT_EDGE_BREATH_EM = 0.75;
@@ -87,6 +88,9 @@ export default function ExportView({ doc, noteNames, onClose }) {
         // print media. The print CSS itself remains untouched.
         const maxSystemEm = contentWidthInEm(mountEl);
         mountEl.replaceChildren(renderExport(doc, { noteNames, maxSystemEm }));
+      // SARGAM_EXPORT_MARKER_ALIGNMENT — align tala numerals to the
+      // struck attack (or a true boundary tick) after final print packing.
+      alignTalaMarkers(mountEl);
       } finally {
         // Measurements are only a one-render layout aid. They never become
         // document data and cannot affect editing, playback, or later saves.

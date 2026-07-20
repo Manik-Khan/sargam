@@ -42,6 +42,7 @@ export function parseDocument(text) {
   let lastMusicLine = null;
   let nextStart = null; // avartan continuation within the current section
   let missingTalReported = false;
+  let inAnchorMetadata = false;
 
   const applyDirective = (key, val, lineNo) => {
     if (key === 'tal') {
@@ -97,6 +98,16 @@ export function parseDocument(text) {
     const lineNo = i + 1;
     const raw = lines[i];
     const trimmed = raw.trim();
+    // SARGAM_ANCHOR_METADATA_SKIP — generated structure is portable in
+    // Markdown but is not music, a label, a directive, or a bol line.
+    if (inAnchorMetadata) {
+      if (trimmed === '-->') inAnchorMetadata = false;
+      continue;
+    }
+    if (trimmed.startsWith('<!-- sargam-anchors:v1')) {
+      inAnchorMetadata = !trimmed.endsWith('-->');
+      continue;
+    }
 
     if (trimmed === '') {
       currentSection = null;

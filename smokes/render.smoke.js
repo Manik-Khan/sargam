@@ -312,7 +312,7 @@ export const smokes = [
     },
   },
   {
-    name: "render: bols render as the handwriting's symbols — | for da, — for ra, ^ diri, v chikari",
+    name: "render: bols render as the handwriting's symbols — | for da, — for ra, V diri, ^ chikari",
     fn: () => {
       const { doc } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra diri chikari da ra\n');
       const root = renderDocument(doc);
@@ -322,9 +322,9 @@ export const smokes = [
       const marks0 = [...bol0.querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
       assert.deepEqual(marks0, ['|', '—']); // da, ra on S and R
       const marks1 = [...row.querySelector('.sr-bol[data-matra="1"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
-      assert.deepEqual(marks1, ['^']); // diri on g
+      assert.deepEqual(marks1, ['V']); // diri on g
       const marks2 = [...row.querySelector('.sr-bol[data-matra="2"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
-      assert.deepEqual(marks2, ['v']); // chikari on m
+      assert.deepEqual(marks2, ['^']); // chikari on m
     },
   },
   {

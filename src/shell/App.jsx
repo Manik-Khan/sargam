@@ -25,6 +25,12 @@ import {
   parseMeterDocument,
   previewMeterSelection,
 } from '../engine/meter.js';
+import {
+  addAnchorMark,
+  parseAnchorDocument,
+  removeAnchorMark,
+  updateAnchorMark,
+} from '../engine/anchors.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
@@ -88,6 +94,12 @@ export default function App() {
   const [meterMessage, setMeterMessage] = useState(
     'Select the first through last note of a local meter span.'
   );
+  const [anchorTool, setAnchorTool] = useState(null);
+  const [anchorMeter, setAnchorMeter] = useState('6');
+  const [anchorMessage, setAnchorMessage] = useState(
+    'Choose a mark, then click or drag directly on the rendered notation.'
+  );
+  const [selectedMarkId, setSelectedMarkId] = useState(null);
   const editorRef = useRef(null);
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
@@ -95,9 +107,10 @@ export default function App() {
 
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const meterModel = useMemo(() => parseMeterDocument(text), [text]);
+  const anchorModel = useMemo(() => parseAnchorDocument(text), [text]);
   const allProblems = useMemo(
-    () => [...problems, ...meterModel.problems],
-    [problems, meterModel]
+    () => [...problems, ...meterModel.problems, ...anchorModel.problems],
+    [problems, meterModel, anchorModel]
   );
   const dirty = text !== lastSaved;
 
@@ -289,16 +302,18 @@ export default function App() {
         el.focus();
       }
       el.setSelectionRange(range.start, range.end);
-      const style = window.getComputedStyle(el);
+      const styleTarget = el.dom || el;
+      const scrollTarget = el.scrollDOM || el;
+      const style = window.getComputedStyle(styleTarget);
       let lineHeight = Number.parseFloat(style.lineHeight);
       if (!Number.isFinite(lineHeight)) {
         lineHeight = (Number.parseFloat(style.fontSize) || 14) * 1.7;
       }
-      el.scrollTop = centeredLineScrollTop({
+      scrollTarget.scrollTop = centeredLineScrollTop({
         line: range.line,
         lineHeight,
         paddingTop: Number.parseFloat(style.paddingTop) || 0,
-        clientHeight: el.clientHeight,
+        clientHeight: scrollTarget.clientHeight,
       });
 
       jumpSelectionRef.current = { ...range, caret: range.start };
@@ -597,6 +612,35 @@ export default function App() {
     setMeterMessage(result.message);
     restoreMeterSelection(result);
   };
+  // Shared score-side anchor tools. The rendered notation supplies exact
+  // attack/boundary endpoints; the engine writes portable generated metadata.
+  const doAnchorGesture = ({ start, end }) => {
+    if (!anchorTool) return;
+    const result = addAnchorMark(text, {
+      kind: anchorTool,
+      value: anchorTool === 'meter' ? anchorMeter : undefined,
+      start,
+      end,
+    });
+    setAnchorMessage(result.message);
+    if (!result.ok) return;
+    setText(result.text);
+    setSelectedMarkId(result.mark.id);
+  };
+  const doMoveAnchorMark = (markId, side, endpoint) => {
+    const result = updateAnchorMark(text, markId, side, endpoint);
+    setAnchorMessage(result.message);
+    if (!result.ok) return;
+    setText(result.text);
+    setSelectedMarkId(markId);
+  };
+  const doRemoveSelectedMark = () => {
+    const result = removeAnchorMark(text, selectedMarkId);
+    setAnchorMessage(result.message);
+    if (!result.ok) return;
+    setText(result.text);
+    setSelectedMarkId(null);
+  };
 
   const toggleLayout = () => {
     const next = layout === 'side' ? 'stacked' : 'side';
@@ -631,7 +675,10 @@ export default function App() {
         doSave();
         return;
       }
-      if (e.key === ' ' && view === 'notation' && !/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)) {
+      if (e.key === ' ' && view === 'notation'
+          && !/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)
+          && !e.target.isContentEditable
+          && !e.target.closest?.('.cm-editor')) {
         e.preventDefault();
         doPlayPause();
       }
@@ -740,14 +787,23 @@ export default function App() {
             onSeek={doSeek}
             meterSpans={meterModel.spans}
             meterDraft={meterDraft}
-          />
-          <div className="app-editor-col">
+            sourceText={text}
+            anchorMarks={anchorModel.marks}
+            anchorTool={anchorTool}
+            selectedMarkId={selectedMarkId}
+            onAnchorGesture={doAnchorGesture}
+            onSelectMark={setSelectedMarkId}
+            onMoveMark={doMoveAnchorMark}
+          
+          /><div className="app-editor-col">
             <CommandBar
             onApply={doCommand}
-            onMeterApply={doMeterApply}
-            onMeterClear={doMeterClear}
-            onMeterPreview={doMeterPreview}
-            meterMessage={meterMessage}
+            anchorTool={anchorTool}
+            onAnchorTool={setAnchorTool}
+            anchorMeter={anchorMeter}
+            onAnchorMeter={setAnchorMeter}
+            onRemoveSelectedMark={doRemoveSelectedMark}
+            anchorMessage={anchorMessage}
           />
             <EditorPane
               text={text}
