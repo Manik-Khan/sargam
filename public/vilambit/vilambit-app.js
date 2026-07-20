@@ -17,6 +17,8 @@
 
 const $ = id => document.getElementById(id);
 const media = $('media');
+const Core = window.VilambitCore;
+if (!Core) throw new Error('VilambitCore must load before vilambit-app.js');
 
 const state = {
   fileURL: null, fileName: '', isVideo: false,
@@ -149,7 +151,7 @@ function setEngineRate(eff){
   }
 }
 function applyTempo(v){
-  state.tempo = Math.min(200, Math.max(25, Math.round(v)));
+  state.tempo = Core.clampTempo(v);
   $('tempo').value = state.tempo;
   $('tempoVal').textContent = state.tempo;
   setEngineRate(effRateAt(pos()));
@@ -198,33 +200,32 @@ function applyLoopToEngine(){
 
 /* ---------------- position abstraction ---------------- */
 function pos(){
-  if (state.engine === 'buffer') return state.playing ? (stretch.inputTime || 0) : state.posPaused;
-  // Engine still unchosen (before first play): posPaused is authoritative.
-  // media.currentTime can lag or stay 0 if the element hasn't finished
-  // loading, which would snap the playhead back to the start after a seek.
-  if (state.engine === 'none') return state.posPaused || media.currentTime || 0;
-  return media.currentTime || 0;
+  return Core.currentPosition({
+    engine: state.engine,
+    playing: state.playing,
+    bufferInputTime: stretch ? stretch.inputTime : 0,
+    pausedPosition: state.posPaused,
+    mediaTime: media.currentTime,
+    duration: state.duration,
+  });
 }
+
 function seekTo(t){
-  t = Math.min(state.duration, Math.max(0, t));
-  // The engine isn't chosen until buildGraph() runs on the first play, so
-  // until then `state.engine` is 'none' and we cannot know which position
-  // store will be read: the buffer engine reads state.posPaused, the media
-  // engines read media.currentTime. Writing only one meant a seek made
-  // BEFORE the first play was silently discarded — the buffer engine then
-  // started from 0 (or nowhere), which looked like "it won't play until
-  // you refresh and press play first". Write both; they reconcile when the
-  // engine is chosen. (M, 2026-07-16)
-  if (state.engine === 'none'){
-    state.posPaused = t;
+  const plan = Core.planSeek({
+    engine: state.engine,
+    target: t,
+    duration: state.duration,
+  });
+  t = plan.position;
+  // Before first play the eventual engine is unknown. Core.planSeek keeps
+  // M's confirmed 2026-07-16 fix by writing both future position stores.
+  if (plan.writePausedPosition) state.posPaused = t;
+  if (plan.writeMediaTime){
     try { media.currentTime = t; } catch (e) { /* metadata not in yet — posPaused carries it */ }
-    return;
   }
-  if (state.engine === 'buffer'){
-    state.posPaused = t;
-    if (stretch){ lastEff = effRateAt(t); stretch.schedule({ input: t, rate: lastEff, semitones: totalSemis(), active: state.playing }); }
-  } else {
-    media.currentTime = t;
+  if (plan.scheduleBufferInput && stretch){
+    lastEff = effRateAt(t);
+    stretch.schedule({ input: t, rate: lastEff, semitones: totalSemis(), active: state.playing });
   }
 }
 
@@ -503,7 +504,7 @@ function endWaveDrag(e){
       else lastTap = { t: now, x };
     }
   } else {
-    if (drag.mode === 'marker'){ state.markers.sort((a, b) => a.t - b.t); renderMarkers(); }
+    if (drag.mode === 'marker'){ state.markers = Core.sortMarkers(state.markers, state.duration); renderMarkers(); }
     else { normLoop(); renderLoop(); applyLoopToEngine(); }
   }
   drag = null;
@@ -554,9 +555,9 @@ function renderLoop(){
   if ($('snapBeats')) $('snapBeats').disabled = !(ready && state.bpm);
 }
 function normLoop(){
-  if (state.loopA != null && state.loopB != null && state.loopB < state.loopA){
-    [state.loopA, state.loopB] = [state.loopB, state.loopA];
-  }
+  const loop = Core.normalizeLoop(state.loopA, state.loopB, state.duration);
+  state.loopA = loop.loopA;
+  state.loopB = loop.loopB;
 }
 function setA(){ if (!state.fileURL) return; state.loopA = pos(); normLoop(); renderLoop(); applyLoopToEngine(); }
 function setB(){ if (!state.fileURL) return; state.loopB = pos(); normLoop(); if (state.loopA != null) state.loopOn = true; renderLoop(); applyLoopToEngine(); }
@@ -571,10 +572,10 @@ $('loopClear').addEventListener('click', () => {
 /* ---------------- markers & session ---------------- */
 function addMarker(){
   if (!state.fileURL) return;
-  state.markers.push({ t: pos(), label: '' });
-  state.markers.sort((a, b) => a.t - b.t);
+  state.markers = Core.addMarker(state.markers, pos(), state.duration);
   renderMarkers();
 }
+
 function renderMarkers(){
   const list = $('markerList');
   list.innerHTML = '';
@@ -627,7 +628,7 @@ $('mkFile').addEventListener('change', e => {
       if (Array.isArray(d.regions)) state.regions = d.regions.filter(r => typeof r.start === 'number' && typeof r.end === 'number' && typeof r.pct === 'number');
       if (d.bpm && typeof d.bpm.bpm === 'number') state.bpm = d.bpm;
       lastEff = null;
-      state.markers.sort((a, b) => a.t - b.t);
+      state.markers = Core.sortMarkers(state.markers, state.duration);
       renderMarkers(); renderLoop(); applyLoopToEngine(); renderRegions(); renderBpm();
     } catch(_){}
   });
