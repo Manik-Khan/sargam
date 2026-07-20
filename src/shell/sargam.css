@@ -933,4 +933,80 @@
   outline: 2px solid var(--sr-alert);
   outline-offset: -2px;
 }
+/* SARGAM_VILAMBIT_PRACTICE_BAR — compact remote for the persistent iframe. */
+.app-practice-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 10px;
+  min-height: 42px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--sr-line);
+  background: var(--sr-paper-raised);
+  color: var(--sr-ink);
+  font-size: 12px;
+}
+.app-practice-source {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  flex: 1 1 240px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.app-practice-source strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+}
+.app-practice-kicker {
+  flex: 0 0 auto;
+  color: var(--sr-ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.app-practice-time {
+  flex: 0 0 auto;
+  min-width: 92px;
+  color: var(--sr-ink-soft);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.app-practice-actions {
+  display: flex;
+  gap: 4px;
+}
+.app-practice-bar button {
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid var(--sr-line);
+  border-radius: 5px;
+  background: var(--sr-paper);
+  color: var(--sr-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.app-practice-bar button:hover:not(:disabled) { border-color: var(--sr-accent); }
+.app-practice-bar button:disabled { color: var(--sr-dim); cursor: default; }
+.app-practice-loop {
+  flex: 0 1 auto;
+  color: var(--sr-ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.app-practice-loop.is-on { color: var(--sr-accent); font-weight: 600; }
+.app-practice-error { color: var(--sr-alert); font-weight: 600; }
+.app-practice-open { margin-left: auto; white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .app-practice-source { flex-basis: 100%; }
+  .app-practice-open { margin-left: 0; }
+}
+
+@media print {
+  .app-practice-bar { display: none !important; }
+}
 

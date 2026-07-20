@@ -1246,3 +1246,151 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   _setLoop: (a, b) => { state.loopA = a; state.loopB = b; renderLoop(); },
   _setMarkers: (ms) => { state.markers = ms; renderMarkers(); },
   _getState: () => ({ loopA: state.loopA, loopB: state.loopB, regions: state.regions.map(r => ({...r})), bpm: state.bpm ? {...state.bpm} : null }) };
+/* SARGAM_VILAMBIT_BRIDGE_V1 — versioned, same-origin iframe contract. */
+(() => {
+  const BRIDGE_CHANNEL = 'sargam.vilambit';
+  const BRIDGE_VERSION = 1;
+  const BRIDGE_COMMANDS = new Set([
+    'request-state', 'play', 'pause', 'toggle', 'seek', 'skip',
+    'set-loop', 'clear-loop', 'jump-marker',
+  ]);
+  const bridgeTargetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
+  let bridgeError = null;
+  let bridgeLastJSON = '';
+  let bridgeLastSentAt = 0;
+
+  function bridgeIsPlaying(){
+    return state.engine === 'buffer'
+      ? Boolean(state.playing)
+      : Boolean(state.fileURL) && !media.paused;
+  }
+
+  function bridgeSnapshot(){
+    return Core.createPublicSnapshot({
+      ready: true,
+      fileURL: state.fileURL,
+      fileName: state.fileName,
+      isVideo: state.isVideo,
+      duration: state.duration,
+      position: pos(),
+      playing: bridgeIsPlaying(),
+      tempo: state.tempo,
+      semitones: state.semitones,
+      cents: state.cents,
+      loopA: state.loopA,
+      loopB: state.loopB,
+      loopOn: state.loopOn,
+      markers: state.markers,
+      error: bridgeError,
+    });
+  }
+
+  function bridgePublish(type = 'state', force = false){
+    if (window.parent === window) return;
+    const payload = bridgeSnapshot();
+    const json = JSON.stringify(payload);
+    const now = Date.now();
+    // Position needs a quick cadence while playing. When idle, a one-second
+    // heartbeat prevents the parent missing an early ready event or hot reload.
+    if (!force && json === bridgeLastJSON && now - bridgeLastSentAt < 1000) return;
+    bridgeLastJSON = json;
+    bridgeLastSentAt = now;
+    window.parent.postMessage({
+      channel: BRIDGE_CHANNEL,
+      version: BRIDGE_VERSION,
+      direction: 'event',
+      type,
+      payload,
+    }, bridgeTargetOrigin);
+  }
+
+  function bridgeTrustedEvent(event){
+    if (event.source !== window.parent) return false;
+    if (window.location.origin === 'null') return event.origin === 'null';
+    if (event.origin !== window.location.origin) return false;
+    return true;
+  }
+
+  function bridgeNumber(payload, key){
+    const value = Number(payload && payload[key]);
+    if (!Number.isFinite(value)) throw new TypeError(`Vilambit command requires numeric ${key}.`);
+    return value;
+  }
+
+  async function bridgeRunCommand(type, payload){
+    if (type === 'request-state') return;
+    if (!state.fileURL) throw new Error('Load a recording in Vilambit first.');
+
+    if (type === 'play') {
+      if (!bridgeIsPlaying()) await togglePlay();
+      return;
+    }
+    if (type === 'pause') {
+      if (bridgeIsPlaying()) await togglePlay();
+      return;
+    }
+    if (type === 'toggle') {
+      await togglePlay();
+      return;
+    }
+    if (type === 'seek') {
+      seekTo(bridgeNumber(payload, 'seconds'));
+      return;
+    }
+    if (type === 'skip') {
+      seekTo(pos() + bridgeNumber(payload, 'deltaSeconds'));
+      return;
+    }
+    if (type === 'set-loop') {
+      const loop = Core.normalizeLoop(
+        bridgeNumber(payload, 'a'),
+        bridgeNumber(payload, 'b'),
+        state.duration,
+      );
+      state.loopA = loop.loopA;
+      state.loopB = loop.loopB;
+      state.loopOn = Boolean(payload.on ?? true) && loop.ready;
+      renderLoop();
+      applyLoopToEngine();
+      return;
+    }
+    if (type === 'clear-loop') {
+      const cleared = Core.clearLoop();
+      state.loopA = cleared.loopA;
+      state.loopB = cleared.loopB;
+      state.loopOn = cleared.loopOn;
+      renderLoop();
+      applyLoopToEngine();
+      return;
+    }
+    if (type === 'jump-marker') {
+      const index = Math.trunc(bridgeNumber(payload, 'index'));
+      state.markers = Core.sortMarkers(state.markers, state.duration);
+      const marker = state.markers[index];
+      if (!marker) throw new RangeError(`No Vilambit marker at index ${index}.`);
+      seekTo(marker.t);
+    }
+  }
+
+  window.addEventListener('message', async (event) => {
+    if (!bridgeTrustedEvent(event)) return;
+    const message = event.data;
+    if (!message || typeof message !== 'object' || Array.isArray(message)) return;
+    if (message.channel !== BRIDGE_CHANNEL || message.version !== BRIDGE_VERSION) return;
+    if (message.direction !== 'command' || !BRIDGE_COMMANDS.has(message.type)) return;
+    if (!message.payload || typeof message.payload !== 'object' || Array.isArray(message.payload)) return;
+
+    try {
+      await bridgeRunCommand(message.type, message.payload);
+      bridgeError = null;
+      bridgePublish('state', true);
+    } catch (error) {
+      bridgeError = error && error.message ? error.message : String(error);
+      bridgePublish('error', true);
+    }
+  });
+
+  window.setInterval(() => bridgePublish('state'), 250);
+  bridgePublish('ready', true);
+})();
+

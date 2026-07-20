@@ -30,6 +30,7 @@ import Toolbar from './Toolbar.jsx';
 import NewDocDialog from './NewDocDialog.jsx';
 import ExportView from './ExportView.jsx';
 import ProblemsPanel from './ProblemsPanel.jsx';
+import PracticeBar from './PracticeBar.jsx';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import './sargam.css';
 
@@ -78,6 +79,7 @@ export default function App() {
   const [view, setView] = useState('notation');
   const [cursorPos, setCursorPos] = useState(0);
   const editorRef = useRef(null);
+  const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
 
@@ -629,6 +631,10 @@ export default function App() {
         onDroneMode={doDroneMode}
         onTalaSound={doTalaSound}
       />
+
+      {view === 'notation' && (
+        <PracticeBar frameRef={vilambitRef} onOpen={() => setView('vilambit')} />
+      )}
       {showLegend && view === 'notation' && <Legend onClose={() => setShowLegend(false)} />}
       {showDictate && (
         <DictateBar
@@ -645,6 +651,7 @@ export default function App() {
           and a frame without that permission simply cannot start it. */}
       <div className="app-stage">
         <iframe
+          ref={vilambitRef}
           title="Vilambit — practice player"
           src="vilambit.html"
           allow="autoplay; fullscreen; encrypted-media; clipboard-read; clipboard-write"
