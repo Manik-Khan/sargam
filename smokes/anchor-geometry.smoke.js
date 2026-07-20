@@ -7,6 +7,7 @@ import { JSDOM } from 'jsdom';
 import { parseDocument } from '../src/engine/parse.js';
 import { buildLineGeometry } from '../src/engine/notation-geometry.js';
 import { renderDocument } from '../src/engine/render.js';
+import { anchoredMeterBracketPath } from '../src/shell/anchor-overlay.js';
 import { attackCenterX, endpointEdgeX, xForMetricTime } from '../src/shell/score-geometry.js';
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
@@ -53,7 +54,7 @@ export const smokes = [
     },
   },
   {
-    name: 'anchor geometry: repeated approaches render as independent mirrored under-brackets',
+    name: 'anchor geometry: repeated approaches render as independent ordinary over-arcs',
     fn() {
       const { doc } = firstLine(repeatedSource);
       const root = renderDocument(doc);
@@ -62,8 +63,15 @@ export const smokes = [
       assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-source')?.textContent), ['n', 'n']);
       assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-destination')?.textContent), ['D', 'D']);
       for (const approach of approaches) {
-        assert.equal(approach.querySelector('.sr-svg-approach path')?.getAttribute('d'), 'M4,2 L4,15 L96,15 L96,2');
+        assert.equal(approach.querySelector('.sr-svg-approach path')?.getAttribute('d'), 'M4,18 Q50,2 96,18');
       }
+    },
+  },
+  {
+    name: 'anchor geometry: meter spans use a mirrored krintan bracket below the notes',
+    fn() {
+      assert.equal(anchoredMeterBracketPath(100), 'M 1 1 L 1 15 L 99 15 L 99 1');
+      assert.equal(anchoredMeterBracketPath(18), 'M 1 1 L 1 15 L 17 15 L 17 1');
     },
   },
   {

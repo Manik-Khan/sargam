@@ -20,7 +20,7 @@ function makeArch(span, left, right, continuation = false) {
   svg.setAttribute('aria-hidden', 'true');
   svg.classList.add('sr-meter-svg');
   const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', 'M2,2 Q50,17 98,2');
+  path.setAttribute('d', 'M2,2 L2,16 L98,16 L98,2');
   svg.appendChild(path);
   el.appendChild(svg);
 

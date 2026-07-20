@@ -19,6 +19,11 @@ function createSvg(className, width, height) {
   return svg;
 }
 
+export function anchoredMeterBracketPath(width) {
+  const right = Math.max(17, Number(width) - 1);
+  return `M 1 1 L 1 15 L ${right} 15 L ${right} 1`;
+}
+
 function targetPayload(node) {
   if (!node) return null;
   const kind = node.getAttribute('data-anchor-kind');
@@ -186,7 +191,7 @@ function meterGlyph(mark, segment, selected, onSelect, onHandleStart) {
   el.dataset.markId = mark.id;
   const svg = createSvg('sr-anchored-meter-svg', Math.max(18, right - left), 18);
   const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', `M 1 1 Q ${Math.max(9, (right - left) / 2)} 15 ${Math.max(17, right - left - 1)} 1`);
+  path.setAttribute('d', anchoredMeterBracketPath(Math.max(18, right - left)));
   svg.appendChild(path);
   el.appendChild(svg);
   const label = document.createElement('button');
