@@ -1,4 +1,46 @@
-# Sargam — Project Context & Handoff (updated 2026-07-19)
+# Sargam — Project Context & Handoff (updated 2026-07-20, Anchor Geometry handoff)
+
+**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, and practicing Hindustani classical notation. Read this with the newest dated handoff, `SARGAM_NEXT_SESSION_CONTEXT_2026-07-20_ANCHOR_GEOMETRY.md`, then inspect the actual GitHub Desktop clone. Manik is the musical authority; never invent raga, tala, bol, ornament, or notation semantics.
+
+## Authoritative recent-state update (2026-07-20 — supersedes older recent-state blocks)
+
+The current source contains substantial work beyond the 2026-07-19 audio checkpoint:
+
+- Vilambit Phase 2 core extraction, versioned iframe bridge, and the compact Notation-side practice bar are working in the browser.
+- CodeMirror replaced the plain textarea and provides Clean/Structure modes; generated anchor metadata can be folded without changing the underlying Markdown.
+- A shared anchor framework exists for rendered attacks and boundaries; anchored marks persist in the document, and Manik confirmed that Diri records held after editing.
+- Point tools exist for Da `|`, Ra `—`, Diri `V`, and chikari `^`; Diri is bindingly a **two-consecutive-attack** gesture, not a one-note mark.
+- Experimental meter-span, export-parity, repeated-slide, repeat-gutter, marker-stability, and bounded Gat-return work was added.
+
+However, the latest visual/ear review **rejected the Anchor/Notation Continuity wave as a finished feature**. The current implementation must not be described as shipped or accepted:
+
+1. **Diri geometry is unstable.** The V persists but does not consistently connect and center beneath the intended two attacks. Export/print includes the mark, but its placement drifts and can occupy arbitrary vertical space.
+2. **Meter-span geometry is wrong.** The selected note range and the rendered meter arch do not line up. The label/arch must use the same true note-slot coordinates as the ordinary one-beat under-arc.
+3. **Repeated local slides are broken.** `{n~}D--{n~}D` does not yet render as two independent `n → D` approaches with the rhythm of `D--D`; the grace `n` can float above the slide.
+4. **Repeat gutters and playback-stable tala markers were attempted but are not yet accepted.** Re-verify them from the actual clone rather than trusting the package prose.
+5. **Bounded Gat return syntax such as `gat@8..@1` is experimental and unverified by Manik.** It must not be treated as settled until browser playback and notation behavior are confirmed.
+
+The next phase is therefore **Anchor Geometry Stabilization**, not another outward feature wave. Build one shared geometry map for attacks, fractional boundaries, and annotation lanes, and make Preview, Export/Print, playback highlighting, and score-side editing consume that same map. Reimplement Diri and meter marks inside the notation render/layout pass rather than as independent overlays that guess after rendering. Treat repeated ornamented destinations as a first-class parser/render/schedule structure.
+
+### Last known gates
+
+- Before the continuity package, the clone reported `405 passed, 2 failed`; both failures were stale symbol/placeholder test contracts.
+- A later run reported one loader failure because `smokes/notation-continuity.smoke.js` exported `tests` instead of the required `smokes`; Manik applied the direct repair.
+- Production build succeeded with Vite (`91 modules transformed`).
+- The final full smoke count after that direct repair was **not explicitly confirmed in chat**. Start the next session by running the suite; do not assert `411 passed` until the clone says so.
+
+### Exact source and packaging contracts learned the hard way
+
+- `src/engine/render.js` currently names the legacy articulation/bol table `BOL_SYMBOL`.
+- Binding marks: Da `|`, Ra `—`, Diri `V`, chikari `^`.
+- The old render smoke may still contain a superseded title; update assertions semantically, not by matching the title.
+- `src/shell/ExportView.jsx` uses measured two-pass export rendering.
+- The meter input has stable ID `cmd-anchor-meter`; placeholder wording is not an API.
+- Every auto-discovered `smokes/*.smoke.js` module must export an array named `smokes`; exporting `tests` makes the runner reject the whole file.
+- Future installers must be tested against files copied verbatim from the current clone. Do not match local variable names, exact whitespace, test titles, or UI prose unless they are the actual contract. Prefer direct changed files over brittle search-and-replace installers when possible.
+
+
+## Earlier project history and rulings (retained; subordinate to the block above)
 
 **What this is:** a complete D&D-session-style handoff for Sargam — M's web app for writing, rendering, and hearing Hindustani classical notation. Written so that *anyone* can pick the project up cold: M working alone, a future AI assistant, a human collaborator. Read this with `docs/design-spec.md` (the requirements authority) and `docs/build-plan.md` (code contracts). If you are an AI assistant: the working rules at the bottom are binding; M is the authority on the tradition — never improvise raga/tala/notation semantics, ask him.
 
@@ -112,25 +154,24 @@ Smokes first, watch red, implement, green; suite + M's eyeball/ear = done. Mock 
 
 *Project history in brief: built across 2026-07-16 sessions from spec → parser/renderer (M1) → files/autosave (M2) → export/layout/form (M2.5) → kan ornament grammar (M's own) → full playback (M3 A/B/C). Corpus: Appendix A in the spec. M's copy: `/Users/khansolo/Sargam`. The two scans that verified the rendering are the 5-16-82 exercise page and the Jaijaiwanti tintal page — keep them with the project.*
 
-## Exact Anchor Framework source contracts (2026-07-20) <!-- SARGAM_EXACT_SOURCE_CONTRACTS_2026_07_20_V3 -->
+## Source-name and installer reliability ruling (2026-07-20) <!-- SARGAM_SOURCE_CONTRACTS_2026_07_20 -->
 
-This section records exact current identifiers that must be inspected before future patches.
+Three consecutive guarded installers failed because they matched fixture-specific names or exact prose instead of the actual clone. The guards prevented partial writes, but the packaging process was not reliable enough. This section is binding for future work.
 
-- `src/engine/render.js` uses the symbol table name `BOL_SYMBOL`.
-- Binding symbols: Da `|`, Ra `—`, Diri `V`, chikari `^`.
-- Diri spans two consecutive attacks; it is not a one-note symbol.
-- The legacy render smoke contains assertion comments `diri on g` and `chikari on m`. Patch those semantic assertions directly; do not locate the smoke by its title.
-- The Anchor Framework meter field is identified by `id="cmd-anchor-meter"`; placeholder text is not a stable API.
-- `ExportView.jsx` uses measured two-pass rendering: an initial render for width measurement, then a final render with `maxSystemEm`.
-- Future installers must be tested against verbatim files from the current clone, not rewritten fixtures. Avoid guards based on variable names, exact whitespace, headings, test titles, or UI prose unless those are the actual contract.
-- All edits must be computed and validated before any file is written.
-## Notation continuity + exact current contracts (2026-07-20)
+### Current exact source contracts
 
-- Essential anchor marks, including Diri V connectors, must appear in Preview, Export preview, Print, and Save as PDF.
-- Repeat glyphs `||:` / `:||` live in equal outside gutters and never narrow or offset shared matra columns.
-- Tala-marker alignment is static; never animate its correction during playback rerenders.
-- `{n~}D--{n~}D` is one matra with the timing of `D--D`: 3/4 + 1/4. Each D has its own untimed local n→D approach.
-- `gat@8..@1` replays the preceding Gat from matra 8 up to, but not including, the next matra 1, then resumes the next written line. It displays simply as `gat`.
-- Current score symbols: Da `|`, Ra `—`, Diri `V` spanning two attacks, chikari `^`.
-- Current source contracts: ExportView is measured/two-pass and anchor overlays mount only after the final packed render; meter input ID is `cmd-anchor-meter`.
-- Installer rule: inspect current files and match semantic behavior. Do not require variable names, smoke titles, placeholder prose, or exact whitespace; test against current-source-shaped fixtures before handoff.
+- `src/engine/render.js` names the legacy symbol table `BOL_SYMBOL`.
+- Binding articulation symbols: Da `|`, Ra `—`, Diri `V`, chikari `^`.
+- Diri is a two-attack span connecting two consecutive notes; it is not a single-note bol.
+- The old render smoke may still be titled with the superseded text `^ diri, v chikari`. Update the assertions by their semantic comments (`diri on g`, `chikari on m`), not by matching the exact test title.
+- `src/shell/ExportView.jsx` uses measured two-pass export rendering: render to measure, then render again with the calculated `maxSystemEm`.
+- The Anchor Framework meter input is identified by `id="cmd-anchor-meter"`. Placeholder wording is UI copy, not a behavioral API.
+
+### Installer and patching rule
+
+1. Inspect the actual current clone before generating a patch.
+2. Test installers against files copied verbatim from that clone, not paraphrased fixtures.
+3. Match stable semantics: exported function names, element IDs, assertion comments, or syntax structure.
+4. Never guard on a local variable name, exact whitespace, an exact test title, or placeholder prose when those are not the contract.
+5. Compute and validate every edit before writing any file. A failed guard must leave the repository untouched.
+6. Run the full smoke suite and build in the real clone after application.

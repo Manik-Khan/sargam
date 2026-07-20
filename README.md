@@ -1,8 +1,8 @@
-# Sargam context handoff — 2026-07-19
+# Sargam handoff package — 2026-07-20
 
-This package contains:
+Copy these two files into the root of the current Sargam clone:
 
-- `CONTEXT.md` — the broad project context with a new authoritative recent-state block.
-- `SARGAM_NEXT_SESSION_CONTEXT_2026-07-19.md` — the detailed next-session handoff.
+- `CONTEXT.md` — broad history plus a new authoritative Anchor Geometry status block.
+- `SARGAM_NEXT_SESSION_CONTEXT_2026-07-20_ANCHOR_GEOMETRY.md` — read this first next session.
 
-Copy both files into the root of the Sargam GitHub Desktop clone. The new dated handoff supersedes the older 2026-07-18 handoff; it does not need to delete it.
+The dated handoff supersedes older current-state/test-count prose. It deliberately marks the latest Diri/meter/repeated-slide work as visually rejected and unaccepted, while preserving the accepted Vilambit bridge, CodeMirror editor, and anchor-persistence direction.
