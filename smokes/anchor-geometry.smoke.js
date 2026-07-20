@@ -53,6 +53,20 @@ export const smokes = [
     },
   },
   {
+    name: 'anchor geometry: repeated approaches render as independent mirrored under-brackets',
+    fn() {
+      const { doc } = firstLine(repeatedSource);
+      const root = renderDocument(doc);
+      const approaches = [...root.querySelectorAll('.sr-approach-slide-body')];
+      assert.equal(approaches.length, 2);
+      assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-source')?.textContent), ['n', 'n']);
+      assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-destination')?.textContent), ['D', 'D']);
+      for (const approach of approaches) {
+        assert.equal(approach.querySelector('.sr-svg-approach path')?.getAttribute('d'), 'M4,2 L4,15 L96,15 L96,2');
+      }
+    },
+  },
+  {
     name: 'anchor geometry: render stamps exact attack, slot-edge, and boundary targets',
     fn() {
       const { doc } = firstLine(meterSource);

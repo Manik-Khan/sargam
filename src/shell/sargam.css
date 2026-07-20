@@ -1111,23 +1111,26 @@
 .sr-approach-slide-body {
   position: relative;
   display: inline-grid;
-  grid-template-columns: minmax(0.58em, max-content) minmax(0.9em, max-content);
+  grid-template-columns: minmax(0.5em, max-content) minmax(0.82em, max-content);
   align-items: end;
+  column-gap: 0.12em;
   min-width: 1.55em;
+  padding-bottom: 0.42em;
 }
 .sr-approach-source {
-  align-self: end;
+  align-self: start;
+  justify-self: end;
   font-size: 0.68em;
   line-height: 1;
-  transform: translateY(-0.02em);
+  transform: translateY(-0.08em);
 }
 .sr-svg-approach {
   position: absolute;
-  left: 0.18em;
-  right: 0.08em;
-  top: 0.08em;
-  width: calc(100% - 0.18em);
-  height: 0.72em;
+  left: 0.06em;
+  right: 0.06em;
+  bottom: -0.02em;
+  width: calc(100% - 0.12em);
+  height: 0.48em;
   overflow: visible;
 }
 .sr-svg-approach path { stroke: currentColor; stroke-width: 1.25; fill: none; }
