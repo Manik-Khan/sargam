@@ -479,17 +479,10 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   const geometryMatra = ctx.geometry?.matras?.[globalMatraIndex] || null;
   cell.setAttribute('data-matra', String(globalMatraIndex));
 
-  // Marker lane: derived from tal + start offset; empty node keeps rows aligned.
-  const markerText = tal ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + k)) : null;
-  cell.appendChild(h('div', 'sr-marker', markerText ?? ''));
-
-  // Glyphs. Grace notes remain ornaments outside metric slots. Timed
-  // events live in an equal-column slot grid; every explicitly written
-  // internal dash becomes its own visible hold slot without a new attack.
-  const glyphs = h('div', 'sr-glyphs');
-  if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph', prefix));
-  for (const e of evs.filter((event) => event.grace)) glyphs.appendChild(renderEvent(e, ctx));
-
+  // Build timed slots before the upper lanes. Repeated local approaches need
+  // the same slot columns twice: once for their ordinary kan arcs above the
+  // tala marker, and once for the written destinations below it. Keeping both
+  // grids in flow prevents print reflow from putting an arc through a marker.
   const visualSlots = [];
   let geometrySlotIndex = 0;
   for (let eventIndex = 0; eventIndex < evs.length; eventIndex++) {
@@ -501,6 +494,41 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
       visualSlots.push({ event: { type: 'sustain' }, hold: true, geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null });
     }
   }
+  const hasLocalApproach = visualSlots.some((item) => item.event?.approachSlide && !item.hold);
+  const slotColumns = hasLocalApproach
+    ? visualSlots
+        .map((item) => item.event?.approachSlide && !item.hold
+          ? 'minmax(1.55em, max-content)'
+          : 'minmax(0.84em, max-content)')
+        .join(' ')
+    : `repeat(${visualSlots.length}, minmax(0.84em, max-content))`;
+
+  if (hasLocalApproach) {
+    const approachLane = h('div', 'sr-local-approach-lane');
+    approachLane.style.gridTemplateColumns = slotColumns;
+    for (const item of visualSlots) {
+      const arcSlot = h('span', 'sr-local-approach-arc-slot');
+      if (item.event?.approachSlide && !item.hold) {
+        const arc = h('span', 'sr-local-approach-arc sr-arc-kan');
+        arc.appendChild(meendSvg());
+        arcSlot.appendChild(arc);
+      }
+      approachLane.appendChild(arcSlot);
+    }
+    cell.appendChild(approachLane);
+  }
+
+  // Marker lane: derived from tal + start offset; empty node keeps rows aligned.
+  const markerText = tal ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + k)) : null;
+  cell.appendChild(h('div', 'sr-marker', markerText ?? ''));
+
+  // Glyphs. Grace notes remain ornaments outside metric slots. Timed
+  // events live in an equal-column slot grid; every explicitly written
+  // internal dash becomes its own visible hold slot without a new attack.
+  const glyphs = h('div', 'sr-glyphs');
+  if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph', prefix));
+  for (const e of evs.filter((event) => event.grace)) glyphs.appendChild(renderEvent(e, ctx));
+
   if (visualSlots.length > 0) {
     const slots = h('span', 'sr-timed-slots');
     slots.setAttribute('data-written-slots', String(visualSlots.length));
@@ -509,7 +537,7 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
     // until adjacent em dashes read as one stretched line. Fixed minimum
     // slot widths plus a visible gap make DnS- and g--- unambiguously four
     // written positions while still allowing wide Western spellings to grow.
-    slots.style.gridTemplateColumns = `repeat(${visualSlots.length}, minmax(0.84em, max-content))`;
+    slots.style.gridTemplateColumns = slotColumns;
     for (let slotIndex = 0; slotIndex < visualSlots.length; slotIndex++) {
       const item = visualSlots[slotIndex];
       const slot = h('span', 'sr-slot' + (item.hold ? ' sr-hold-slot' : ''));
@@ -588,9 +616,6 @@ function renderApproachSlideEvent(e, ctx) {
   const body = h('span', 'sr-approach-slide-body');
   const approach = { type: 'note', ch: e.approachSlide.ch, octave: e.approachSlide.octave || 0 };
   body.appendChild(h('span', 'sr-approach-source', chOf(approach, ctx)));
-  const arc = h('span', 'sr-approach-arc sr-arc sr-arc-kan');
-  arc.appendChild(meendSvg());
-  body.appendChild(arc);
   body.appendChild(h('span', 'sr-ch sr-approach-destination', chOf(e, ctx)));
   ev.appendChild(body);
   const below = h('span', 'sr-dots sr-dots-below');

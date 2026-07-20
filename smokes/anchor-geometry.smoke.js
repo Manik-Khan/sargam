@@ -62,11 +62,14 @@ export const smokes = [
       assert.equal(approaches.length, 2);
       assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-source')?.textContent), ['n', 'n']);
       assert.deepEqual(approaches.map((node) => node.querySelector('.sr-approach-destination')?.textContent), ['D', 'D']);
-      for (const approach of approaches) {
-        const arc = approach.querySelector('.sr-approach-arc.sr-arc.sr-arc-kan');
-        assert.ok(arc, 'local approach reuses the ordinary kan arc wrapper');
+      const lane = root.querySelector('.sr-local-approach-lane');
+      assert.ok(lane, 'local approaches reserve a flow lane above the tala marker');
+      const arcs = [...lane.querySelectorAll('.sr-local-approach-arc.sr-arc-kan')];
+      assert.equal(arcs.length, 2);
+      for (const arc of arcs) {
         assert.equal(arc.querySelector('.sr-svg-meend path')?.getAttribute('d'), 'M4,18 Q50,2 96,18');
       }
+      assert.equal(root.querySelector('.sr-approach-slide-body .sr-approach-arc'), null);
     },
   },
   {

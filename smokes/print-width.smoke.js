@@ -88,4 +88,12 @@ export const smokes = [
       assert.match(source, /contentWidthInEm/);
     },
   },
+
+  {
+    name: 'print width: screen paper uses border-box so preview and printable content widths agree',
+    fn() {
+      const css = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
+      assert.match(css, /\.app-export-paper\s*\{[^}]*width:\s*780px;[^}]*padding:\s*46px 52px 60px;[^}]*box-sizing:\s*border-box;/s);
+    },
+  },
 ];

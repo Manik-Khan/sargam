@@ -24,6 +24,16 @@ export function anchoredMeterBracketPath(width) {
   return `M 1 1 L 1 15 L ${right} 15 L ${right} 1`;
 }
 
+function emFromPx(container, px) {
+  const fontSize = Number.parseFloat(getComputedStyle(container).fontSize) || 16;
+  return Number(px) / fontSize;
+}
+
+function setInlineSpanInEm(el, container, leftPx, widthPx = null) {
+  el.style.left = `${emFromPx(container, leftPx)}em`;
+  if (widthPx != null) el.style.width = `${emFromPx(container, widthPx)}em`;
+}
+
 function targetPayload(node) {
   if (!node) return null;
   const kind = node.getAttribute('data-anchor-kind');
@@ -103,7 +113,7 @@ function pointGlyph(mark, block, node, selected, onSelect) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `sr-anchor-mark sr-anchor-${mark.kind}${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
-  el.style.left = `${attackCenterX(lane, node)}px`;
+  setInlineSpanInEm(el, lane, attackCenterX(lane, node));
   el.dataset.markId = mark.id;
   el.title = `${mark.kind} annotation`;
   el.textContent = mark.kind === 'da' ? '|' : mark.kind === 'ra' ? '—' : '^';
@@ -118,8 +128,7 @@ function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
   if (left == null || right == null) return;
   const holder = document.createElement('div');
   holder.className = `sr-diri-mark${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
-  holder.style.left = `${Math.min(left, right)}px`;
-  holder.style.width = `${Math.max(12, Math.abs(right - left))}px`;
+  setInlineSpanInEm(holder, lane, Math.min(left, right), Math.max(12, Math.abs(right - left)));
   holder.dataset.markId = mark.id;
   const svg = createSvg('sr-diri-svg', Math.max(12, Math.abs(right - left)), 20);
   const path = document.createElementNS(SVG_NS, 'path');
@@ -127,11 +136,12 @@ function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
   svg.appendChild(path);
   holder.appendChild(svg);
   holder.addEventListener('click', (event) => { event.stopPropagation(); onSelect?.(mark.id); });
-  for (const [side, x] of [['start', 0], ['end', Math.max(12, Math.abs(right - left))]]) {
+  for (const side of ['start', 'end']) {
     const handle = document.createElement('button');
     handle.type = 'button';
     handle.className = 'sr-anchor-handle';
-    handle.style.left = `${x}px`;
+    if (side === 'start') handle.style.left = '0';
+    else { handle.style.left = 'auto'; handle.style.right = '0'; }
     handle.setAttribute('aria-label', `Move ${side} of diri`);
     handle.addEventListener('pointerdown', (event) => { event.stopPropagation(); onHandleStart?.(event, mark.id, side); });
     holder.appendChild(handle);
@@ -186,8 +196,7 @@ function meterGlyph(mark, segment, selected, onSelect, onHandleStart) {
   if (left == null || right == null) return;
   const el = document.createElement('div');
   el.className = `sr-anchored-meter${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
-  el.style.left = `${left}px`;
-  el.style.width = `${Math.max(18, right - left)}px`;
+  setInlineSpanInEm(el, lane, left, Math.max(18, right - left));
   el.dataset.markId = mark.id;
   const svg = createSvg('sr-anchored-meter-svg', Math.max(18, right - left), 18);
   const path = document.createElementNS(SVG_NS, 'path');

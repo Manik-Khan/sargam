@@ -7,11 +7,16 @@ import { xForMetricTime } from './score-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-function makeArch(span, left, right, continuation = false) {
+function emFromPx(container, px) {
+  const fontSize = Number.parseFloat(getComputedStyle(container).fontSize) || 16;
+  return Number(px) / fontSize;
+}
+
+function makeArch(span, lane, left, right, continuation = false) {
   const el = document.createElement('div');
   el.className = 'sr-meter-span' + (span.valid === false ? ' sr-meter-invalid' : '') + (span.draft ? ' sr-meter-draft' : '');
-  el.style.left = `${Math.min(left, right)}px`;
-  el.style.width = `${Math.max(12, Math.abs(right - left))}px`;
+  el.style.left = `${emFromPx(lane, Math.min(left, right))}em`;
+  el.style.width = `${emFromPx(lane, Math.max(12, Math.abs(right - left)))}em`;
   el.title = span.message || `${span.label} local meter`;
 
   const svg = document.createElementNS(SVG_NS, 'svg');
@@ -86,7 +91,7 @@ export function mountMeterOverlays(root, spans = [], draft = null) {
         const left = xForMetricTime(lane, block, startValue, 'start');
         const right = xForMetricTime(lane, block, endValue, 'end');
         if (left === null || right === null) continue;
-        lane.appendChild(makeArch(segment.span, left, right, segment.start > segment.originalStart + 1e-8));
+        lane.appendChild(makeArch(segment.span, lane, left, right, segment.start > segment.originalStart + 1e-8));
         if (segment.span.draft) {
           highlightDraft(block, segment.span, startValue, endValue);
         }
