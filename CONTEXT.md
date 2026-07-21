@@ -1,44 +1,142 @@
-# Sargam — Project Context & Handoff (updated 2026-07-20, Anchor Geometry handoff)
+# Sargam — Project Context & Handoff (updated 2026-07-21, Clip Vault and Portable Projects handoff)
 
-**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, and practicing Hindustani classical notation. Read this with the newest dated handoff, `SARGAM_NEXT_SESSION_CONTEXT_2026-07-20_ANCHOR_GEOMETRY.md`, then inspect the actual GitHub Desktop clone. Manik is the musical authority; never invent raga, tala, bol, ornament, or notation semantics.
+**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with the newest dated handoff, `SARGAM_NEXT_SESSION_CONTEXT_2026-07-21_CLIP_VAULT_PORTABLE_PROJECTS.md`, then inspect the actual GitHub Desktop clone. Manik is the musical authority; never invent raga, tala, bol, ornament, or notation semantics.
 
-## Authoritative recent-state update (2026-07-20 — supersedes older recent-state blocks)
+## Authoritative recent-state update (2026-07-21 — supersedes older recent-state blocks)
 
-The current source contains substantial work beyond the 2026-07-19 audio checkpoint:
+### Accepted geometry and notation continuity
 
-- Vilambit Phase 2 core extraction, versioned iframe bridge, and the compact Notation-side practice bar are working in the browser.
-- CodeMirror replaced the plain textarea and provides Clean/Structure modes; generated anchor metadata can be folded without changing the underlying Markdown.
-- A shared anchor framework exists for rendered attacks and boundaries; anchored marks persist in the document, and Manik confirmed that Diri records held after editing.
-- Point tools exist for Da `|`, Ra `—`, Diri `V`, and chikari `^`; Diri is bindingly a **two-consecutive-attack** gesture, not a one-note mark.
-- Experimental meter-span, export-parity, repeated-slide, repeat-gutter, marker-stability, and bounded Gat-return work was added.
+The Anchor Geometry Stabilization work is now browser-accepted by Manik:
 
-However, the latest visual/ear review **rejected the Anchor/Notation Continuity wave as a finished feature**. The current implementation must not be described as shipped or accepted:
+- Diri is a two-consecutive-attack `V`, attached to the exact timed-slot grid rather than drifting as a line-wide overlay.
+- The Diri V was reduced to a visually appropriate size while preserving its two endpoints.
+- Meter annotations render as a mirrored krintan-style bracket below the selected rhythmic span and retain their span in Preview, Export, and print/PDF.
+- Repeated local slides such as `{n~}D--{n~}D` preserve the rhythm of `D--D` and render as two independent ordinary over-arcs, one `n → D` approach per destination.
+- Repeat signs remain full-height, level with the notation, and sit outside the metric note grid without shifting ordinary lines.
+- Playback highlighting updates only the active class; it no longer rebuilds the score every beat or rhythmically scrolls the page downward.
+- Preview, Export, and print geometry now share the accepted rendering behavior for these features.
 
-1. **Diri geometry is unstable.** The V persists but does not consistently connect and center beneath the intended two attacks. Export/print includes the mark, but its placement drifts and can occupy arbitrary vertical space.
-2. **Meter-span geometry is wrong.** The selected note range and the rendered meter arch do not line up. The label/arch must use the same true note-slot coordinates as the ordinary one-beat under-arc.
-3. **Repeated local slides are broken.** `{n~}D--{n~}D` does not yet render as two independent `n → D` approaches with the rhythm of `D--D`; the grace `n` can float above the slide.
-4. **Repeat gutters and playback-stable tala markers were attempted but are not yet accepted.** Re-verify them from the actual clone rather than trusting the package prose.
-5. **Bounded Gat return syntax such as `gat@8..@1` is experimental and unverified by Manik.** It must not be treated as settled until browser playback and notation behavior are confirmed.
+The last user-run pre-Phase-3A gate was:
 
-The next phase is therefore **Anchor Geometry Stabilization**, not another outward feature wave. Build one shared geometry map for attacks, fractional boundaries, and annotation lanes, and make Preview, Export/Print, playback highlighting, and score-side editing consume that same map. Reimplement Diri and meter marks inside the notation render/layout pass rather than as independent overlays that guess after rendering. Treat repeated ornamented destinations as a first-class parser/render/schedule structure.
+```text
+424 passed, 0 failed
+vite build succeeded
+94 modules transformed
+```
 
-### Last known gates
+### Vilambit Phase 3A — linked notation loops
 
-- Before the continuity package, the clone reported `405 passed, 2 failed`; both failures were stale symbol/placeholder test contracts.
-- A later run reported one loader failure because `smokes/notation-continuity.smoke.js` exported `tests` instead of the required `smokes`; Manik applied the direct repair.
-- Production build succeeded with Vite (`91 modules transformed`).
-- The final full smoke count after that direct repair was **not explicitly confirmed in chat**. Start the next session by running the suite; do not assert `411 passed` until the clone says so.
+Vilambit Phase 3A is working in the browser and was positively accepted by Manik:
 
-### Exact source and packaging contracts learned the hard way
+- select a notation phrase in CodeMirror;
+- set an A–B loop in Vilambit;
+- attach the current loop to the notation selection;
+- store the relationship in a versioned `sargam-audio-links:v1` Markdown-safe metadata block;
+- show a subtle linked-audio indicator in Preview only;
+- click a linked phrase to restore the loop and seek to A without forced autoplay;
+- use **Play Linked** to restore, seek, and play;
+- remove a selected link;
+- fold generated audio-link metadata in Clean mode while preserving exact source in Structure mode.
 
-- `src/engine/render.js` currently names the legacy articulation/bol table `BOL_SYMBOL`.
-- Binding marks: Da `|`, Ra `—`, Diri `V`, chikari `^`.
-- The old render smoke may still contain a superseded title; update assertions semantically, not by matching the title.
-- `src/shell/ExportView.jsx` uses measured two-pass export rendering.
-- The meter input has stable ID `cmd-anchor-meter`; placeholder wording is not an API.
-- Every auto-discovered `smokes/*.smoke.js` module must export an array named `smokes`; exporting `tests` makes the runner reject the whole file.
-- Future installers must be tested against files copied verbatim from the current clone. Do not match local variable names, exact whitespace, test titles, or UI prose unless they are the actual contract. Prefer direct changed files over brittle search-and-replace installers when possible.
+The Phase 3A package was verified by the assistant at `431 passed, 0 failed` with a successful Vite build (`96 modules transformed`). Manik confirmed the browser workflow is working nicely. The next session must still run the suite/build in the actual current clone before editing and record the real current count.
 
+### New product direction: local project folders, extracted clips, and one-file portable projects
+
+The next phase is **Vilambit Phase 3B — Local Project Folder, Clip Vault, and Portable Project Format**.
+
+The central decision is local-first storage:
+
+1. The user explicitly chooses a Sargam project folder. The browser may read and write only that user-approved folder; Sargam must never imply unrestricted filesystem access.
+2. The original multi-gigabyte source recording may remain outside the project folder as the archival source.
+3. Vilambit extracts only the linked A–B audio ranges into small audio clips.
+4. Binary media must never be embedded as Base64 or Blob data inside Markdown.
+5. Markdown stores notation and lightweight IDs/references; a media manifest stores asset metadata; the project folder stores actual clips.
+
+Proposed visible local project structure:
+
+```text
+Raga Bageshri/
+├── composition.md
+├── media.json
+└── clips/
+    ├── clip-a1.opus
+    ├── clip-a2.opus
+    └── clip-a3.opus
+```
+
+The project may remember the original source identity, filename, size/fingerprint, original A–B timestamps, and optional reconnection information. A browser file handle is a local permission object and should not be treated as portable JSON.
+
+### Portable single-source package
+
+A user must not have to upload the notation, manifest, and clips separately. Sargam should support one portable archive, tentatively named:
+
+```text
+Raga-Bageshri.sargam
+```
+
+Internally it can be a ZIP-compatible container:
+
+```text
+Raga-Bageshri.sargam
+├── manifest.json
+├── composition.md
+├── media.json
+└── clips/
+    ├── clip-a1.opus
+    └── clip-a2.opus
+```
+
+The intended experience is:
+
+```text
+drag/open one .sargam file
+→ Sargam unpacks it in the browser
+→ notation, links, and clips are immediately available
+→ the recipient can listen, edit, practice, save, or export a separate copy
+```
+
+This package is the first sharing mechanism. It does not require Cloudinary or user accounts.
+
+### Cloud and collaboration direction
+
+Cloudinary is optional distribution storage for extracted clips, not the mandatory working store and not a replacement for project data. A future application backend would be required for project ownership, permissions, comments, suggestions, revision history, notifications, and collaborative editing.
+
+Planned sharing levels:
+
+```text
+Export Copy        self-contained independent .sargam package
+Share Read-Only    hosted notation and clips
+Share for Comments anchored feedback and suggestions
+Invite as Editor   shared project state
+Create Fork        independent cloud copy
+```
+
+Cloud media and collaboration are later phases. The immediate goal is a robust local project and portable archive.
+
+### Next implementation order
+
+1. **Freeze and inspect the current clone.** Run `git status`, `npm run smoke`, and `npm run build` before editing.
+2. **Define media/project contracts first.** Create versioned, testable source-asset, clip-asset, manifest, and portable-package schemas.
+3. **Add explicit source identity.** Audio links must name a `sourceAssetId`; do not assume one global recording forever.
+4. **Choose/Open Project Folder.** Implement full local-folder mode where supported, with import/export fallback elsewhere.
+5. **Extract Current Loop.** Save the current A–B range as a small audio-only clip. Prefer source-speed/source-pitch extraction as the canonical clip and store practice settings separately.
+6. **Play extracted clips.** Linked notation should prefer its clip, then fall back to the original source A–B range, then offer **Locate recording**.
+7. **Clip Vault management.** Show storage used, missing clips, unused clips, export, delete, and relink actions.
+8. **Portable `.sargam` import/export.** One file must reconstruct the editable/listenable project without separate uploads.
+9. **Optional Cloudinary publishing.** Upload only selected clips or packages after the local system is reliable.
+10. **Collaboration backend later.** Add accounts, comments, suggestions, permissions, and revisions only after portable projects are settled.
+
+### Binding media/storage rulings
+
+- Text remains the source of truth for notation.
+- Do not place binary media in Markdown.
+- Keep both the original source A–B timestamps and the optional extracted `clipAssetId`.
+- Missing clips must degrade gracefully: extracted clip → loaded source range → locate source; never silently bind to a different recording.
+- Filenames alone are not stable asset identity.
+- The original source recording does not need to be copied or uploaded to make a portable teaching/practice project; extracted clips are sufficient.
+- A `.sargam` package must be openable as one source and must preserve notation, metadata, anchors, links, and included clips.
+- Cloudinary is optional and should not make local editing dependent on an internet connection.
+- Inspect and patch the exact current clone. Do not build patches against reconstructed patch chains or paraphrased fixtures.
 
 ## Earlier project history and rulings (retained; subordinate to the block above)
 
