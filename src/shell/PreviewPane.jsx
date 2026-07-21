@@ -5,6 +5,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderDocument } from '../engine/render.js';
 import { mountMeterOverlays } from './meter-overlay.js';
+import { applyPlaybackCursor } from './playback-cursor.js';
 import {
   closestAnchorTarget,
   mountAnchorOverlays,
@@ -38,6 +39,8 @@ export default function PreviewPane({
   const mount = useRef(null);
   const gesture = useRef(null);
   const handleDrag = useRef(null);
+  const activeCursorRef = useRef(activeCursor);
+  activeCursorRef.current = activeCursor;
   const [maxSystemEm, setMaxSystemEm] = useState(56);
 
   useLayoutEffect(() => {
@@ -55,12 +58,12 @@ export default function PreviewPane({
 
   useEffect(() => {
     if (!mount.current) return undefined;
-    const el = renderDocument(doc, { activeLine, activeCursor, noteNames, maxSystemEm });
+    const el = renderDocument(doc, { activeLine, noteNames, maxSystemEm });
     mount.current.replaceChildren(el);
     stampAnchorTargets(mount.current, sourceText);
     // Keep legacy >> spans visible while new work is stored in anchor metadata.
     mountMeterOverlays(mount.current, meterSpans, meterDraft);
-    return mountAnchorOverlays(mount.current, anchorMarks, {
+    const cleanup = mountAnchorOverlays(mount.current, anchorMarks, {
       selectedMarkId,
       onSelectMark,
       onHandleStart(event, markId, side) {
@@ -68,7 +71,13 @@ export default function PreviewPane({
         event.currentTarget.setPointerCapture?.(event.pointerId);
       },
     });
-  }, [doc, sourceText, activeLine, activeCursor, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, selectedMarkId, onSelectMark]);
+    applyPlaybackCursor(mount.current, activeCursorRef.current);
+    return cleanup;
+  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, selectedMarkId, onSelectMark]);
+
+  useEffect(() => {
+    applyPlaybackCursor(mount.current, activeCursor);
+  }, [activeCursor]);
 
   useEffect(() => {
     const onPointerUp = (event) => {

@@ -169,6 +169,8 @@ function renderSection(section, sectionIndex, opts) {
 function renderLine(line, tal, ctx) {
   const group = h('div', 'sr-line-group');
   if (line.sourceLine !== undefined) group.setAttribute('data-source-line', String(line.sourceLine));
+  group.setAttribute('data-section-index', String(ctx.sectionIndex));
+  group.setAttribute('data-line-index', String(ctx.lineIndex));
   const geometry = buildLineGeometry(line);
   const ranges = planLineSystems(line, tal, { maxEm: ctx.maxSystemEm });
   ranges.forEach((range, systemIndex) => {
@@ -262,13 +264,6 @@ function renderLineBlock(line, tal, ctx) {
     }
   }
 
-  // --- repeat-open glyph
-  if (showRepeatOpen) {
-    const open = h('div', 'sr-repeat-open sr-glyphcol', '||:');
-    open.style.gridRow = '2';
-    row.appendChild(open);
-  }
-
   // --- matra cells + barlines (grid row 2)
   const prefixOf = new Map(); // matraIndex → '(' etc.
   const suffixOf = new Map();
@@ -277,8 +272,10 @@ function renderLineBlock(line, tal, ctx) {
     suffixOf.set(pr.toMatra, `)x${pr.times}`);
   }
 
+  const renderedCells = [];
   for (let k = 0; k < line.matras.length; k++) {
     const cell = renderCell(line, k, tal, prefixOf.get(k), suffixOf.get(k), ctx);
+    renderedCells.push(cell);
     cell.style.gridRow = '2';
     cell.style.gridColumn = String(colOf[k]);
     row.appendChild(cell);
@@ -290,11 +287,13 @@ function renderLineBlock(line, tal, ctx) {
     }
   }
 
-  // --- repeat-close glyph
-  if (showRepeatClose && repeatCloseCol !== null) {
-    const close = h('div', 'sr-repeat-close sr-glyphcol', ':||');
-    close.style.gridRow = '2';
-    row.appendChild(close);
+  // Repeat punctuation belongs to the notation's outside gutters, but it
+  // shares the exact glyph height of the first/last written note. Attaching it
+  // to those glyph boxes keeps repeated and plain lines on the same metric
+  // origin without compressing or lowering ||: / :|| in Export and print.
+  if (showRepeatOpen && renderedCells.length) attachRepeatGlyph(renderedCells[0], 'open');
+  if (showRepeatClose && repeatCloseCol !== null && renderedCells.length) {
+    attachRepeatGlyph(renderedCells.at(-1), 'close');
   }
 
   // --- terminal return cue: visible instruction, zero rhythmic time.
@@ -650,6 +649,20 @@ function renderEvent(e, ctx, microHold = false) {
   ev.appendChild(below);
 
   return ev;
+}
+
+function repeatGlyph(kind) {
+  const ev = h('span', `sr-ev sr-repeat-${kind}`);
+  ev.setAttribute('aria-hidden', 'true');
+  ev.appendChild(h('span', 'sr-dots sr-dots-above'));
+  ev.appendChild(h('span', 'sr-ch', kind === 'open' ? '||:' : ':||'));
+  ev.appendChild(h('span', 'sr-dots sr-dots-below'));
+  return ev;
+}
+
+function attachRepeatGlyph(cell, kind) {
+  const glyphs = cell?.querySelector(':scope > .sr-glyphs');
+  if (glyphs) glyphs.appendChild(repeatGlyph(kind));
 }
 
 // ---------------------------------------------------------------------------

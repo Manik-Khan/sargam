@@ -171,7 +171,12 @@ export default function App() {
 
   useEffect(() => {
     player.onCursor((ev) =>
-      setPlayCursor({ sectionIndex: ev.sectionIndex, lineIndex: ev.lineIndex, matraIndex: ev.matraIndex })
+      setPlayCursor({
+        sectionIndex: ev.sectionIndex,
+        lineIndex: ev.lineIndex,
+        matraIndex: ev.matraIndex,
+        sourceLine: ev.sourceLine,
+      })
     );
     player.onEnded(() => {
       setPlaying(false);

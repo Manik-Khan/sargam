@@ -80,6 +80,7 @@
 }
 
 .sr-glyphs {
+  position: relative;
   display: flex;
   align-items: flex-end;   /* every event is now the same height (reserved
                               lanes), so bottoms align exactly. `baseline`
@@ -94,6 +95,7 @@
    (`DnS-`, `g---`) occupy real slots but remain playback sustains, not
    attacks. Grace notes stay outside this metric grid. */
 .sr-timed-slots {
+  position: relative;
   display: inline-grid;
   grid-auto-flow: column;
   align-items: end;
@@ -168,13 +170,7 @@
   margin: 0 3px;
   grid-row: 2;
 }
-.sr-repeat-open, .sr-repeat-close {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--sr-ink);
-  align-self: end;
-  padding: 0 4px 2px;
-}
+.sr-repeat-open, .sr-repeat-close { color: var(--sr-ink); }
 .sr-phrase-glyph {
   font-size: 15px;
   color: var(--sr-accent);
@@ -1067,6 +1063,7 @@
 .sr-annotation-stack { position: relative; width: 100%; }
 .sr-annotation-stack > :empty { height: 0; margin-top: 0; }
 .sr-articulation-lane { position: relative; height: 1.5em; margin-top: 0.08em; pointer-events: none; }
+.sr-lane-reserve { display: block; width: 0; height: 0; overflow: hidden; }
 .sr-anchor-mark { position: absolute; top: 0; transform: translateX(-50%); border: 0; background: transparent; color: inherit; font: 600 0.95em/1 Charter, Georgia, 'Times New Roman', serif; padding: 0.05em 0.2em; pointer-events: auto; }
 .sr-anchor-mark.selected, .sr-diri-mark.selected, .sr-anchored-meter.selected { color: var(--sr-accent); }
 .sr-anchor-repaired { opacity: 0.72; }
@@ -1074,6 +1071,12 @@
 .sr-diri-mark { position: absolute; top: 0; height: 1.25em; pointer-events: auto; }
 .sr-diri-svg { display: block; width: 100%; height: 1.15em; overflow: visible; }
 .sr-diri-svg path { fill: none; stroke: currentColor; stroke-width: 1.8; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.sr-diri-inline {
+  top: calc(100% + 0.5em);
+  z-index: 5;
+  min-width: 0;
+}
+.sr-diri-fallback { top: 0; }
 .sr-anchored-meter-lane { position: relative; height: 3.1em; margin-top: 0.45em; pointer-events: none; }
 .sr-anchored-meter { position: absolute; top: 0; height: 2.75em; pointer-events: auto; }
 .sr-anchored-meter-svg { display: block; width: 100%; height: 1.25em; overflow: visible; }
@@ -1099,13 +1102,20 @@
 .sr-row { position: relative; }
 .sr-repeat-open, .sr-repeat-close {
   position: absolute;
+  top: 0;
   z-index: 4;
   width: max-content;
-  padding-inline: 0;
+  padding: 0;
+  color: var(--sr-ink);
+  font: inherit;
+  font-size: 1em;
+  font-weight: 400;
+  line-height: inherit;
+  white-space: nowrap;
   pointer-events: none;
 }
-.sr-repeat-open { left: -1.5em; }
-.sr-repeat-close { right: -1.5em; }
+.sr-repeat-open { right: calc(100% + 0.42em); left: auto; }
+.sr-repeat-close { left: calc(100% + 0.42em); right: auto; }
 
 /* Two local n→D approaches can occupy one matra without changing its slots.
    Their notation deliberately reuses the ordinary kan language: the same

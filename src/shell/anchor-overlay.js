@@ -34,6 +34,14 @@ function setInlineSpanInEm(el, container, leftPx, widthPx = null) {
   if (widthPx != null) el.style.width = `${emFromPx(container, widthPx)}em`;
 }
 
+function setInlineSpanInPercent(el, leftPx, widthPx, totalPx) {
+  const total = Number(totalPx);
+  if (!(total > 0)) return false;
+  el.style.left = `${(Number(leftPx) / total) * 100}%`;
+  el.style.width = `${(Number(widthPx) / total) * 100}%`;
+  return true;
+}
+
 function targetPayload(node) {
   if (!node) return null;
   const kind = node.getAttribute('data-anchor-kind');
@@ -121,21 +129,7 @@ function pointGlyph(mark, block, node, selected, onSelect) {
   lane.appendChild(el);
 }
 
-function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
-  const lane = ensureLane(block, 'sr-articulation-lane');
-  const left = attackCenterX(lane, a);
-  const right = attackCenterX(lane, b);
-  if (left == null || right == null) return;
-  const holder = document.createElement('div');
-  holder.className = `sr-diri-mark${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
-  setInlineSpanInEm(holder, lane, Math.min(left, right), Math.max(12, Math.abs(right - left)));
-  holder.dataset.markId = mark.id;
-  const svg = createSvg('sr-diri-svg', Math.max(12, Math.abs(right - left)), 20);
-  const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', `M 1 1 L ${Math.max(6, Math.abs(right - left) / 2)} 17 L ${Math.max(11, Math.abs(right - left) - 1)} 1`);
-  svg.appendChild(path);
-  holder.appendChild(svg);
-  holder.addEventListener('click', (event) => { event.stopPropagation(); onSelect?.(mark.id); });
+function addDiriHandles(holder, mark, onHandleStart) {
   for (const side of ['start', 'end']) {
     const handle = document.createElement('button');
     handle.type = 'button';
@@ -146,6 +140,62 @@ function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
     handle.addEventListener('pointerdown', (event) => { event.stopPropagation(); onHandleStart?.(event, mark.id, side); });
     holder.appendChild(handle);
   }
+}
+
+function inlineDiriGlyph(mark, a, b, selected, onSelect, onHandleStart) {
+  const grid = a?.closest('.sr-timed-slots');
+  if (!grid || b?.closest('.sr-timed-slots') !== grid) return false;
+  const gridRect = grid.getBoundingClientRect();
+  const left = attackCenterX(grid, a);
+  const right = attackCenterX(grid, b);
+  if (left == null || right == null || !(gridRect.width > 0)) return false;
+
+  const holder = document.createElement('div');
+  holder.className = `sr-diri-mark sr-diri-inline${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
+  if (!setInlineSpanInPercent(holder, Math.min(left, right), Math.abs(right - left), gridRect.width)) return false;
+  holder.dataset.markId = mark.id;
+  holder.dataset.diriPlacement = 'slot-grid';
+
+  const svg = createSvg('sr-diri-svg', 100, 20);
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', 'M 1 1 L 50 17 L 99 1');
+  svg.appendChild(path);
+  holder.appendChild(svg);
+  holder.addEventListener('click', (event) => { event.stopPropagation(); onSelect?.(mark.id); });
+  addDiriHandles(holder, mark, onHandleStart);
+  grid.appendChild(holder);
+  return true;
+}
+
+function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
+  // A normal Diri connects two attacks in one written subdivision grid. Keep
+  // the V inside that grid and express its endpoints as percentages, so page
+  // scaling and print packing cannot detach it from the two note centers.
+  if (inlineDiriGlyph(mark, a, b, selected, onSelect, onHandleStart)) {
+    const reserve = document.createElement('span');
+    reserve.className = 'sr-lane-reserve';
+    reserve.setAttribute('aria-hidden', 'true');
+    ensureLane(block, 'sr-articulation-lane').appendChild(reserve);
+    return;
+  }
+
+  // Cross-matra fallback: retain the existing block-lane geometry.
+  const lane = ensureLane(block, 'sr-articulation-lane');
+  const left = attackCenterX(lane, a);
+  const right = attackCenterX(lane, b);
+  if (left == null || right == null) return;
+  const holder = document.createElement('div');
+  holder.className = `sr-diri-mark sr-diri-fallback${selected ? ' selected' : ''}${mark.status !== 'resolved' ? ` sr-anchor-${mark.status}` : ''}`;
+  setInlineSpanInEm(holder, lane, Math.min(left, right), Math.max(12, Math.abs(right - left)));
+  holder.dataset.markId = mark.id;
+  holder.dataset.diriPlacement = 'line-lane';
+  const svg = createSvg('sr-diri-svg', Math.max(12, Math.abs(right - left)), 20);
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', `M 1 1 L ${Math.max(6, Math.abs(right - left) / 2)} 17 L ${Math.max(11, Math.abs(right - left) - 1)} 1`);
+  svg.appendChild(path);
+  holder.appendChild(svg);
+  holder.addEventListener('click', (event) => { event.stopPropagation(); onSelect?.(mark.id); });
+  addDiriHandles(holder, mark, onHandleStart);
   lane.appendChild(holder);
 }
 
@@ -240,6 +290,7 @@ export function stampAnchorTargets(root, sourceText) {
 
 export function mountAnchorOverlays(root, marks = [], options = {}) {
   if (!root) return () => {};
+  root.querySelectorAll('.sr-diri-inline').forEach((node) => node.remove());
   root.querySelectorAll('.sr-articulation-lane,.sr-anchored-meter-lane').forEach((node) => node.replaceChildren());
   for (const mark of marks) {
     if (!mark.resolvedStart || mark.status === 'missing' || mark.status === 'ambiguous') continue;
