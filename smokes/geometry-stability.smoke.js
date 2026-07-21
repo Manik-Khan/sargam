@@ -60,6 +60,8 @@ export const smokes = [
       assert.equal(mark.dataset.diriPlacement, 'slot-grid');
       assert.equal(mark.style.left, '15%');
       assert.equal(mark.style.width, '20%');
+      assert.equal(mark.querySelector('.sr-diri-svg').getAttribute('viewBox'), '0 0 100 10');
+      assert.equal(mark.querySelector('path').getAttribute('d'), 'M 1 1 L 50 9 L 99 1');
     },
   },
   {

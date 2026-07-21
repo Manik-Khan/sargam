@@ -156,9 +156,9 @@ function inlineDiriGlyph(mark, a, b, selected, onSelect, onHandleStart) {
   holder.dataset.markId = mark.id;
   holder.dataset.diriPlacement = 'slot-grid';
 
-  const svg = createSvg('sr-diri-svg', 100, 20);
+  const svg = createSvg('sr-diri-svg', 100, 10);
   const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', 'M 1 1 L 50 17 L 99 1');
+  path.setAttribute('d', 'M 1 1 L 50 9 L 99 1');
   svg.appendChild(path);
   holder.appendChild(svg);
   holder.addEventListener('click', (event) => { event.stopPropagation(); onSelect?.(mark.id); });
@@ -189,9 +189,9 @@ function diriGlyph(mark, block, a, b, selected, onSelect, onHandleStart) {
   setInlineSpanInEm(holder, lane, Math.min(left, right), Math.max(12, Math.abs(right - left)));
   holder.dataset.markId = mark.id;
   holder.dataset.diriPlacement = 'line-lane';
-  const svg = createSvg('sr-diri-svg', Math.max(12, Math.abs(right - left)), 20);
+  const svg = createSvg('sr-diri-svg', Math.max(12, Math.abs(right - left)), 10);
   const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', `M 1 1 L ${Math.max(6, Math.abs(right - left) / 2)} 17 L ${Math.max(11, Math.abs(right - left) - 1)} 1`);
+  path.setAttribute('d', `M 1 1 L ${Math.max(6, Math.abs(right - left) / 2)} 9 L ${Math.max(11, Math.abs(right - left) - 1)} 1`);
   svg.appendChild(path);
   holder.appendChild(svg);
   holder.addEventListener('click', (event) => { event.stopPropagation(); onSelect?.(mark.id); });
