@@ -6,6 +6,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderDocument } from '../engine/render.js';
 import { mountMeterOverlays } from './meter-overlay.js';
 import { applyPlaybackCursor } from './playback-cursor.js';
+import { mountAudioLinkOverlays } from './audio-link-overlay.js';
 import {
   closestAnchorTarget,
   mountAnchorOverlays,
@@ -35,6 +36,9 @@ export default function PreviewPane({
   onAnchorGesture,
   onSelectMark,
   onMoveMark,
+  audioLinks = [],
+  selectedAudioLinkId = null,
+  onActivateAudioLink,
 }) {
   const mount = useRef(null);
   const gesture = useRef(null);
@@ -63,7 +67,7 @@ export default function PreviewPane({
     stampAnchorTargets(mount.current, sourceText);
     // Keep legacy >> spans visible while new work is stored in anchor metadata.
     mountMeterOverlays(mount.current, meterSpans, meterDraft);
-    const cleanup = mountAnchorOverlays(mount.current, anchorMarks, {
+    const cleanupAnchors = mountAnchorOverlays(mount.current, anchorMarks, {
       selectedMarkId,
       onSelectMark,
       onHandleStart(event, markId, side) {
@@ -71,9 +75,13 @@ export default function PreviewPane({
         event.currentTarget.setPointerCapture?.(event.pointerId);
       },
     });
+    const cleanupAudio = mountAudioLinkOverlays(mount.current, audioLinks, {
+      selectedLinkId: selectedAudioLinkId,
+      onActivate: onActivateAudioLink,
+    });
     applyPlaybackCursor(mount.current, activeCursorRef.current);
-    return cleanup;
-  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, selectedMarkId, onSelectMark]);
+    return () => { cleanupAudio?.(); cleanupAnchors?.(); };
+  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink]);
 
   useEffect(() => {
     applyPlaybackCursor(mount.current, activeCursor);
@@ -112,7 +120,7 @@ export default function PreviewPane({
 
   const handleClick = (event) => {
     if (anchorTool) return;
-    const marked = event.target.closest('[data-mark-id]');
+    const marked = event.target.closest('[data-mark-id],[data-audio-link-id]');
     if (marked) return;
     if (!onSeek) return;
     const cell = event.target.closest('.sr-cell');

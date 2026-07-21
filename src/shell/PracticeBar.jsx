@@ -1,5 +1,5 @@
 // src/shell/PracticeBar.jsx — compact remote for the always-mounted Vilambit iframe.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   EMPTY_VILAMBIT_STATE,
   formatVilambitTime,
@@ -8,8 +8,18 @@ import {
   readVilambitMessage,
 } from './vilambit-bridge.js';
 
-export default function PracticeBar({ frameRef, onOpen }) {
+export default function PracticeBar({
+  frameRef,
+  onOpen,
+  onState,
+  onAttachLoop,
+  selectedLink = null,
+  onPlayLinked,
+  onRemoveLinked,
+}) {
   const [player, setPlayer] = useState(EMPTY_VILAMBIT_STATE);
+  const stateRef = useRef(onState);
+  stateRef.current = onState;
 
   const send = useCallback((type, payload = {}) => {
     const frameWindow = frameRef.current?.contentWindow;
@@ -22,7 +32,10 @@ export default function PracticeBar({ frameRef, onOpen }) {
       const frameWindow = frameRef.current?.contentWindow;
       if (!isExpectedVilambitEvent(event, { frameWindow, origin })) return;
       const message = readVilambitMessage(event.data);
-      if (message) setPlayer(message.state);
+      if (message) {
+        setPlayer(message.state);
+        stateRef.current?.(message.state);
+      }
     };
 
     window.addEventListener('message', onMessage);
@@ -63,6 +76,28 @@ export default function PracticeBar({ frameRef, onOpen }) {
         </button>
       </div>
       <span className={'app-practice-loop' + (player.loop.on ? ' is-on' : '')}>{loopText}</span>
+      <div className="app-practice-link-actions" aria-label="Linked notation loop actions">
+        <button
+          type="button"
+          className="app-practice-attach"
+          disabled={!loaded || !player.loop.ready}
+          title="Select notation, set an A–B loop, then attach it"
+          onClick={() => onAttachLoop?.(player)}
+        >
+          Attach Loop
+        </button>
+        {selectedLink && (
+          <>
+            <button type="button" onClick={() => onPlayLinked?.(selectedLink)}>Play Linked</button>
+            <button type="button" onClick={() => onRemoveLinked?.(selectedLink.id)}>Remove Link</button>
+          </>
+        )}
+      </div>
+      {selectedLink && (
+        <span className="app-practice-linked" title={selectedLink.recording?.name || ''}>
+          Linked {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}
+        </span>
+      )}
       {player.error && <span className="app-practice-error" title={player.error}>Vilambit error</span>}
       <button type="button" className="app-practice-open" onClick={onOpen}>Open Vilambit</button>
     </div>

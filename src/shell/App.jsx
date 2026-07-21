@@ -6,7 +6,7 @@
 // (Safari download fallback, autosave restore). Save writes the editor text
 // verbatim plus the surgical identity edit — never serialize(parse(text)).
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
@@ -31,6 +31,12 @@ import {
   removeAnchorMark,
   updateAnchorMark,
 } from '../engine/anchors.js';
+import {
+  addAudioLink,
+  parseAudioLinkDocument,
+  recordingMatches,
+  removeAudioLink,
+} from '../engine/audio-links.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
@@ -43,6 +49,7 @@ import NewDocDialog from './NewDocDialog.jsx';
 import ExportView from './ExportView.jsx';
 import ProblemsPanel from './ProblemsPanel.jsx';
 import PracticeBar from './PracticeBar.jsx';
+import { EMPTY_VILAMBIT_STATE, postVilambitCommand } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import './sargam.css';
 
@@ -100,6 +107,9 @@ export default function App() {
     'Choose a mark, then click or drag directly on the rendered notation.'
   );
   const [selectedMarkId, setSelectedMarkId] = useState(null);
+  const [selectedAudioLinkId, setSelectedAudioLinkId] = useState(null);
+  const [vilambitState, setVilambitState] = useState(EMPTY_VILAMBIT_STATE);
+  const vilambitStateRef = useRef(EMPTY_VILAMBIT_STATE);
   const editorRef = useRef(null);
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
@@ -108,9 +118,14 @@ export default function App() {
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const meterModel = useMemo(() => parseMeterDocument(text), [text]);
   const anchorModel = useMemo(() => parseAnchorDocument(text), [text]);
+  const audioLinkModel = useMemo(() => parseAudioLinkDocument(text), [text]);
+  const selectedAudioLink = useMemo(
+    () => audioLinkModel.links.find((link) => link.id === selectedAudioLinkId) || null,
+    [audioLinkModel.links, selectedAudioLinkId]
+  );
   const allProblems = useMemo(
-    () => [...problems, ...meterModel.problems, ...anchorModel.problems],
-    [problems, meterModel, anchorModel]
+    () => [...problems, ...meterModel.problems, ...anchorModel.problems, ...audioLinkModel.problems],
+    [problems, meterModel, anchorModel, audioLinkModel]
   );
   const dirty = text !== lastSaved;
 
@@ -647,6 +662,62 @@ export default function App() {
     setSelectedMarkId(null);
   };
 
+  // Vilambit Phase 3A — attach the player's current A–B range to the live
+  // CodeMirror selection using repairable musical endpoints. The recording
+  // stays in Vilambit; Sargam stores only identity, seconds, and notation.
+  const sendVilambit = useCallback((type, payload = {}) => {
+    const frameWindow = vilambitRef.current?.contentWindow;
+    return postVilambitCommand(frameWindow, type, payload, window.location.origin);
+  }, []);
+
+  const receiveVilambitState = useCallback((state) => {
+    vilambitStateRef.current = state;
+    setVilambitState(state);
+  }, []);
+
+  const doAttachAudioLoop = (playerState = vilambitState) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const result = addAudioLink(text, {
+      player: playerState,
+      selectionStart: el.selectionStart ?? 0,
+      selectionEnd: el.selectionEnd ?? 0,
+    });
+    setNotice(result.message);
+    if (!result.ok) return;
+    setText(result.text);
+    setSelectedAudioLinkId(result.link.id);
+    const restore = () => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.focus();
+      editor.setSelectionRange(result.selectionStart, result.selectionEnd);
+    };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(restore);
+    else setTimeout(restore, 0);
+  };
+
+  const activateAudioLink = useCallback((link, { play = false } = {}) => {
+    if (!link) return;
+    setSelectedAudioLinkId(link.id);
+    if (!recordingMatches(link.recording, vilambitStateRef.current)) {
+      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit to use this phrase.`);
+      return;
+    }
+    sendVilambit('set-loop', { a: link.startTime, b: link.endTime, on: true });
+    sendVilambit('seek', { seconds: link.startTime });
+    if (play) sendVilambit('play');
+    setNotice(`${play ? 'Playing' : 'Loaded'} linked loop ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s.`);
+  }, [sendVilambit]);
+
+  const doRemoveAudioLink = (id = selectedAudioLinkId) => {
+    const result = removeAudioLink(text, id);
+    setNotice(result.message);
+    if (!result.ok) return;
+    setText(result.text);
+    setSelectedAudioLinkId(null);
+  };
+
   const toggleLayout = () => {
     const next = layout === 'side' ? 'stacked' : 'side';
     setLayout(next);
@@ -758,7 +829,15 @@ export default function App() {
       />
 
       {view === 'notation' && (
-        <PracticeBar frameRef={vilambitRef} onOpen={() => setView('vilambit')} />
+        <PracticeBar
+          frameRef={vilambitRef}
+          onOpen={() => setView('vilambit')}
+          onState={receiveVilambitState}
+          onAttachLoop={doAttachAudioLoop}
+          selectedLink={selectedAudioLink}
+          onPlayLinked={(link) => activateAudioLink(link, { play: true })}
+          onRemoveLinked={doRemoveAudioLink}
+        />
       )}
       {showLegend && view === 'notation' && <Legend onClose={() => setShowLegend(false)} />}
       {showDictate && (
@@ -802,6 +881,9 @@ export default function App() {
             onAnchorGesture={doAnchorGesture}
             onSelectMark={setSelectedMarkId}
             onMoveMark={doMoveAnchorMark}
+            audioLinks={audioLinkModel.links}
+            selectedAudioLinkId={selectedAudioLinkId}
+            onActivateAudioLink={activateAudioLink}
           
           /><div className="app-editor-col">
             <CommandBar

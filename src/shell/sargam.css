@@ -1163,3 +1163,47 @@
 .sr-export .sr-diri-mark,
 .sr-export .sr-anchored-meter { pointer-events: none; }
 @media print { .sr-anchor-handle { display: none !important; } }
+
+/* SARGAM_VILAMBIT_LINKED_LOOPS_V1 — preview-only audio↔notation links. */
+.app-practice-link-actions { display: flex; gap: 4px; align-items: center; }
+.app-practice-attach { font-weight: 650 !important; }
+.app-practice-linked {
+  color: var(--sr-accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sr-slot.sr-audio-linked {
+  position: relative;
+  border-radius: 0.18em;
+  box-shadow: inset 0 -0.11em 0 color-mix(in srgb, var(--sr-accent) 42%, transparent);
+  cursor: pointer;
+}
+.sr-slot.sr-audio-linked:hover,
+.sr-slot.sr-audio-linked.selected {
+  background: color-mix(in srgb, var(--sr-accent) 11%, transparent);
+  box-shadow: inset 0 -0.15em 0 color-mix(in srgb, var(--sr-accent) 72%, transparent);
+}
+.sr-audio-link-badge {
+  position: absolute;
+  z-index: 9;
+  right: -0.28em;
+  bottom: -0.88em;
+  width: 1.05em;
+  height: 1.05em;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--sr-accent) 55%, var(--sr-line));
+  border-radius: 50%;
+  background: var(--sr-paper-raised);
+  color: var(--sr-accent);
+  font: 700 0.67em/1 Charter, Georgia, 'Times New Roman', serif;
+  cursor: pointer;
+}
+.sr-audio-link-badge.selected { background: var(--sr-accent); color: var(--sr-paper-raised); }
+@media (max-width: 720px) {
+  .app-practice-link-actions { flex-wrap: wrap; }
+}
+@media print {
+  .sr-audio-link-badge { display: none !important; }
+  .sr-slot.sr-audio-linked { background: transparent !important; box-shadow: none !important; }
+}

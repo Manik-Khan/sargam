@@ -45,6 +45,7 @@ export function parseDocument(text) {
   let nextStart = null; // avartan continuation within the current section
   let missingTalReported = false;
   let inAnchorMetadata = false;
+  let inAudioLinkMetadata = false;
 
   const applyDirective = (key, val, lineNo) => {
     if (key === 'tal') {
@@ -108,6 +109,16 @@ export function parseDocument(text) {
     }
     if (trimmed.startsWith('<!-- sargam-anchors:v1')) {
       inAnchorMetadata = !trimmed.endsWith('-->');
+      continue;
+    }
+    // SARGAM_AUDIO_LINK_METADATA_SKIP — linked Vilambit ranges are generated
+    // document structure, never notation tokens.
+    if (inAudioLinkMetadata) {
+      if (trimmed === '-->') inAudioLinkMetadata = false;
+      continue;
+    }
+    if (trimmed.startsWith('<!-- sargam-audio-links:v1')) {
+      inAudioLinkMetadata = !trimmed.endsWith('-->');
       continue;
     }
 

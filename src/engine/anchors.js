@@ -111,7 +111,7 @@ export function attacksForLine(text, sourceLine) {
   return { line, attacks: notes, duration: scanned.duration, error: null };
 }
 
-function endpointFromGesture(text, gesture) {
+export function endpointFromGesture(text, gesture) {
   const sourceLine = Number(gesture?.sourceLine);
   const ordinal = Number(gesture?.ordinal);
   const time = String(gesture?.time ?? '');

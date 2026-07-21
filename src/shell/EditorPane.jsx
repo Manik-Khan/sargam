@@ -17,19 +17,23 @@ import {
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { metadataRanges } from '../engine/anchors.js';
+import { audioLinkMetadataRanges } from '../engine/audio-links.js';
 
 class HiddenStructureWidget extends WidgetType {
   toDOM() {
     const span = document.createElement('span');
     span.className = 'cm-sargam-fold';
     span.textContent = '⋯ generated structure';
-    span.title = 'Turn on Structure to inspect the stored anchors';
+    span.title = 'Turn on Structure to inspect stored anchors and audio links';
     return span;
   }
 }
 
 function hiddenDecorations(state) {
-  const ranges = metadataRanges(state.doc.toString()).map(({ from, to }) =>
+  const source = state.doc.toString();
+  const ranges = [...metadataRanges(source), ...audioLinkMetadataRanges(source)]
+    .sort((a, b) => a.from - b.from)
+    .map(({ from, to }) =>
     Decoration.replace({ widget: new HiddenStructureWidget(), block: true }).range(from, to)
   );
   return Decoration.set(ranges, true);
@@ -191,7 +195,7 @@ export default function EditorPane({
           className={showStructure ? 'active' : ''}
           onClick={() => setShowStructure(true)}
         >Structure</button>
-        <span>{showStructure ? 'Generated anchor comments are editable.' : 'Generated anchor comments are folded.'}</span>
+        <span>{showStructure ? 'Generated anchors and audio links are editable.' : 'Generated anchors and audio links are folded.'}</span>
       </div>
       <div className="app-editor" ref={mount} />
     </div>
