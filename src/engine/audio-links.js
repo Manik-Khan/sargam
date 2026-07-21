@@ -5,6 +5,7 @@
 
 import { endpointFromGesture, metadataRange as anchorMetadataRange, resolveEndpoint } from './anchors.js';
 import { scanMusicLine } from './meter.js';
+import { sourceAssetIdFromReference } from './project-media.js';
 
 export const AUDIO_LINK_VERSION = 1;
 export const AUDIO_LINK_OPEN = '<!-- sargam-audio-links:v1';
@@ -37,11 +38,50 @@ export function recordingReference(player) {
   const kind = source.kind === 'video' ? 'video' : 'audio';
   const normalizedDuration = roundMillis(duration);
   if (!name) return null;
-  return {
+  const reference = {
     key: hashText(`${kind}\n${name}\n${normalizedDuration}`),
     name,
     kind,
     duration: normalizedDuration,
+  };
+  const size = finite(source.size);
+  if (size != null && size >= 0) reference.size = Math.round(size);
+  const lastModified = finite(source.lastModified);
+  if (lastModified != null && lastModified >= 0) reference.lastModified = Math.round(lastModified);
+  return reference;
+}
+
+
+function normalizeStoredLink(link = {}) {
+  const recording = link.recording && typeof link.recording === 'object' ? link.recording : null;
+  const startTime = roundMillis(finite(link.sourceRange?.start, finite(link.startTime, 0)));
+  const endTime = roundMillis(finite(link.sourceRange?.end, finite(link.endTime, 0)));
+  const speed = Math.min(200, Math.max(25, Math.round(finite(link.practice?.speed, 100))));
+  const pitchSemitones = Math.min(12, Math.max(-12, finite(link.practice?.pitchSemitones, 0)));
+  return {
+    ...link,
+    sourceAssetId: String(link.sourceAssetId || sourceAssetIdFromReference(recording || {})),
+    clipAssetId: typeof link.clipAssetId === 'string' && link.clipAssetId ? link.clipAssetId : null,
+    sourceRange: { start: startTime, end: endTime },
+    practice: {
+      ...(link.practice && typeof link.practice === 'object' ? link.practice : {}),
+      speed,
+      pitchSemitones,
+    },
+    recording,
+    // v1 aliases stay present so accepted UI, old exports, and older readers
+    // continue to work while the project manifest becomes the identity model.
+    startTime,
+    endTime,
+  };
+}
+
+export function sourceAssetFromAudioLink(link) {
+  const normalized = normalizeStoredLink(link);
+  if (!normalized.recording?.name || normalized.endTime <= normalized.startTime) return null;
+  return {
+    id: normalized.sourceAssetId,
+    ...normalized.recording,
   };
 }
 
@@ -70,7 +110,7 @@ export function parseAudioLinkMetadata(text) {
         problems: [{ line: null, col: null, msg: 'generated audio-link metadata has an unsupported shape or version' }],
       };
     }
-    return { version: AUDIO_LINK_VERSION, links: data.links, range, problems: [] };
+    return { version: AUDIO_LINK_VERSION, links: data.links.map(normalizeStoredLink), range, problems: [] };
   } catch (error) {
     return {
       version: AUDIO_LINK_VERSION,
@@ -107,7 +147,7 @@ export function writeAudioLinkMetadata(text, links) {
   const clean = stripAudioLinkMetadata(text);
   if (!links?.length) return clean;
   const eol = clean.includes('\r\n') ? '\r\n' : '\n';
-  const body = JSON.stringify({ version: AUDIO_LINK_VERSION, links }, null, 2).replace(/\n/g, eol);
+  const body = JSON.stringify({ version: AUDIO_LINK_VERSION, links: links.map(normalizeStoredLink) }, null, 2).replace(/\n/g, eol);
   const block = `${AUDIO_LINK_OPEN}${eol}${body}${eol}${AUDIO_LINK_CLOSE}${eol}`;
   const anchorRange = anchorMetadataRange(clean);
   if (anchorRange) {
@@ -189,14 +229,23 @@ export function addAudioLink(text, request) {
   }
   const range = selectionToAudioAnchorRange(text, request.selectionStart, request.selectionEnd);
   if (!range.ok) return { ...range, text };
-  const link = {
+  const normalizedStart = roundMillis(startTime);
+  const normalizedEnd = roundMillis(endTime);
+  const link = normalizeStoredLink({
     id: nextLinkId(metadata.links),
+    sourceAssetId: sourceAssetIdFromReference(recording),
+    clipAssetId: null,
     recording,
-    startTime: roundMillis(startTime),
-    endTime: roundMillis(endTime),
+    sourceRange: { start: normalizedStart, end: normalizedEnd },
+    practice: {
+      speed: finite(request?.player?.speed, 100),
+      pitchSemitones: finite(request?.player?.pitch?.totalSemitones, 0),
+    },
+    startTime: normalizedStart,
+    endTime: normalizedEnd,
     notationStart: range.start,
     notationEnd: range.end,
-  };
+  });
   const links = [...metadata.links, link];
   return {
     ok: true,
@@ -206,6 +255,25 @@ export function addAudioLink(text, request) {
     selectionStart: range.selectionStart,
     selectionEnd: range.selectionEnd,
     message: `Linked ${range.attackCount} notation attack${range.attackCount === 1 ? '' : 's'} to ${formatSeconds(link.startTime)}–${formatSeconds(link.endTime)}.`,
+  };
+}
+
+export function attachClipToAudioLink(text, id, clipAssetId) {
+  const metadata = parseAudioLinkMetadata(text);
+  if (metadata.problems.length) return { ok: false, text, message: metadata.problems[0].msg };
+  let found = false;
+  const links = metadata.links.map((link) => {
+    if (link.id !== id) return link;
+    found = true;
+    return normalizeStoredLink({ ...link, clipAssetId });
+  });
+  if (!found) return { ok: false, text, message: 'Select a linked phrase first.' };
+  return {
+    ok: true,
+    text: writeAudioLinkMetadata(text, links),
+    links,
+    link: links.find((link) => link.id === id),
+    message: clipAssetId ? 'Extracted clip attached to the notation link.' : 'Extracted clip detached; source timing is preserved.',
   };
 }
 

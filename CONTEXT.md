@@ -138,6 +138,10 @@ Cloud media and collaboration are later phases. The immediate goal is a robust l
 - Cloudinary is optional and should not make local editing dependent on an internet connection.
 - Inspect and patch the exact current clone. Do not build patches against reconstructed patch chains or paraphrased fixtures.
 
+## Phase 3B Wave 1 implementation candidate (2026-07-21 — browser acceptance pending)
+
+An exact-clone implementation candidate now exists for the first local-project wave. It adds explicit source/clip IDs, versioned media and project contracts, user-approved project folders (`composition.md`, `media.json`, `clips/`), decoded-audio A–B extraction as source-speed WAV, extracted-clip-first playback with original-source fallback, and a Clip Vault for linked/missing/unused assets. Old `sargam-audio-links:v1` records normalize forward without losing source times or notation anchors. The automated gate is `448 passed, 0 failed`; Vite succeeds with `99 modules transformed`. This wave is not browser-accepted yet. Read `SARGAM_PHASE_3B_WAVE_1_2026-07-21.md` for the exact checklist and known boundaries.
+
 ## Earlier project history and rulings (retained; subordinate to the block above)
 
 **What this is:** a complete D&D-session-style handoff for Sargam — M's web app for writing, rendering, and hearing Hindustani classical notation. Written so that *anyone* can pick the project up cold: M working alone, a future AI assistant, a human collaborator. Read this with `docs/design-spec.md` (the requirements authority) and `docs/build-plan.md` (code contracts). If you are an AI assistant: the working rules at the bottom are binding; M is the authority on the tradition — never improvise raga/tala/notation semantics, ask him.

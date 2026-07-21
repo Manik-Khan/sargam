@@ -21,11 +21,13 @@ export function makeEnv() {
   const hasFSA =
     typeof window.showOpenFilePicker === 'function' &&
     typeof window.showSaveFilePicker === 'function';
+  const hasDirectoryPicker = typeof window.showDirectoryPicker === 'function';
   return {
     fsa: hasFSA
       ? {
           open: (opts) => window.showOpenFilePicker(opts),
           save: (opts) => window.showSaveFilePicker(opts),
+          directory: hasDirectoryPicker ? (opts) => window.showDirectoryPicker(opts) : null,
         }
       : null,
     download,

@@ -6,10 +6,12 @@ import { parseDocument } from '../src/engine/parse.js';
 import { addAnchorMark, parseAnchorMetadata } from '../src/engine/anchors.js';
 import {
   addAudioLink,
+  attachClipToAudioLink,
   parseAudioLinkDocument,
   parseAudioLinkMetadata,
   recordingMatches,
   removeAudioLink,
+  sourceAssetFromAudioLink,
   stripAudioLinkMetadata,
 } from '../src/engine/audio-links.js';
 import { renderDocument } from '../src/engine/render.js';
@@ -48,6 +50,50 @@ export const smokes = [
       assert.notEqual(stored.recording.key, stored.recording.name);
       assert.equal(stored.notationStart.note, 'g');
       assert.equal(stored.notationEnd.note, 'm');
+    },
+  },
+  {
+    name: 'audio links: new records name an explicit source and preserve practice settings',
+    fn() {
+      const sel = selection(music, 'gm D');
+      const linked = addAudioLink(music, {
+        player: { ...player, speed: 75, pitch: { totalSemitones: -1 } },
+        selectionStart: sel.start, selectionEnd: sel.end,
+      });
+      assert.match(linked.link.sourceAssetId, /^source-/);
+      assert.deepEqual(linked.link.sourceRange, { start: 42.25, end: 48.75 });
+      assert.deepEqual(linked.link.practice, { speed: 75, pitchSemitones: -1 });
+      assert.equal(sourceAssetFromAudioLink(linked.link).id, linked.link.sourceAssetId);
+    },
+  },
+  {
+    name: 'audio links: legacy v1 records upgrade in memory without losing old aliases',
+    fn() {
+      const legacy = `${music}\n\n<!-- sargam-audio-links:v1\n${JSON.stringify({ version: 1, links: [{
+        id: 'audio1', recording: { key: 'abc', name: 'old.wav', kind: 'audio', duration: 60 },
+        startTime: 2, endTime: 3, notationStart: {}, notationEnd: {},
+      }] }, null, 2)}\n-->\n`;
+      const stored = parseAudioLinkMetadata(legacy).links[0];
+      assert.equal(stored.sourceAssetId, 'source-abc');
+      assert.deepEqual(stored.sourceRange, { start: 2, end: 3 });
+      assert.equal(stored.clipAssetId, null);
+      assert.equal(stored.startTime, 2);
+    },
+  },
+  {
+    name: 'audio links: attaching or detaching a clip never removes source timing',
+    fn() {
+      const sel = selection(music, 'gm D');
+      const linked = addAudioLink(music, { player, selectionStart: sel.start, selectionEnd: sel.end });
+      const attached = attachClipToAudioLink(linked.text, linked.link.id, 'clip-0001');
+      assert.equal(attached.ok, true);
+      assert.equal(attached.link.clipAssetId, 'clip-0001');
+      assert.deepEqual(attached.link.sourceRange, { start: 42.25, end: 48.75 });
+      const detached = attachClipToAudioLink(attached.text, linked.link.id, null);
+      const restored = parseAudioLinkMetadata(detached.text).links[0];
+      assert.equal(restored.clipAssetId, null);
+      assert.equal(restored.startTime, 42.25);
+      assert.equal(restored.endTime, 48.75);
     },
   },
   {
@@ -142,7 +188,10 @@ export const smokes = [
       assert.match(app, /recordingMatches/);
       assert.match(bar, /Attach Loop/);
       assert.match(bar, /Play Linked/);
+      assert.match(bar, /Extract Clip/);
       assert.match(bar, /Remove Link/);
+      assert.match(app, /createProjectIO/);
+      assert.match(app, /attachClipToAudioLink/);
       assert.match(editor, /audioLinkMetadataRanges/);
       assert.match(preview, /mountAudioLinkOverlays/);
     },

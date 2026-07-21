@@ -222,10 +222,13 @@
     ready = false,
     fileURL = null,
     fileName = '',
+    fileSize = null,
+    fileLastModified = null,
     isVideo = false,
     duration = 0,
     position = 0,
     playing = false,
+    extractable = false,
     tempo = 100,
     semitones = 0,
     cents = 0,
@@ -245,10 +248,15 @@
       source: loaded ? {
         name: typeof fileName === 'string' ? fileName : '',
         kind: isVideo ? 'video' : 'audio',
+        ...(fileSize != null && Number.isFinite(Number(fileSize)) && Number(fileSize) >= 0
+          ? { size: Math.round(Number(fileSize)) } : {}),
+        ...(fileLastModified != null && Number.isFinite(Number(fileLastModified)) && Number(fileLastModified) >= 0
+          ? { lastModified: Math.round(Number(fileLastModified)) } : {}),
       } : null,
       duration: safeDuration,
       position: clampPosition(position, safeDuration),
       playing: loaded && Boolean(playing),
+      extractable: loaded && Boolean(extractable),
       speed: clampTempo(tempo),
       pitch: {
         semitones: clampSemitones(semitones),

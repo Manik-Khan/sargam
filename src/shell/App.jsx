@@ -33,11 +33,23 @@ import {
 } from '../engine/anchors.js';
 import {
   addAudioLink,
+  attachClipToAudioLink,
   parseAudioLinkDocument,
   recordingMatches,
   removeAudioLink,
+  sourceAssetFromAudioLink,
 } from '../engine/audio-links.js';
 import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
+import { createProjectIO } from '../engine/project-files.js';
+import {
+  clipPathFor,
+  createEmptyMediaManifest,
+  nextClipId,
+  normalizeSourceAsset,
+  removeClipAsset,
+  upsertClipAsset,
+  upsertSourceAsset,
+} from '../engine/project-media.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
 import CommandBar from './CommandBar.jsx';
@@ -49,6 +61,7 @@ import NewDocDialog from './NewDocDialog.jsx';
 import ExportView from './ExportView.jsx';
 import ProblemsPanel from './ProblemsPanel.jsx';
 import PracticeBar from './PracticeBar.jsx';
+import ClipVault from './ClipVault.jsx';
 import { EMPTY_VILAMBIT_STATE, postVilambitCommand } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import './sargam.css';
@@ -64,13 +77,22 @@ const prefGain = (value, fallback) => {
 
 export default function App() {
   const store = useMemo(() => createStore(window.localStorage, clock), []);
-  const io = useMemo(() => createFileIO(makeEnv()), []);
+  const fileEnv = useMemo(() => makeEnv(), []);
+  const io = useMemo(() => createFileIO(fileEnv), [fileEnv]);
+  const projectIO = useMemo(() => createProjectIO(fileEnv), [fileEnv]);
 
   // Restore-on-load: a crash or accidental close loses nothing (spec §7).
   const restored = useMemo(() => store.loadCurrent(), [store]);
   const [text, setText] = useState(restored ? restored.text : STARTER);
   const [fileName, setFileName] = useState(null);
   const [handle, setHandle] = useState(null);
+  const [project, setProject] = useState(null);
+  const [projectMedia, setProjectMedia] = useState(() => createEmptyMediaManifest());
+  const [showClipVault, setShowClipVault] = useState(false);
+  const [clipPresence, setClipPresence] = useState({});
+  const [extractingClip, setExtractingClip] = useState(false);
+  const pendingClipRef = useRef(null);
+  const clipAudioRef = useRef({ audio: null, url: null });
   // null = no known on-disk state (restored/new docs count as unsaved).
   const [lastSaved, setLastSaved] = useState(restored ? null : STARTER);
   const [notice, setNotice] = useState(() => {
@@ -128,6 +150,24 @@ export default function App() {
     [problems, meterModel, anchorModel, audioLinkModel]
   );
   const dirty = text !== lastSaved;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!project) {
+      setClipPresence({});
+      return () => { cancelled = true; };
+    }
+    Promise.all((projectMedia.clips || []).map(async (clip) => [clip.id, await projectIO.clipExists(project, clip.path)]))
+      .then((entries) => { if (!cancelled) setClipPresence(Object.fromEntries(entries)); })
+      .catch((error) => { if (!cancelled) setNotice(`Clip Vault check failed: ${error?.message || error}`); });
+    return () => { cancelled = true; };
+  }, [project, projectIO, projectMedia]);
+
+  useEffect(() => () => {
+    const current = clipAudioRef.current;
+    if (current.audio) current.audio.pause();
+    if (current.url) URL.revokeObjectURL(current.url);
+  }, []);
 
   // ---- playback (M3) ----
   const player = useMemo(() => createPlayer(makeAudioEnv()), []);
@@ -456,7 +496,49 @@ export default function App() {
     return 'untitled.md';
   };
 
+  const mediaWithCurrentSources = (base = projectMedia, links = audioLinkModel.links) => {
+    let next = base;
+    for (const link of links) {
+      const source = sourceAssetFromAudioLink(link);
+      if (source) next = upsertSourceAsset(next, source);
+    }
+    return next;
+  };
+
+  const recordSavedDocument = (withId, name) => {
+    store.recordRecent({ id: withId.id, title: doc.directives.title || null, name });
+    store.saveSnapshot(withId.id, withId.text);
+    setRecents(store.listRecents());
+  };
+
+  const doSaveProject = async ({ textOverride = text, mediaOverride = projectMedia, quiet = false } = {}) => {
+    if (!project) {
+      if (!quiet) setNotice('Open or create a Project Folder first.');
+      return null;
+    }
+    const withId = ensureIdentity(textOverride, clock);
+    const media = mediaWithCurrentSources(mediaOverride, parseAudioLinkDocument(withId.text).links);
+    try {
+      await projectIO.save(project, { text: withId.text, media });
+    } catch (error) {
+      setNotice(`Project save failed: ${error?.message || error}`);
+      return null;
+    }
+    setText(withId.text);
+    setLastSaved(withId.text);
+    setFileName('composition.md');
+    setHandle(null);
+    setProjectMedia(media);
+    recordSavedDocument(withId, `${project.name}/composition.md`);
+    if (!quiet) setNotice(`Saved project folder “${project.name}”.`);
+    return { withId, media };
+  };
+
   const doSave = async () => {
+    if (project) {
+      await doSaveProject();
+      return;
+    }
     const withId = ensureIdentity(text, clock);
     let res;
     try {
@@ -470,14 +552,68 @@ export default function App() {
     setLastSaved(withId.text);
     setHandle(res.handle);
     setFileName(res.name);
-    store.recordRecent({ id: withId.id, title: doc.directives.title || null, name: res.name });
-    store.saveSnapshot(withId.id, withId.text);
-    setRecents(store.listRecents());
+    recordSavedDocument(withId, res.name);
     if (res.method === 'download') {
       setNotice(`Saved as a download (${res.name}) — this browser can't write files in place.`);
     } else {
       setNotice(null);
     }
+  };
+
+  const doNewProject = async () => {
+    if (!projectIO.supportsDirectory) {
+      setNotice('Project folders are not available in this browser. Plain Markdown open/save still works.');
+      return;
+    }
+    const withId = ensureIdentity(text, clock);
+    const media = mediaWithCurrentSources(createEmptyMediaManifest());
+    let result;
+    try {
+      result = await projectIO.create({ text: withId.text, media });
+    } catch (error) {
+      setNotice(`Could not create project folder: ${error?.message || error}`);
+      return;
+    }
+    if (!result) return;
+    if (!result.ok) {
+      setNotice(result.message || 'That folder could not be initialized.');
+      return;
+    }
+    const nextProject = { directory: result.directory, name: result.name };
+    setProject(nextProject);
+    setProjectMedia(result.media);
+    setText(withId.text);
+    setLastSaved(withId.text);
+    setFileName('composition.md');
+    setHandle(null);
+    recordSavedDocument(withId, `${result.name}/composition.md`);
+    setNotice(`Created project folder “${result.name}” with composition.md, media.json, and clips/.`);
+  };
+
+  const doOpenProject = async () => {
+    if (!confirmDiscard()) return;
+    if (!projectIO.supportsDirectory) {
+      setNotice('Project folders are not available in this browser.');
+      return;
+    }
+    let result;
+    try {
+      result = await projectIO.open();
+    } catch (error) {
+      setNotice(`Could not open project folder: ${error?.message || error}`);
+      return;
+    }
+    if (!result) return;
+    setProject({ directory: result.directory, name: result.name });
+    setProjectMedia(result.media);
+    setText(result.text);
+    setLastSaved(result.text);
+    setFileName('composition.md');
+    setHandle(null);
+    setSelectedAudioLinkId(null);
+    setNotice(result.problems?.length
+      ? `Opened “${result.name}” with media warnings: ${result.problems.join('; ')}`
+      : `Opened project folder “${result.name}”.`);
   };
 
   const confirmDiscard = () =>
@@ -493,6 +629,8 @@ export default function App() {
       return;
     }
     if (!res) return;
+    setProject(null);
+    setProjectMedia(createEmptyMediaManifest());
     setText(res.text);
     setFileName(res.name);
     setHandle(res.handle);
@@ -508,6 +646,8 @@ export default function App() {
   // The form (or "Blank document") hands back the text it wrote.
   const createDoc = (newText) => {
     setShowNew(false);
+    setProject(null);
+    setProjectMedia(createEmptyMediaManifest());
     setText(newText);
     setFileName(null);
     setHandle(null);
@@ -687,6 +827,8 @@ export default function App() {
     if (!result.ok) return;
     setText(result.text);
     setSelectedAudioLinkId(result.link.id);
+    const source = sourceAssetFromAudioLink(result.link);
+    if (source) setProjectMedia((current) => upsertSourceAsset(current, source));
     const restore = () => {
       const editor = editorRef.current;
       if (!editor) return;
@@ -697,18 +839,155 @@ export default function App() {
     else setTimeout(restore, 0);
   };
 
-  const activateAudioLink = useCallback((link, { play = false } = {}) => {
+  const stopExtractedClip = useCallback(() => {
+    const current = clipAudioRef.current;
+    if (current.audio) current.audio.pause();
+    if (current.url) URL.revokeObjectURL(current.url);
+    clipAudioRef.current = { audio: null, url: null };
+  }, []);
+
+  const activateAudioLink = useCallback(async (link, { play = false } = {}) => {
     if (!link) return;
     setSelectedAudioLinkId(link.id);
+
+    if (link.clipAssetId && project) {
+      const clip = (projectMedia.clips || []).find((item) => item.id === link.clipAssetId);
+      if (clip) {
+        if (!play) {
+          setNotice(`Extracted clip ${clip.id} is ready in “${project.name}”.`);
+          return;
+        }
+        try {
+          const file = await projectIO.readClip(project, clip.path);
+          stopExtractedClip();
+          if (vilambitStateRef.current.loaded && vilambitStateRef.current.playing) sendVilambit('pause');
+          const url = URL.createObjectURL(file);
+          const audio = new Audio(url);
+          clipAudioRef.current = { audio, url };
+          audio.addEventListener('ended', () => {
+            if (clipAudioRef.current.audio === audio) stopExtractedClip();
+          }, { once: true });
+          await audio.play();
+          setClipPresence((current) => ({ ...current, [clip.id]: true }));
+          setNotice(`Playing extracted clip ${clip.id} (${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s from the source).`);
+          return;
+        } catch (error) {
+          setClipPresence((current) => ({ ...current, [clip.id]: false }));
+          setNotice(`Extracted clip is missing or unreadable; trying the original recording. ${error?.message || ''}`.trim());
+        }
+      }
+    }
+
     if (!recordingMatches(link.recording, vilambitStateRef.current)) {
       setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit to use this phrase.`);
       return;
     }
+    stopExtractedClip();
     sendVilambit('set-loop', { a: link.startTime, b: link.endTime, on: true });
     sendVilambit('seek', { seconds: link.startTime });
     if (play) sendVilambit('play');
-    setNotice(`${play ? 'Playing' : 'Loaded'} linked loop ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s.`);
-  }, [sendVilambit]);
+    setNotice(`${play ? 'Playing' : 'Loaded'} linked source loop ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s.`);
+  }, [project, projectIO, projectMedia.clips, sendVilambit, stopExtractedClip]);
+
+  const receiveVilambitError = useCallback((message) => {
+    if (!pendingClipRef.current) return;
+    pendingClipRef.current = null;
+    setExtractingClip(false);
+    setNotice(`Clip extraction failed: ${message}`);
+  }, []);
+
+  const doExtractAudioClip = (playerState, link) => {
+    if (!project) {
+      setNotice('Open or create a Project Folder before extracting clips.');
+      return;
+    }
+    if (!link) {
+      setNotice('Select a linked phrase first.');
+      return;
+    }
+    if (!recordingMatches(link.recording, playerState)) {
+      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit before extracting its clip.`);
+      return;
+    }
+    const requestId = clock.uuid();
+    pendingClipRef.current = { requestId, link };
+    setExtractingClip(true);
+    setNotice(`Extracting ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s as a source-speed WAV…`);
+    const sent = sendVilambit('extract-loop', { requestId, a: link.startTime, b: link.endTime });
+    if (!sent) {
+      pendingClipRef.current = null;
+      setExtractingClip(false);
+      setNotice('Vilambit is not ready to extract the clip.');
+    }
+  };
+
+  const receiveExtractedClip = useCallback(async (clipPayload) => {
+    const pending = pendingClipRef.current;
+    if (!pending || pending.requestId !== clipPayload?.requestId) return;
+    if (!project) {
+      pendingClipRef.current = null;
+      setExtractingClip(false);
+      setNotice('The project folder closed before the clip was written.');
+      return;
+    }
+    try {
+      const sourceResult = normalizeSourceAsset({
+        ...pending.link.recording,
+        ...(clipPayload.source || {}),
+        id: pending.link.sourceAssetId,
+        duration: pending.link.recording?.duration,
+      });
+      if (!sourceResult.ok) throw new Error(sourceResult.problem);
+      let media = upsertSourceAsset(projectMedia, sourceResult.asset);
+      const clipId = nextClipId(media);
+      const path = clipPathFor(clipId, clipPayload.extension);
+      const blob = new Blob([clipPayload.buffer], { type: clipPayload.mimeType });
+      await projectIO.writeClip(project, path, blob);
+      const clip = {
+        id: clipId,
+        sourceAssetId: pending.link.sourceAssetId,
+        startTime: clipPayload.startTime,
+        endTime: clipPayload.endTime,
+        path,
+        mimeType: clipPayload.mimeType,
+        bytes: blob.size,
+        createdAt: clock.now(),
+      };
+      media = upsertClipAsset(media, clip);
+      const attached = attachClipToAudioLink(text, pending.link.id, clipId);
+      if (!attached.ok) throw new Error(attached.message);
+      const withId = ensureIdentity(attached.text, clock);
+      await projectIO.save(project, { text: withId.text, media });
+      setText(withId.text);
+      setLastSaved(withId.text);
+      setProjectMedia(media);
+      setClipPresence((current) => ({ ...current, [clipId]: true }));
+      setSelectedAudioLinkId(pending.link.id);
+      recordSavedDocument(withId, `${project.name}/composition.md`);
+      setNotice(`Saved ${clipId} to ${path} and attached it to the notation.`);
+    } catch (error) {
+      setNotice(`Clip extraction failed: ${error?.message || error}`);
+    } finally {
+      pendingClipRef.current = null;
+      setExtractingClip(false);
+    }
+  }, [project, projectIO, projectMedia, text]);
+
+  const doDeleteUnusedClips = async (clips) => {
+    if (!project || !clips?.length) return;
+    let media = projectMedia;
+    try {
+      for (const clip of clips) {
+        await projectIO.deleteClip(project, clip.path);
+        media = removeClipAsset(media, clip.id);
+      }
+      await projectIO.save(project, { text, media });
+      setProjectMedia(media);
+      setNotice(`Deleted ${clips.length} unused clip${clips.length === 1 ? '' : 's'}; linked source ranges were untouched.`);
+    } catch (error) {
+      setNotice(`Could not delete unused clips: ${error?.message || error}`);
+    }
+  };
 
   const doRemoveAudioLink = (id = selectedAudioLinkId) => {
     const result = removeAudioLink(text, id);
@@ -731,6 +1010,8 @@ export default function App() {
       setNotice(`No autosave copy found for “${entry.title || entry.name || entry.id}”.`);
       return;
     }
+    setProject(null);
+    setProjectMedia(createEmptyMediaManifest());
     setText(snap);
     setFileName(entry.name || null);
     setHandle(null); // snapshots restore content, not the on-disk handle (v1)
@@ -772,6 +1053,16 @@ export default function App() {
 />
       )}
       {showNew && <NewDocDialog onCreate={createDoc} onCancel={() => setShowNew(false)} />}
+      {showClipVault && project && (
+        <ClipVault
+          project={project}
+          manifest={projectMedia}
+          links={audioLinkModel.links}
+          presence={clipPresence}
+          onDeleteUnused={doDeleteUnusedClips}
+          onClose={() => setShowClipVault(false)}
+        />
+      )}
       <Toolbar
         fileName={fileName || doc.directives.title || null}
         dirty={dirty}
@@ -780,6 +1071,13 @@ export default function App() {
         onNew={doNew}
         onOpen={doOpen}
         onSave={doSave}
+        projectName={project?.name || null}
+        projectSupported={projectIO.supportsDirectory}
+        clipCount={projectMedia.clips.length}
+        onNewProject={doNewProject}
+        onOpenProject={doOpenProject}
+        onSaveProject={doSaveProject}
+        onClipVault={() => setShowClipVault(true)}
         onExport={() => setShowExport(true)}
         onExportXML={doExportXML}
         noteNames={noteNames}
@@ -834,6 +1132,11 @@ export default function App() {
           onOpen={() => setView('vilambit')}
           onState={receiveVilambitState}
           onAttachLoop={doAttachAudioLoop}
+          projectOpen={Boolean(project)}
+          extracting={extractingClip}
+          onExtractClip={doExtractAudioClip}
+          onClipExtracted={receiveExtractedClip}
+          onVilambitError={receiveVilambitError}
           selectedLink={selectedAudioLink}
           onPlayLinked={(link) => activateAudioLink(link, { play: true })}
           onRemoveLinked={doRemoveAudioLink}

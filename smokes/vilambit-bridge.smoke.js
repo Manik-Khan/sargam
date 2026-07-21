@@ -18,7 +18,7 @@ function statePayload(overrides = {}) {
   return {
     ready: true,
     loaded: true,
-    source: { name: 'Summer class.wav', kind: 'audio' },
+    source: { name: 'Summer class.wav', kind: 'audio', size: 123456, lastModified: 1760000000000 },
     duration: 6994,
     position: 2541,
     playing: false,
@@ -58,6 +58,7 @@ export const smokes = [
       assert.equal(message.type, 'state');
       assert.equal(message.state.source.name, 'Summer class.wav');
       assert.equal(message.state.position, 2541);
+      assert.equal(message.state.source.size, 123456);
       assert.equal(readVilambitMessage({ ...message, channel: 'other' }), null);
       assert.equal(readVilambitMessage({
         channel: VILAMBIT_CHANNEL, version: 2, direction: 'event', type: 'state', payload: statePayload(),
@@ -65,6 +66,27 @@ export const smokes = [
       assert.equal(readVilambitMessage({
         channel: VILAMBIT_CHANNEL, version: 1, direction: 'command', type: 'state', payload: statePayload(),
       }), null);
+    },
+  },
+  {
+    name: 'vilambit bridge: extracted clips cross as validated transferable data',
+    async fn() {
+      const buffer = new ArrayBuffer(32);
+      const message = readVilambitMessage({
+        channel: VILAMBIT_CHANNEL, version: VILAMBIT_VERSION, direction: 'event', type: 'clip',
+        payload: {
+          requestId: 'request-1', buffer, mimeType: 'audio/wav', extension: 'wav',
+          startTime: 10, endTime: 12, source: { name: 'class.wav', kind: 'audio' },
+        },
+      });
+      assert.equal(message.type, 'clip');
+      assert.equal(message.clip.bytes, 32);
+      assert.equal(message.clip.extension, 'wav');
+      assert.equal(readVilambitMessage({
+        channel: VILAMBIT_CHANNEL, version: VILAMBIT_VERSION, direction: 'event', type: 'clip',
+        payload: { requestId: 'bad', startTime: 1, endTime: 2 },
+      }), null);
+      assert.equal(makeVilambitCommand('extract-loop', { requestId: 'r', a: 1, b: 2 }).type, 'extract-loop');
     },
   },
   {
@@ -128,6 +150,9 @@ export const smokes = [
       assert.match(app, /event\.origin !== window\.location\.origin/);
       assert.match(app, /request-state/);
       assert.match(app, /jump-marker/);
+      assert.match(app, /extract-loop/);
+      assert.match(app, /sliceChannels\(state\.decoded/);
+      assert.match(app, /type: 'clip'/);
       assert.doesNotMatch(app, /payload:\s*state\b/);
     },
   },
@@ -143,6 +168,8 @@ export const smokes = [
       assert.match(bar, /−5s/);
       assert.match(bar, /\+5s/);
       assert.match(bar, /Open Vilambit/);
+      assert.match(bar, /onClipExtracted/);
+      assert.match(bar, /Extract Clip/);
       assert.doesNotMatch(bar, /AudioContext|createMediaElementSource|decodeAudioData/);
     },
   },

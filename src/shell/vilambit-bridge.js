@@ -15,10 +15,11 @@ export const VILAMBIT_COMMANDS = Object.freeze([
   'set-loop',
   'clear-loop',
   'jump-marker',
+  'extract-loop',
 ]);
 
 const COMMAND_SET = new Set(VILAMBIT_COMMANDS);
-const EVENT_SET = new Set(['ready', 'state', 'error']);
+const EVENT_SET = new Set(['ready', 'state', 'error', 'clip']);
 
 export const EMPTY_VILAMBIT_STATE = Object.freeze({
   ready: false,
@@ -27,6 +28,7 @@ export const EMPTY_VILAMBIT_STATE = Object.freeze({
   duration: 0,
   position: 0,
   playing: false,
+  extractable: false,
   speed: 100,
   pitch: Object.freeze({ semitones: 0, cents: 0, totalSemitones: 0 }),
   loop: Object.freeze({ a: null, b: null, on: false, ready: false }),
@@ -58,6 +60,10 @@ export function sanitizeVilambitState(value) {
     ? {
         name: text(value.source.name),
         kind: value.source.kind === 'video' ? 'video' : 'audio',
+        ...(value.source.size != null && Number.isFinite(Number(value.source.size)) && Number(value.source.size) >= 0
+          ? { size: Math.round(Number(value.source.size)) } : {}),
+        ...(value.source.lastModified != null && Number.isFinite(Number(value.source.lastModified)) && Number(value.source.lastModified) >= 0
+          ? { lastModified: Math.round(Number(value.source.lastModified)) } : {}),
       }
     : null;
   const pitch = value.pitch && typeof value.pitch === 'object' ? value.pitch : {};
@@ -79,6 +85,7 @@ export function sanitizeVilambitState(value) {
     duration,
     position,
     playing: Boolean(value.playing) && Boolean(value.loaded),
+    extractable: Boolean(value.extractable) && Boolean(value.loaded),
     speed: Math.min(200, Math.max(25, Math.round(finite(value.speed, 100)))),
     pitch: {
       semitones: Math.min(12, Math.max(-12, Math.round(finite(pitch.semitones)))),
@@ -110,11 +117,43 @@ export function makeVilambitCommand(type, payload = {}) {
   };
 }
 
+function sanitizeClipPayload(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const requestId = text(value.requestId);
+  const buffer = value.buffer instanceof ArrayBuffer ? value.buffer : null;
+  const startTime = optionalSecond(value.startTime);
+  const endTime = optionalSecond(value.endTime);
+  if (!requestId || !buffer || startTime == null || endTime == null || endTime <= startTime) return null;
+  const mimeType = text(value.mimeType, 'application/octet-stream');
+  const extension = text(value.extension, 'bin').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'bin';
+  return {
+    requestId,
+    buffer,
+    mimeType,
+    extension,
+    bytes: buffer.byteLength,
+    startTime,
+    endTime,
+    source: value.source && typeof value.source === 'object' ? {
+      name: text(value.source.name),
+      kind: value.source.kind === 'video' ? 'video' : 'audio',
+      ...(value.source.size != null && Number.isFinite(Number(value.source.size)) && Number(value.source.size) >= 0
+        ? { size: Math.round(Number(value.source.size)) } : {}),
+      ...(value.source.lastModified != null && Number.isFinite(Number(value.source.lastModified)) && Number(value.source.lastModified) >= 0
+        ? { lastModified: Math.round(Number(value.source.lastModified)) } : {}),
+    } : null,
+  };
+}
+
 export function readVilambitMessage(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (value.channel !== VILAMBIT_CHANNEL) return null;
   if (value.version !== VILAMBIT_VERSION) return null;
   if (value.direction !== 'event' || !EVENT_SET.has(value.type)) return null;
+  if (value.type === 'clip') {
+    const clip = sanitizeClipPayload(value.payload);
+    return clip ? { type: 'clip', clip } : null;
+  }
   const state = sanitizeVilambitState(value.payload);
   return state ? { type: value.type, state } : null;
 }
@@ -125,10 +164,10 @@ export function isExpectedVilambitEvent(event, { frameWindow, origin }) {
   return event.origin === origin;
 }
 
-export function postVilambitCommand(frameWindow, type, payload = {}, origin = '') {
+export function postVilambitCommand(frameWindow, type, payload = {}, origin = '', transfer = []) {
   if (!frameWindow || typeof frameWindow.postMessage !== 'function') return false;
   const message = makeVilambitCommand(type, payload);
-  frameWindow.postMessage(message, origin === 'null' ? '*' : origin);
+  frameWindow.postMessage(message, origin === 'null' ? '*' : origin, transfer);
   return true;
 }
 

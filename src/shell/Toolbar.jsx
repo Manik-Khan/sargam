@@ -13,6 +13,13 @@ export default function Toolbar({
   onNew,
   onOpen,
   onSave,
+  projectName,
+  projectSupported,
+  clipCount = 0,
+  onNewProject,
+  onOpenProject,
+  onSaveProject,
+  onClipVault,
   onExport,
   onExportXML,
   noteNames,
@@ -26,15 +33,18 @@ export default function Toolbar({
   onRemoveRecent,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const projectMenuRef = useRef(null);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !projectMenuOpen) return;
     const close = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target)) setProjectMenuOpen(false);
     };
     const esc = (e) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape') { setMenuOpen(false); setProjectMenuOpen(false); }
     };
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', esc);
@@ -42,7 +52,7 @@ export default function Toolbar({
       document.removeEventListener('mousedown', close);
       document.removeEventListener('keydown', esc);
     };
-  }, [menuOpen]);
+  }, [menuOpen, projectMenuOpen]);
 
   return (
     <div className="app-header app-toolbar">
@@ -50,6 +60,35 @@ export default function Toolbar({
       <button className="tb-btn" onClick={onNew}>New</button>
       <button className="tb-btn" onClick={onOpen}>Open</button>
       <button className="tb-btn" onClick={onSave} title="Cmd+S">Save</button>
+      <span className="tb-recent-wrap" ref={projectMenuRef}>
+        <button
+          className={'tb-btn' + (projectName ? ' tb-on' : '')}
+          onClick={() => setProjectMenuOpen((value) => !value)}
+          aria-expanded={projectMenuOpen}
+          title={projectName ? `Project folder: ${projectName}` : 'Local project folder and extracted clips'}
+        >
+          Project ▾
+        </button>
+        {projectMenuOpen && (
+          <div className="tb-menu" role="menu">
+            {!projectSupported && (
+              <div className="tb-menu-empty">Project folders require a browser with directory access.</div>
+            )}
+            <button className="tb-menu-item" disabled={!projectSupported} onClick={() => { setProjectMenuOpen(false); onNewProject?.(); }}>
+              New Project Folder…
+            </button>
+            <button className="tb-menu-item" disabled={!projectSupported} onClick={() => { setProjectMenuOpen(false); onOpenProject?.(); }}>
+              Open Project Folder…
+            </button>
+            <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onSaveProject?.(); }}>
+              Save Project
+            </button>
+            <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onClipVault?.(); }}>
+              Clip Vault ({clipCount})
+            </button>
+          </div>
+        )}
+      </span>
       <span className="tb-recent-wrap" ref={menuRef}>
         <button
           className="tb-btn"

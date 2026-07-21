@@ -7,6 +7,10 @@
 **Assistant name:** Quill / Q  
 **Supersedes:** `SARGAM_NEXT_SESSION_CONTEXT_2026-07-20_ANCHOR_GEOMETRY.md` and all older current-state paragraphs
 
+## Phase 3B Wave 1 candidate now present
+
+The current prepared source includes an assistant-built Wave 1 candidate at `448 passed, 0 failed` with a successful Vite build (`99 modules transformed`). It implements local project folders, versioned media contracts, explicit source/clip identities, decoded-loop WAV extraction, extracted-clip-first playback, and a Clip Vault. It is **not browser-accepted yet**. Run the checklist in `SARGAM_PHASE_3B_WAVE_1_2026-07-21.md` before treating these features as settled. Large videos whose audio cannot be decoded still require the later real-time capture path; portable `.sargam` archives remain the next wave after acceptance.
+
 ## 1. Read this first
 
 The geometry stabilization phase is complete and accepted. Do not reopen it casually. The next task is to make linked Vilambit audio sustainable and portable without embedding large recordings in Markdown.

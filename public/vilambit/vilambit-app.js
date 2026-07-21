@@ -21,7 +21,7 @@ const Core = window.VilambitCore;
 if (!Core) throw new Error('VilambitCore must load before vilambit-app.js');
 
 const state = {
-  fileURL: null, fileName: '', isVideo: false,
+  fileURL: null, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
   engine: 'none',            // 'buffer' | 'video' | 'fallback'
   tempo: 100, semitones: 0, cents: 0,
   loopA: null, loopB: null, loopOn: false,
@@ -277,6 +277,8 @@ function loadFile(file){
   if (state.fileURL) URL.revokeObjectURL(state.fileURL);
   Object.assign(state, {
     fileURL: URL.createObjectURL(file), fileName: file.name,
+    fileSize: Number.isFinite(Number(file.size)) ? Number(file.size) : null,
+    fileLastModified: Number.isFinite(Number(file.lastModified)) ? Number(file.lastModified) : null,
     peaks: null, decoded: null, detected: null,
     loopA: null, loopB: null, loopOn: false, markers: [],
     regions: [], bpm: null,
@@ -1252,7 +1254,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   const BRIDGE_VERSION = 1;
   const BRIDGE_COMMANDS = new Set([
     'request-state', 'play', 'pause', 'toggle', 'seek', 'skip',
-    'set-loop', 'clear-loop', 'jump-marker',
+    'set-loop', 'clear-loop', 'jump-marker', 'extract-loop',
   ]);
   const bridgeTargetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
   let bridgeError = null;
@@ -1270,10 +1272,13 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       ready: true,
       fileURL: state.fileURL,
       fileName: state.fileName,
+      fileSize: state.fileSize,
+      fileLastModified: state.fileLastModified,
       isVideo: state.isVideo,
       duration: state.duration,
       position: pos(),
       playing: bridgeIsPlaying(),
+      extractable: Boolean(state.decoded),
       tempo: state.tempo,
       semitones: state.semitones,
       cents: state.cents,
@@ -1302,6 +1307,18 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       type,
       payload,
     }, bridgeTargetOrigin);
+  }
+
+  function bridgePublishClip(payload){
+    if (window.parent === window) return;
+    const transfer = payload && payload.buffer instanceof ArrayBuffer ? [payload.buffer] : [];
+    window.parent.postMessage({
+      channel: BRIDGE_CHANNEL,
+      version: BRIDGE_VERSION,
+      direction: 'event',
+      type: 'clip',
+      payload,
+    }, bridgeTargetOrigin, transfer);
   }
 
   function bridgeTrustedEvent(event){
@@ -1361,6 +1378,35 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       state.loopOn = cleared.loopOn;
       renderLoop();
       applyLoopToEngine();
+      return;
+    }
+    if (type === 'extract-loop') {
+      if (!state.decoded) {
+        throw new Error('This recording has no decoded audio available for clip extraction. Audio files work now; some large videos will need the later real-time capture path.');
+      }
+      const requestId = String(payload && payload.requestId || '');
+      if (!requestId) throw new TypeError('Clip extraction requires a requestId.');
+      const requestedA = payload && payload.a != null ? bridgeNumber(payload, 'a') : state.loopA;
+      const requestedB = payload && payload.b != null ? bridgeNumber(payload, 'b') : state.loopB;
+      const loop = Core.normalizeLoop(requestedA, requestedB, state.duration);
+      if (!loop.ready || loop.loopB - loop.loopA < 0.05) throw new Error('Set a complete A–B loop before extracting a clip.');
+      const sliced = sliceChannels(state.decoded, loop.loopA, loop.loopB);
+      const blob = encodeWav(sliced.channels, sliced.sr);
+      const buffer = await blob.arrayBuffer();
+      bridgePublishClip({
+        requestId,
+        buffer,
+        mimeType: blob.type || 'audio/wav',
+        extension: 'wav',
+        startTime: loop.loopA,
+        endTime: loop.loopB,
+        source: {
+          name: state.fileName,
+          kind: state.isVideo ? 'video' : 'audio',
+          ...(state.fileSize != null ? { size: state.fileSize } : {}),
+          ...(state.fileLastModified != null ? { lastModified: state.fileLastModified } : {}),
+        },
+      });
       return;
     }
     if (type === 'jump-marker') {

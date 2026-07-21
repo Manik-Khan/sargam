@@ -13,6 +13,11 @@ export default function PracticeBar({
   onOpen,
   onState,
   onAttachLoop,
+  projectOpen = false,
+  extracting = false,
+  onExtractClip,
+  onClipExtracted,
+  onVilambitError,
   selectedLink = null,
   onPlayLinked,
   onRemoveLinked,
@@ -32,10 +37,14 @@ export default function PracticeBar({
       const frameWindow = frameRef.current?.contentWindow;
       if (!isExpectedVilambitEvent(event, { frameWindow, origin })) return;
       const message = readVilambitMessage(event.data);
-      if (message) {
-        setPlayer(message.state);
-        stateRef.current?.(message.state);
+      if (!message) return;
+      if (message.type === 'clip') {
+        onClipExtracted?.(message.clip);
+        return;
       }
+      setPlayer(message.state);
+      stateRef.current?.(message.state);
+      if (message.type === 'error' && message.state.error) onVilambitError?.(message.state.error);
     };
 
     window.addEventListener('message', onMessage);
@@ -47,7 +56,7 @@ export default function PracticeBar({
       window.removeEventListener('message', onMessage);
       window.clearTimeout(retry);
     };
-  }, [frameRef, send]);
+  }, [frameRef, onClipExtracted, onVilambitError, send]);
 
   const loaded = player.ready && player.loaded;
   const sourceName = player.source?.name || 'No recording loaded';
@@ -89,13 +98,21 @@ export default function PracticeBar({
         {selectedLink && (
           <>
             <button type="button" onClick={() => onPlayLinked?.(selectedLink)}>Play Linked</button>
+            <button
+              type="button"
+              disabled={!projectOpen || !player.extractable || extracting || Boolean(selectedLink.clipAssetId)}
+              title={!projectOpen ? 'Open or create a Project Folder first' : !player.extractable ? 'Vilambit is still decoding this recording, or its audio track is unavailable for direct extraction' : selectedLink.clipAssetId ? 'This link already has an extracted clip' : 'Save a source-speed WAV of this linked A–B range'}
+              onClick={() => onExtractClip?.(player, selectedLink)}
+            >
+              {extracting ? 'Extracting…' : selectedLink.clipAssetId ? 'Clip Saved' : 'Extract Clip'}
+            </button>
             <button type="button" onClick={() => onRemoveLinked?.(selectedLink.id)}>Remove Link</button>
           </>
         )}
       </div>
       {selectedLink && (
         <span className="app-practice-linked" title={selectedLink.recording?.name || ''}>
-          Linked {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}
+          Linked {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}{selectedLink.clipAssetId ? ' · clip ready' : ''}
         </span>
       )}
       {player.error && <span className="app-practice-error" title={player.error}>Vilambit error</span>}
