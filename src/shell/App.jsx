@@ -39,17 +39,31 @@ import {
   removeAudioLink,
   sourceAssetFromAudioLink,
 } from '../engine/audio-links.js';
-import { makeClock, makeEnv, makeAudioEnv, openViaInput } from './platform.js';
+import {
+  makeClock, makeEnv, makeAudioEnv, openViaInput, openPortableFile, savePortableFile,
+} from './platform.js';
 import { createProjectIO } from '../engine/project-files.js';
 import {
   clipPathFor,
   createEmptyMediaManifest,
+  createProjectManifest,
+  PROJECT_FILE,
+  COMPOSITION_FILE,
+  MEDIA_FILE,
   nextClipId,
   normalizeSourceAsset,
   removeClipAsset,
   upsertClipAsset,
   upsertSourceAsset,
 } from '../engine/project-media.js';
+import {
+  PORTABLE_HARD_LIMIT_BYTES,
+  PORTABLE_MIME,
+  PORTABLE_SOFT_LIMIT_BYTES,
+  buildPortableProject,
+  parsePortableProject,
+  portableProjectName,
+} from '../engine/portable-project.js';
 import {
   extractionRangeForLink,
   updateClipLoopAsset,
@@ -68,6 +82,7 @@ import ProblemsPanel from './ProblemsPanel.jsx';
 import PracticeBar from './PracticeBar.jsx';
 import ClipVault from './ClipVault.jsx';
 import ClipLoopEditor from './ClipLoopEditor.jsx';
+import PortableProjectImport from './PortableProjectImport.jsx';
 import { EMPTY_VILAMBIT_STATE, postVilambitCommand } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import './sargam.css';
@@ -95,6 +110,8 @@ export default function App() {
   const [project, setProject] = useState(null);
   const [projectMedia, setProjectMedia] = useState(() => createEmptyMediaManifest());
   const [showClipVault, setShowClipVault] = useState(false);
+  const [portableImport, setPortableImport] = useState(null);
+  const [importingPortable, setImportingPortable] = useState(false);
   const [clipEditor, setClipEditor] = useState(null);
   const [clipPresence, setClipPresence] = useState({});
   const [extractingClip, setExtractingClip] = useState(false);
@@ -551,9 +568,9 @@ export default function App() {
     return next;
   };
 
-  const recordSavedDocument = (withId, name) => {
-    store.recordRecent({ id: withId.id, title: doc.directives.title || null, name });
-    store.saveSnapshot(withId.id, withId.text);
+  const recordSavedDocument = (withId, name, identityId = withId.id) => {
+    store.recordRecent({ id: identityId, title: doc.directives.title || null, name });
+    store.saveSnapshot(identityId, withId.text);
     setRecents(store.listRecents());
   };
 
@@ -564,20 +581,32 @@ export default function App() {
     }
     const withId = ensureIdentity(textOverride, clock);
     const media = mediaWithCurrentSources(mediaOverride, parseAudioLinkDocument(withId.text).links);
+    let saved;
     try {
-      await projectIO.save(project, { text: withId.text, media });
+      saved = await projectIO.save(project, {
+        text: withId.text,
+        media,
+        manifest: project.manifest,
+        now: clock.now(),
+      });
     } catch (error) {
       setNotice(`Project save failed: ${error?.message || error}`);
       return null;
     }
+    const nextProject = { ...project, manifest: saved.manifest };
+    setProject(nextProject);
     setText(withId.text);
     setLastSaved(withId.text);
     setFileName('composition.md');
     setHandle(null);
     setProjectMedia(media);
-    recordSavedDocument(withId, `${project.name}/composition.md`);
-    if (!quiet) setNotice(`Saved project folder “${project.name}”.`);
-    return { withId, media };
+    // Project copies keep their Markdown byte-for-byte compatible while the
+    // project manifest supplies an independent recent/snapshot identity.
+    recordSavedDocument(withId, `${project.name}/composition.md`, saved.manifest.id);
+    if (!quiet) setNotice(project.memory
+      ? `Saved changes in the temporary project “${project.name}”. Export a .sargam copy before closing or refreshing.`
+      : `Saved project folder “${project.name}”.`);
+    return { withId, media, manifest: saved.manifest, project: nextProject };
   };
 
   const doSave = async () => {
@@ -613,9 +642,18 @@ export default function App() {
     }
     const withId = ensureIdentity(text, clock);
     const media = mediaWithCurrentSources(createEmptyMediaManifest());
+    const projectCreatedAt = clock.now();
     let result;
     try {
-      result = await projectIO.create({ text: withId.text, media });
+      result = await projectIO.create({
+        text: withId.text,
+        media,
+        manifest: createProjectManifest({
+          name: doc.directives.title || doc.directives.raga || 'Untitled Sargam Project',
+          createdAt: projectCreatedAt,
+          modifiedAt: projectCreatedAt,
+        }),
+      });
     } catch (error) {
       setNotice(`Could not create project folder: ${error?.message || error}`);
       return;
@@ -626,15 +664,15 @@ export default function App() {
       return;
     }
     stopLinkedPlayback();
-    const nextProject = { directory: result.directory, name: result.name };
+    const nextProject = { directory: result.directory, name: result.name, manifest: result.manifest };
     setProject(nextProject);
     setProjectMedia(result.media);
     setText(withId.text);
     setLastSaved(withId.text);
     setFileName('composition.md');
     setHandle(null);
-    recordSavedDocument(withId, `${result.name}/composition.md`);
-    setNotice(`Created project folder “${result.name}” with composition.md, media.json, and clips/.`);
+    recordSavedDocument(withId, `${result.name}/composition.md`, result.manifest.id);
+    setNotice(`Created project folder “${result.name}” with manifest.json, composition.md, media.json, and clips/.`);
   };
 
   const doOpenProject = async () => {
@@ -652,7 +690,13 @@ export default function App() {
     }
     if (!result) return;
     stopLinkedPlayback();
-    setProject({ directory: result.directory, name: result.name });
+    setProject({
+      directory: result.directory,
+      name: result.name,
+      manifest: result.manifest,
+      ...(result.entries ? { entries: result.entries } : {}),
+      ...(result.memory ? { memory: true } : {}),
+    });
     setProjectMedia(result.media);
     setText(result.text);
     setLastSaved(result.text);
@@ -662,6 +706,154 @@ export default function App() {
     setNotice(result.problems?.length
       ? `Opened “${result.name}” with media warnings: ${result.problems.join('; ')}`
       : `Opened project folder “${result.name}”.`);
+  };
+
+  const readPortableCandidate = useCallback(async (file) => {
+    if (!file) return;
+    if (!/\.sargam$/i.test(file.name || '')) {
+      setNotice('Portable projects must use the .sargam extension.');
+      return;
+    }
+    if (file.size > PORTABLE_HARD_LIMIT_BYTES) {
+      setNotice('That portable project is larger than the 1 GiB safety limit.');
+      return;
+    }
+    if (file.size > PORTABLE_SOFT_LIMIT_BYTES && !window.confirm(
+      `This package is ${(file.size / 1024 / 1024).toFixed(1)} MB and will be read into browser memory. Continue?`
+    )) return;
+    setNotice(`Validating portable project “${file.name}”…`);
+    let packageData;
+    try {
+      packageData = parsePortableProject(await file.arrayBuffer());
+    } catch (error) {
+      setNotice(`Could not read portable project: ${error?.message || error}`);
+      return;
+    }
+    if (!packageData.ok) {
+      setNotice(`Portable project rejected: ${packageData.problems.join('; ')}`);
+      return;
+    }
+    setPortableImport({ fileName: file.name, fileSize: file.size, packageData });
+    setNotice(null);
+  }, []);
+
+  const doOpenPortable = async () => {
+    let file;
+    try { file = await openPortableFile(); }
+    catch (error) {
+      setNotice(`Could not choose portable project: ${error?.message || error}`);
+      return;
+    }
+    if (file) await readPortableCandidate(file);
+  };
+
+  const doImportPortable = async () => {
+    if (!portableImport || importingPortable) return;
+    if (!confirmDiscard()) return;
+    setImportingPortable(true);
+    let result;
+    try {
+      result = await projectIO.importPortable(portableImport.packageData, {
+        now: clock.now(),
+        packageName: portableImport.fileName,
+      });
+    } catch (error) {
+      setNotice(`Portable project import failed: ${error?.message || error}`);
+      setImportingPortable(false);
+      return;
+    }
+    setImportingPortable(false);
+    if (!result) return;
+    if (!result.ok) {
+      setNotice(result.message || 'That destination folder could not be used.');
+      return;
+    }
+    stopLinkedPlayback();
+    setShowClipVault(false);
+    setClipEditor(null);
+    setProject({
+      directory: result.directory,
+      name: result.name,
+      manifest: result.manifest,
+      ...(result.entries ? { entries: result.entries } : {}),
+      ...(result.memory ? { memory: true } : {}),
+    });
+    setProjectMedia(result.media);
+    setText(result.text);
+    setLastSaved(result.text);
+    setFileName(COMPOSITION_FILE);
+    setHandle(null);
+    setSelectedAudioLinkId(null);
+    const importedDoc = parseDocument(result.text).doc;
+    const importedId = result.manifest.id;
+    store.recordRecent({ id: importedId, title: importedDoc.directives.title || null, name: `${result.name}/${COMPOSITION_FILE}` });
+    store.saveSnapshot(importedId, result.text);
+    setRecents(store.listRecents());
+    setPortableImport(null);
+    setNotice(result.memory
+      ? `Opened “${portableImport.fileName}” as a temporary independent project. Export a .sargam copy before closing or refreshing.${result.problems?.length ? ` Notes: ${result.problems.join('; ')}` : ''}`
+      : result.problems?.length
+        ? `Imported independent project “${result.name}” with notes: ${result.problems.join('; ')}`
+        : `Imported “${portableImport.fileName}” as independent project folder “${result.name}”.`);
+  };
+
+  const doExportPortable = async () => {
+    if (!project) {
+      setNotice('Open or create a project before exporting a portable project.');
+      return;
+    }
+    const saved = await doSaveProject({ quiet: true });
+    if (!saved) return;
+    const files = new Map();
+    try {
+      for (const clip of saved.media.clips) {
+        const file = await projectIO.readClip(saved.project, clip.path);
+        files.set(clip.path, new Uint8Array(await file.arrayBuffer()));
+      }
+      const known = new Set([PROJECT_FILE, COMPOSITION_FILE, MEDIA_FILE, ...saved.media.clips.map((clip) => clip.path)]);
+      const extraPaths = new Set(saved.manifest?.portable?.extraFiles || []);
+      // Compatibility with early Phase 3C imports that retained the complete
+      // archive inventory in the editable project manifest.
+      for (const record of saved.manifest?.portable?.files || []) {
+        const path = record?.path;
+        if (path && !known.has(path)) extraPaths.add(path);
+      }
+      for (const path of extraPaths) {
+        if (!path || known.has(path)) continue;
+        const file = await projectIO.readProjectFile(saved.project, path);
+        files.set(path, new Uint8Array(await file.arrayBuffer()));
+      }
+    } catch (error) {
+      setNotice(`Portable export stopped because a project file is missing: ${error?.message || error}. Check the Clip Vault.`);
+      return;
+    }
+
+    let portable;
+    try {
+      portable = buildPortableProject({
+        manifest: { ...saved.manifest, name: project.name },
+        composition: saved.withId.text,
+        media: saved.media,
+        files,
+        exportedAt: clock.now(),
+      });
+    } catch (error) {
+      setNotice(`Portable export failed: ${error?.message || error}`);
+      return;
+    }
+    if (portable.bytes.byteLength > PORTABLE_SOFT_LIMIT_BYTES && !window.confirm(
+      `This portable project is ${(portable.bytes.byteLength / 1024 / 1024).toFixed(1)} MB. Save it anyway?`
+    )) return;
+    const name = portableProjectName(project.name || doc.directives.title || doc.directives.raga || 'sargam-project');
+    const blob = new Blob([portable.bytes], { type: PORTABLE_MIME });
+    let result;
+    try { result = await savePortableFile(blob, name); }
+    catch (error) {
+      setNotice(`Could not save portable project: ${error?.message || error}`);
+      return;
+    }
+    if (!result) return;
+    setNotice(`Exported “${result.name}” with ${saved.media.clips.length} clip${saved.media.clips.length === 1 ? '' : 's'}. It opens as an independent editable project.`);
   };
 
   const confirmDiscard = () =>
@@ -1079,13 +1271,20 @@ export default function App() {
       const attached = attachClipToAudioLink(text, pending.link.id, clipId);
       if (!attached.ok) throw new Error(attached.message);
       const withId = ensureIdentity(attached.text, clock);
-      await projectIO.save(project, { text: withId.text, media });
+      const saved = await projectIO.save(project, {
+        text: withId.text,
+        media,
+        manifest: project.manifest,
+        now: clock.now(),
+      });
+      const nextProject = { ...project, manifest: saved.manifest };
+      setProject(nextProject);
       setText(withId.text);
       setLastSaved(withId.text);
       setProjectMedia(media);
       setClipPresence((current) => ({ ...current, [clipId]: true }));
       setSelectedAudioLinkId(pending.link.id);
-      recordSavedDocument(withId, `${project.name}/composition.md`);
+      recordSavedDocument(withId, `${project.name}/composition.md`, saved.manifest.id);
       setNotice(`Saved ${clipId} to ${path} and attached it to the notation.`);
     } catch (error) {
       setNotice(`Clip extraction failed: ${error?.message || error}`);
@@ -1172,8 +1371,8 @@ export default function App() {
         await projectIO.deleteClip(project, clip.path);
         media = removeClipAsset(media, clip.id);
       }
-      await projectIO.save(project, { text, media });
-      setProjectMedia(media);
+      const saved = await doSaveProject({ mediaOverride: media, quiet: true });
+      if (!saved) return;
       setNotice(`Deleted ${clips.length} unused clip${clips.length === 1 ? '' : 's'}; linked source ranges were untouched.`);
     } catch (error) {
       setNotice(`Could not delete unused clips: ${error?.message || error}`);
@@ -1217,6 +1416,35 @@ export default function App() {
     setRecents(store.listRecents());
   };
 
+  // A portable project may be opened from the Project menu or dropped
+  // anywhere in the app. Dropping only validates it; destination-folder access
+  // is requested from the explicit button in the import dialog.
+  useEffect(() => {
+    const hasFiles = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+    const onDragOver = (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    };
+    const onDrop = (event) => {
+      const files = Array.from(event.dataTransfer?.files || []);
+      if (!files.length) return;
+      event.preventDefault();
+      const file = files.find((item) => /\.sargam$/i.test(item.name || ''));
+      if (!file) {
+        setNotice('Drop one .sargam portable project file.');
+        return;
+      }
+      void readPortableCandidate(file);
+    };
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, [readPortableCandidate]);
+
   // Cmd+S / Ctrl+S; Space = play/pause when not typing in a field.
   useEffect(() => {
     const onKey = (e) => {
@@ -1246,6 +1474,15 @@ export default function App() {
 />
       )}
       {showNew && <NewDocDialog onCreate={createDoc} onCancel={() => setShowNew(false)} />}
+      {portableImport && (
+        <PortableProjectImport
+          pending={portableImport}
+          importing={importingPortable}
+          supportsDirectory={projectIO.supportsDirectory}
+          onImport={doImportPortable}
+          onClose={() => { if (!importingPortable) setPortableImport(null); }}
+        />
+      )}
       {showClipVault && project && (
         <ClipVault
           project={project}
@@ -1282,6 +1519,8 @@ export default function App() {
         onOpenProject={doOpenProject}
         onSaveProject={doSaveProject}
         onClipVault={() => setShowClipVault(true)}
+        onOpenPortable={doOpenPortable}
+        onExportPortable={doExportPortable}
         onExport={() => setShowExport(true)}
         onExportXML={doExportXML}
         noteNames={noteNames}

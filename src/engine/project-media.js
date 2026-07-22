@@ -6,6 +6,7 @@ export const MEDIA_MANIFEST_VERSION = 1;
 export const PROJECT_MANIFEST_VERSION = 1;
 export const MEDIA_MANIFEST_KIND = 'sargam-media';
 export const PROJECT_MANIFEST_KIND = 'sargam-project';
+export const PROJECT_FILE = 'manifest.json';
 export const COMPOSITION_FILE = 'composition.md';
 export const MEDIA_FILE = 'media.json';
 export const CLIPS_DIRECTORY = 'clips';

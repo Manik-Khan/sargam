@@ -100,3 +100,70 @@ export function makeAudioEnv() {
     revokeObjectURL: (url) => URL.revokeObjectURL(url),
   };
 }
+
+/** Pick one portable .sargam package. Uses FSA where available and a normal
+ * file input elsewhere; returns a File or null on cancel. */
+export async function openPortableFile() {
+  if (typeof window.showOpenFilePicker === 'function') {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{
+          description: 'Sargam portable project',
+          accept: { 'application/vnd.sargam+zip': ['.sargam'] },
+        }],
+      });
+      return handle ? handle.getFile() : null;
+    } catch (error) {
+      if (error?.name === 'AbortError') return null;
+      throw error;
+    }
+  }
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.sargam,application/zip,application/octet-stream';
+    input.style.display = 'none';
+    const finish = (value) => { input.remove(); resolve(value); };
+    input.onchange = () => finish(input.files?.[0] || null);
+    input.oncancel = () => finish(null);
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
+function downloadBlob(name, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Save a portable binary package without ever converting it to text/base64. */
+export async function savePortableFile(blob, suggestedName) {
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{
+          description: 'Sargam portable project',
+          accept: { 'application/vnd.sargam+zip': ['.sargam'] },
+        }],
+      });
+      if (!handle) return null;
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return { method: 'fsa', name: handle.name || suggestedName };
+    } catch (error) {
+      if (error?.name === 'AbortError') return null;
+      throw error;
+    }
+  }
+  downloadBlob(suggestedName, blob);
+  return { method: 'download', name: suggestedName };
+}

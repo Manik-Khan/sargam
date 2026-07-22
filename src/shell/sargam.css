@@ -1401,3 +1401,36 @@
   .clip-loop-action-spacer { display: none; }
 }
 @media print { .clip-loop-editor { display: none !important; } }
+
+/* SARGAM_PORTABLE_PROJECT_PHASE_3C — one-file import/export. */
+.tb-menu-separator {
+  height: 1px;
+  margin: 5px 8px;
+  background: color-mix(in srgb, var(--sr-rule) 72%, transparent);
+}
+.portable-import-modal { width: min(620px, calc(100vw - 32px)); }
+.portable-import-body {
+  padding: 4px 20px 18px;
+  color: var(--sr-ink-soft);
+  line-height: 1.5;
+}
+.portable-import-body p { margin: 12px 0; }
+.portable-import-body strong { color: var(--sr-ink); }
+.portable-import-note {
+  padding: 9px 11px;
+  border: 1px solid var(--sr-rule);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sr-panel) 88%, transparent);
+}
+.portable-import-warnings {
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--sr-alert) 45%, var(--sr-rule));
+  border-radius: 8px;
+}
+.portable-import-warnings ul { margin: 6px 0 0; padding-left: 20px; }
+.project-modal-actions .is-primary {
+  color: var(--sr-bg);
+  background: var(--sr-accent);
+  border-color: var(--sr-accent);
+}

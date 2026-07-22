@@ -20,6 +20,8 @@ export default function Toolbar({
   onOpenProject,
   onSaveProject,
   onClipVault,
+  onOpenPortable,
+  onExportPortable,
   onExport,
   onExportXML,
   noteNames,
@@ -85,6 +87,13 @@ export default function Toolbar({
             </button>
             <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onClipVault?.(); }}>
               Clip Vault ({clipCount})
+            </button>
+            <div className="tb-menu-separator" role="separator" />
+            <button className="tb-menu-item" onClick={() => { setProjectMenuOpen(false); onOpenPortable?.(); }}>
+              Open Portable Project…
+            </button>
+            <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onExportPortable?.(); }}>
+              Export Portable .sargam…
             </button>
           </div>
         )}
