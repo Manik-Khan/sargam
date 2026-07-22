@@ -83,7 +83,11 @@ export const smokes = [
     async fn() {
       const app = await read('../src/shell/App.jsx');
       const bar = await read('../src/shell/PracticeBar.jsx');
-      assert.match(app, /audio\.loop = true/);
+      // SUPERSEDED 2026-07-21, Phase 3B Wave 3: HTMLMediaElement.loop
+      // restarted extracted files with a rough seam. Linked clips now use the
+      // decoded Web Audio transport and saved in-file A–B boundaries.
+      assert.match(app, /playClipLoopFile\(file, clip/);
+      assert.doesNotMatch(app, /audio\.loop\s*=\s*true/);
       assert.match(app, /linkedPlayback/);
       assert.match(app, /stopLinkedPlayback/);
       assert.match(bar, /Stop Linked/);

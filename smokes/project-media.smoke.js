@@ -80,6 +80,40 @@ export const smokes = [
     },
   },
   {
+    name: 'project media: padded clips preserve editable loop boundaries',
+    fn() {
+      let manifest = upsertSourceAsset(createEmptyMediaManifest(), source);
+      manifest = upsertClipAsset(manifest, {
+        id: 'clip-0001', sourceAssetId: manifest.sources[0].id,
+        startTime: 41.6, endTime: 48.4, duration: 6.8,
+        loopStart: 0.4, loopEnd: 6.4,
+        defaultLoopStart: 0.4, defaultLoopEnd: 6.4,
+        paddingBefore: 0.4, paddingAfter: 0.4, crossfadeMs: 12,
+        path: 'clips/clip-0001.wav', mimeType: 'audio/wav', bytes: 1000,
+      });
+      const clip = parseMediaManifest(serializeMediaManifest(manifest)).manifest.clips[0];
+      assert.equal(clip.loopStart, 0.4);
+      assert.equal(clip.loopEnd, 6.4);
+      assert.equal(clip.defaultLoopStart, 0.4);
+      assert.equal(clip.paddingAfter, 0.4);
+    },
+  },
+  {
+    name: 'project media: invalid clip loops are rejected rather than clamped silently',
+    fn() {
+      const normalized = normalizeMediaManifest({
+        version: 1, kind: 'sargam-media', sources: [{ ...source, id: 'source-a' }],
+        clips: [{
+          id: 'clip-0001', sourceAssetId: 'source-a', startTime: 1, endTime: 2,
+          duration: 1, loopStart: 0.8, loopEnd: 1.2,
+          path: 'clips/clip-0001.wav', mimeType: 'audio/wav',
+        }],
+      });
+      assert.match(normalized.problems.join('\n'), /stay inside/);
+      assert.equal(normalized.manifest.clips.length, 0);
+    },
+  },
+  {
     name: 'project media: missing source references narrate instead of disappearing',
     fn() {
       const normalized = normalizeMediaManifest({

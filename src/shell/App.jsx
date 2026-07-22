@@ -50,6 +50,11 @@ import {
   upsertClipAsset,
   upsertSourceAsset,
 } from '../engine/project-media.js';
+import {
+  extractionRangeForLink,
+  updateClipLoopAsset,
+} from '../engine/clip-loop.js';
+import { playClipLoopFile } from './clip-audio.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
 import CommandBar from './CommandBar.jsx';
@@ -62,6 +67,7 @@ import ExportView from './ExportView.jsx';
 import ProblemsPanel from './ProblemsPanel.jsx';
 import PracticeBar from './PracticeBar.jsx';
 import ClipVault from './ClipVault.jsx';
+import ClipLoopEditor from './ClipLoopEditor.jsx';
 import { EMPTY_VILAMBIT_STATE, postVilambitCommand } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import './sargam.css';
@@ -89,10 +95,11 @@ export default function App() {
   const [project, setProject] = useState(null);
   const [projectMedia, setProjectMedia] = useState(() => createEmptyMediaManifest());
   const [showClipVault, setShowClipVault] = useState(false);
+  const [clipEditor, setClipEditor] = useState(null);
   const [clipPresence, setClipPresence] = useState({});
   const [extractingClip, setExtractingClip] = useState(false);
   const pendingClipRef = useRef(null);
-  const clipAudioRef = useRef({ audio: null, url: null, linkId: null });
+  const clipAudioRef = useRef({ session: null, linkId: null });
   const [linkedPlayback, setLinkedPlayback] = useState(null);
   const linkedPlaybackRef = useRef(null);
   // null = no known on-disk state (restored/new docs count as unsaved).
@@ -151,22 +158,21 @@ export default function App() {
 
   const stopExtractedClip = useCallback(() => {
     const current = clipAudioRef.current;
-    if (current.audio) {
-      current.audio.loop = false;
-      current.audio.pause();
-      current.audio.removeAttribute('src');
-    }
-    if (current.url) URL.revokeObjectURL(current.url);
-    clipAudioRef.current = { audio: null, url: null, linkId: null };
+    current.session?.close?.();
+    clipAudioRef.current = { session: null, linkId: null };
   }, []);
 
   const stopLinkedPlayback = useCallback(({ pauseSource = true, announce = false } = {}) => {
     const active = linkedPlaybackRef.current;
-    if (!active) return false;
+    const pendingClip = Boolean(clipAudioRef.current.session);
+    if (!active && !pendingClip) return false;
     stopExtractedClip();
-    if (pauseSource && active.kind === 'source') sendVilambit('pause');
+    if (pauseSource && active?.kind === 'source') sendVilambit('pause');
     setLinkedPlaybackState(null);
-    if (announce) setNotice(`Stopped linked ${active.kind === 'clip' ? 'clip' : 'source loop'}.`);
+    if (announce) {
+      const label = active?.kind === 'source' ? 'source loop' : 'clip';
+      setNotice(`Stopped linked ${label}.`);
+    }
     return true;
   }, [sendVilambit, setLinkedPlaybackState, stopExtractedClip]);
 
@@ -195,6 +201,10 @@ export default function App() {
       .catch((error) => { if (!cancelled) setNotice(`Clip Vault check failed: ${error?.message || error}`); });
     return () => { cancelled = true; };
   }, [project, projectIO, projectMedia]);
+
+  useEffect(() => {
+    setClipEditor(null);
+  }, [project]);
 
   useEffect(() => () => {
     stopExtractedClip();
@@ -917,16 +927,20 @@ export default function App() {
               setPosition(player.position);
             }
             if (vilambitStateRef.current.loaded && vilambitStateRef.current.playing) sendVilambit('pause');
-            const url = URL.createObjectURL(file);
-            const audio = new Audio(url);
-            audio.loop = true;
-            clipAudioRef.current = { audio, url, linkId: link.id };
-            audio.addEventListener('error', () => {
-              if (clipAudioRef.current.audio !== audio) return;
-              stopLinkedPlayback();
-              setNotice(`Extracted clip ${clip.id} could not continue playing.`);
-            }, { once: true });
-            await audio.play();
+            const playbackToken = { linkId: link.id };
+            clipAudioRef.current = { session: playbackToken, linkId: link.id };
+            const session = await playClipLoopFile(file, clip, {
+              onError: () => {
+                if (clipAudioRef.current.linkId !== link.id) return;
+                stopLinkedPlayback();
+                setNotice(`Extracted clip ${clip.id} could not continue playing.`);
+              },
+            });
+            if (clipAudioRef.current.session !== playbackToken) {
+              await session.close();
+              return;
+            }
+            clipAudioRef.current = { session, linkId: link.id };
             setLinkedPlaybackState({
               linkId: link.id,
               clipAssetId: clip.id,
@@ -934,7 +948,7 @@ export default function App() {
               startTime: link.startTime,
               endTime: link.endTime,
             });
-            setNotice(`Looping extracted clip ${clip.id}. Choose Stop Linked, start another phrase, or use another transport to stop it.`);
+            setNotice(`Looping refined clip region from ${clip.id}. Choose Stop Linked, edit its A–B points, or start another transport to stop it.`);
             return;
           } catch (error) {
             stopExtractedClip();
@@ -995,11 +1009,20 @@ export default function App() {
       setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit before extracting its clip.`);
       return;
     }
+    const extraction = extractionRangeForLink(link, playerState.duration || link.recording?.duration);
+    if (!extraction.ok) {
+      setNotice(`Clip extraction failed: ${extraction.problem}`);
+      return;
+    }
     const requestId = clock.uuid();
-    pendingClipRef.current = { requestId, link };
+    pendingClipRef.current = { requestId, link, extraction };
     setExtractingClip(true);
-    setNotice(`Extracting ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s as a source-speed WAV…`);
-    const sent = sendVilambit('extract-loop', { requestId, a: link.startTime, b: link.endTime });
+    setNotice(`Extracting ${extraction.extractionStart.toFixed(1)}–${extraction.extractionEnd.toFixed(1)}s with editable context around the linked phrase…`);
+    const sent = sendVilambit('extract-loop', {
+      requestId,
+      a: extraction.extractionStart,
+      b: extraction.extractionEnd,
+    });
     if (!sent) {
       pendingClipRef.current = null;
       setExtractingClip(false);
@@ -1029,11 +1052,24 @@ export default function App() {
       const path = clipPathFor(clipId, clipPayload.extension);
       const blob = new Blob([clipPayload.buffer], { type: clipPayload.mimeType });
       await projectIO.writeClip(project, path, blob);
+      const estimatedDuration = Math.max(0.05, clipPayload.endTime - clipPayload.startTime);
+      const defaultLoopStart = Math.max(0, pending.link.startTime - clipPayload.startTime);
+      const defaultLoopEnd = Math.min(estimatedDuration, pending.link.endTime - clipPayload.startTime);
       const clip = {
         id: clipId,
         sourceAssetId: pending.link.sourceAssetId,
+        // startTime/endTime describe the actual extracted range in the master;
+        // the Markdown link keeps its original narrower sourceRange.
         startTime: clipPayload.startTime,
         endTime: clipPayload.endTime,
+        duration: estimatedDuration,
+        loopStart: defaultLoopStart,
+        loopEnd: defaultLoopEnd,
+        defaultLoopStart,
+        defaultLoopEnd,
+        paddingBefore: pending.extraction?.paddingBefore ?? defaultLoopStart,
+        paddingAfter: pending.extraction?.paddingAfter ?? Math.max(0, estimatedDuration - defaultLoopEnd),
+        crossfadeMs: 12,
         path,
         mimeType: clipPayload.mimeType,
         bytes: blob.size,
@@ -1058,6 +1094,75 @@ export default function App() {
       setExtractingClip(false);
     }
   }, [project, projectIO, projectMedia, text]);
+
+  const doOpenClipEditor = useCallback(async (link = selectedAudioLink) => {
+    if (!project || !link?.clipAssetId) {
+      setNotice('Select a linked phrase with an extracted clip first.');
+      return;
+    }
+    const clip = (projectMedia.clips || []).find((item) => item.id === link.clipAssetId);
+    if (!clip) {
+      setNotice('The linked clip is not present in media.json.');
+      return;
+    }
+    try {
+      stopLinkedPlayback();
+      const file = await projectIO.readClip(project, clip.path);
+      setClipPresence((current) => ({ ...current, [clip.id]: true }));
+      setClipEditor({ linkId: link.id, clip, file });
+      setNotice(`Opened ${clip.id} for non-destructive loop editing.`);
+    } catch (error) {
+      setClipPresence((current) => ({ ...current, [clip.id]: false }));
+      setNotice(`Could not open the extracted clip: ${error?.message || error}`);
+    }
+  }, [project, projectIO, projectMedia.clips, selectedAudioLink, stopLinkedPlayback]);
+
+  const doOpenVaultClipEditor = useCallback(async (clip) => {
+    if (!project || !clip) return;
+    try {
+      stopLinkedPlayback();
+      const file = await projectIO.readClip(project, clip.path);
+      setClipPresence((current) => ({ ...current, [clip.id]: true }));
+      setShowClipVault(false);
+      setClipEditor({ linkId: null, clip, file });
+      setNotice(`Opened ${clip.id} from the Clip Vault.`);
+    } catch (error) {
+      setClipPresence((current) => ({ ...current, [clip.id]: false }));
+      setNotice(`Could not open the extracted clip: ${error?.message || error}`);
+    }
+  }, [project, projectIO, stopLinkedPlayback]);
+
+  const doOpenClipSource = useCallback(() => {
+    const link = audioLinkModel.links.find((item) => item.id === clipEditor?.linkId);
+    if (!link) {
+      setNotice('This Clip Vault item is not currently attached to notation.');
+      return;
+    }
+    setClipEditor(null);
+    activateAudioLink(link, { play: false });
+    setView('vilambit');
+  }, [activateAudioLink, audioLinkModel.links, clipEditor]);
+
+  const doSaveClipLoop = useCallback(async (values) => {
+    if (!project || !clipEditor?.clip) return;
+    try {
+      const updated = updateClipLoopAsset(clipEditor.clip, {
+        ...values,
+        updatedAt: clock.now(),
+      });
+      const media = upsertClipAsset(projectMedia, updated);
+      const saved = await doSaveProject({ mediaOverride: media, quiet: true });
+      if (!saved) return;
+      setClipEditor(null);
+      const shifts = values.snapShiftMs || {};
+      const snapText = shifts.start || shifts.end
+        ? ` Zero-crossing seam adjustment: A ${shifts.start >= 0 ? '+' : ''}${shifts.start || 0} ms, B ${shifts.end >= 0 ? '+' : ''}${shifts.end || 0} ms.`
+        : '';
+      setNotice(`Saved ${updated.id} loop at ${updated.loopStart.toFixed(3)}–${updated.loopEnd.toFixed(3)}s.${snapText}`);
+    } catch (error) {
+      setNotice(`Could not save clip loop points: ${error?.message || error}`);
+    }
+  }, [clipEditor, project, projectMedia, doSaveProject]);
 
   const doDeleteUnusedClips = async (clips) => {
     if (!project || !clips?.length) return;
@@ -1148,7 +1253,18 @@ export default function App() {
           links={audioLinkModel.links}
           presence={clipPresence}
           onDeleteUnused={doDeleteUnusedClips}
+          onEditClip={doOpenVaultClipEditor}
           onClose={() => setShowClipVault(false)}
+        />
+      )}
+      {clipEditor && (
+        <ClipLoopEditor
+          project={project}
+          clip={clipEditor.clip}
+          file={clipEditor.file}
+          onSave={doSaveClipLoop}
+          onOpenSource={clipEditor.linkId ? doOpenClipSource : null}
+          onClose={() => setClipEditor(null)}
         />
       )}
       <Toolbar
@@ -1229,6 +1345,7 @@ export default function App() {
           linkedPlayback={linkedPlayback}
           onPlayLinked={(link) => activateAudioLink(link, { play: true })}
           onStopLinked={() => stopLinkedPlayback({ announce: true })}
+          onEditClip={doOpenClipEditor}
           onRemoveLinked={doRemoveAudioLink}
         />
       )}

@@ -128,6 +128,57 @@ export function normalizeClipAsset(value = {}) {
   const bytes = finite(value.bytes);
   if (bytes != null && bytes >= 0) asset.bytes = Math.round(bytes);
   else delete asset.bytes;
+
+  // Wave 3: the extracted binary may include context outside the practice
+  // phrase. These optional values define a non-destructive loop inside it.
+  const duration = roundMillis(value.duration);
+  if (duration != null && duration > 0) asset.duration = duration;
+  else delete asset.duration;
+  const loopStart = roundMillis(value.loopStart);
+  const loopEnd = roundMillis(value.loopEnd);
+  if ((loopStart == null) !== (loopEnd == null)) {
+    return { ok: false, problem: 'clip loop requires both loopStart and loopEnd' };
+  }
+  if (loopStart != null) {
+    const fileDuration = duration ?? roundMillis(endTime - startTime);
+    if (loopStart < 0 || loopEnd <= loopStart || loopEnd > fileDuration + 0.001) {
+      return { ok: false, problem: 'clip loop must stay inside the extracted file' };
+    }
+    asset.loopStart = loopStart;
+    asset.loopEnd = loopEnd;
+  } else {
+    delete asset.loopStart;
+    delete asset.loopEnd;
+  }
+  const defaultLoopStart = roundMillis(value.defaultLoopStart);
+  const defaultLoopEnd = roundMillis(value.defaultLoopEnd);
+  if ((defaultLoopStart == null) !== (defaultLoopEnd == null)) {
+    return { ok: false, problem: 'clip default loop requires both endpoints' };
+  }
+  if (defaultLoopStart != null) {
+    const fileDuration = duration ?? roundMillis(endTime - startTime);
+    if (defaultLoopStart < 0 || defaultLoopEnd <= defaultLoopStart || defaultLoopEnd > fileDuration + 0.001) {
+      return { ok: false, problem: 'clip default loop must stay inside the extracted file' };
+    }
+    asset.defaultLoopStart = defaultLoopStart;
+    asset.defaultLoopEnd = defaultLoopEnd;
+  } else {
+    delete asset.defaultLoopStart;
+    delete asset.defaultLoopEnd;
+  }
+  const paddingBefore = roundMillis(value.paddingBefore);
+  const paddingAfter = roundMillis(value.paddingAfter);
+  if (paddingBefore != null && paddingBefore >= 0) asset.paddingBefore = paddingBefore;
+  else delete asset.paddingBefore;
+  if (paddingAfter != null && paddingAfter >= 0) asset.paddingAfter = paddingAfter;
+  else delete asset.paddingAfter;
+  const crossfadeMs = finite(value.crossfadeMs);
+  if (crossfadeMs != null) asset.crossfadeMs = Math.min(50, Math.max(0, Math.round(crossfadeMs)));
+  else delete asset.crossfadeMs;
+  const loopUpdatedAt = nonEmpty(value.loopUpdatedAt);
+  if (loopUpdatedAt) asset.loopUpdatedAt = loopUpdatedAt;
+  else delete asset.loopUpdatedAt;
+
   const createdAt = nonEmpty(value.createdAt);
   if (createdAt) asset.createdAt = createdAt;
   else delete asset.createdAt;

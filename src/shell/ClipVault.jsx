@@ -10,7 +10,7 @@ function formatBytes(value) {
   return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
 }
 
-export default function ClipVault({ project, manifest, links = [], presence = {}, onClose, onDeleteUnused }) {
+export default function ClipVault({ project, manifest, links = [], presence = {}, onClose, onDeleteUnused, onEditClip }) {
   const used = useMemo(() => new Set(links.map((link) => link.clipAssetId).filter(Boolean)), [links]);
   const sources = useMemo(() => new Map((manifest.sources || []).map((source) => [source.id, source])), [manifest]);
   const clips = manifest.clips || [];
@@ -50,11 +50,16 @@ export default function ClipVault({ project, manifest, links = [], presence = {}
                     <strong>{clip.id}</strong>
                     <span>{source?.name || clip.sourceAssetId}</span>
                   </div>
-                  <span>{formatVilambitTime(clip.startTime)}–{formatVilambitTime(clip.endTime)}</span>
+                  <span title={`Master ${formatVilambitTime(clip.startTime)}–${formatVilambitTime(clip.endTime)}`}>
+                    {clip.loopStart != null && clip.loopEnd != null
+                      ? `Loop ${Number(clip.loopStart).toFixed(2)}–${Number(clip.loopEnd).toFixed(2)}s`
+                      : `${formatVilambitTime(clip.startTime)}–${formatVilambitTime(clip.endTime)}`}
+                  </span>
                   <span>{formatBytes(clip.bytes)}</span>
                   <span className={isMissing ? 'is-missing' : isUsed ? 'is-used' : 'is-unused'}>
                     {isMissing ? 'Missing' : isUsed ? 'Linked' : 'Unused'}
                   </span>
+                  <button type="button" disabled={isMissing} onClick={() => onEditClip?.(clip)}>Edit Loop</button>
                 </article>
               );
             })}
