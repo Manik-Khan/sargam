@@ -19,7 +19,9 @@ export default function PracticeBar({
   onClipExtracted,
   onVilambitError,
   selectedLink = null,
+  linkedPlayback = null,
   onPlayLinked,
+  onStopLinked,
   onRemoveLinked,
 }) {
   const [player, setPlayer] = useState(EMPTY_VILAMBIT_STATE);
@@ -97,7 +99,15 @@ export default function PracticeBar({
         </button>
         {selectedLink && (
           <>
-            <button type="button" onClick={() => onPlayLinked?.(selectedLink)}>Play Linked</button>
+            <button
+              type="button"
+              aria-pressed={linkedPlayback?.linkId === selectedLink.id}
+              onClick={() => linkedPlayback?.linkId === selectedLink.id
+                ? onStopLinked?.()
+                : onPlayLinked?.(selectedLink)}
+            >
+              {linkedPlayback?.linkId === selectedLink.id ? 'Stop Linked' : 'Play Linked'}
+            </button>
             <button
               type="button"
               disabled={!projectOpen || !player.extractable || extracting || Boolean(selectedLink.clipAssetId)}
@@ -112,7 +122,11 @@ export default function PracticeBar({
       </div>
       {selectedLink && (
         <span className="app-practice-linked" title={selectedLink.recording?.name || ''}>
-          Linked {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}{selectedLink.clipAssetId ? ' · clip ready' : ''}
+          Linked {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}
+          {selectedLink.clipAssetId ? ' · clip ready' : ''}
+          {linkedPlayback?.linkId === selectedLink.id
+            ? linkedPlayback.kind === 'clip' ? ' · clip looping' : ' · source looping'
+            : ''}
         </span>
       )}
       {player.error && <span className="app-practice-error" title={player.error}>Vilambit error</span>}

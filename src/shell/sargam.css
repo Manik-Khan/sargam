@@ -986,6 +986,11 @@
   cursor: pointer;
 }
 .app-practice-bar button:hover:not(:disabled) { border-color: var(--sr-accent); }
+.app-practice-bar button[aria-pressed="true"] {
+  border-color: var(--sr-accent);
+  box-shadow: inset 0 0 0 1px var(--sr-accent);
+  font-weight: 700;
+}
 .app-practice-bar button:disabled { color: var(--sr-dim); cursor: default; }
 .app-practice-loop {
   flex: 0 1 auto;

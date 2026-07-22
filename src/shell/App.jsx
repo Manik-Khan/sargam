@@ -92,7 +92,9 @@ export default function App() {
   const [clipPresence, setClipPresence] = useState({});
   const [extractingClip, setExtractingClip] = useState(false);
   const pendingClipRef = useRef(null);
-  const clipAudioRef = useRef({ audio: null, url: null });
+  const clipAudioRef = useRef({ audio: null, url: null, linkId: null });
+  const [linkedPlayback, setLinkedPlayback] = useState(null);
+  const linkedPlaybackRef = useRef(null);
   // null = no known on-disk state (restored/new docs count as unsaved).
   const [lastSaved, setLastSaved] = useState(restored ? null : STARTER);
   const [notice, setNotice] = useState(() => {
@@ -137,6 +139,37 @@ export default function App() {
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
 
+  const sendVilambit = useCallback((type, payload = {}) => {
+    const frameWindow = vilambitRef.current?.contentWindow;
+    return postVilambitCommand(frameWindow, type, payload, window.location.origin);
+  }, []);
+
+  const setLinkedPlaybackState = useCallback((next) => {
+    linkedPlaybackRef.current = next;
+    setLinkedPlayback(next);
+  }, []);
+
+  const stopExtractedClip = useCallback(() => {
+    const current = clipAudioRef.current;
+    if (current.audio) {
+      current.audio.loop = false;
+      current.audio.pause();
+      current.audio.removeAttribute('src');
+    }
+    if (current.url) URL.revokeObjectURL(current.url);
+    clipAudioRef.current = { audio: null, url: null, linkId: null };
+  }, []);
+
+  const stopLinkedPlayback = useCallback(({ pauseSource = true, announce = false } = {}) => {
+    const active = linkedPlaybackRef.current;
+    if (!active) return false;
+    stopExtractedClip();
+    if (pauseSource && active.kind === 'source') sendVilambit('pause');
+    setLinkedPlaybackState(null);
+    if (announce) setNotice(`Stopped linked ${active.kind === 'clip' ? 'clip' : 'source loop'}.`);
+    return true;
+  }, [sendVilambit, setLinkedPlaybackState, stopExtractedClip]);
+
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const meterModel = useMemo(() => parseMeterDocument(text), [text]);
   const anchorModel = useMemo(() => parseAnchorDocument(text), [text]);
@@ -164,10 +197,8 @@ export default function App() {
   }, [project, projectIO, projectMedia]);
 
   useEffect(() => () => {
-    const current = clipAudioRef.current;
-    if (current.audio) current.audio.pause();
-    if (current.url) URL.revokeObjectURL(current.url);
-  }, []);
+    stopExtractedClip();
+  }, [stopExtractedClip]);
 
   // ---- playback (M3) ----
   const player = useMemo(() => createPlayer(makeAudioEnv()), []);
@@ -279,6 +310,10 @@ export default function App() {
       return;
     }
 
+    // One musical transport owns the speakers at a time. Starting notation
+    // playback stops either an extracted linked clip or a Vilambit source loop.
+    stopLinkedPlayback();
+
     // Do not begin a sampled-voice transport while the 30 MB bank is still
     // loading. Starting immediately used the pluck fallback for the opening
     // notes and made the selected instrument appear to enter late.
@@ -308,6 +343,7 @@ export default function App() {
 
   const doStop = () => {
     player.stop();
+    stopLinkedPlayback();
     setPlaying(false);
     setPlayCursor(null);
     setPosition(0);
@@ -579,6 +615,7 @@ export default function App() {
       setNotice(result.message || 'That folder could not be initialized.');
       return;
     }
+    stopLinkedPlayback();
     const nextProject = { directory: result.directory, name: result.name };
     setProject(nextProject);
     setProjectMedia(result.media);
@@ -604,6 +641,7 @@ export default function App() {
       return;
     }
     if (!result) return;
+    stopLinkedPlayback();
     setProject({ directory: result.directory, name: result.name });
     setProjectMedia(result.media);
     setText(result.text);
@@ -629,6 +667,7 @@ export default function App() {
       return;
     }
     if (!res) return;
+    stopLinkedPlayback();
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
     setText(res.text);
@@ -646,6 +685,7 @@ export default function App() {
   // The form (or "Blank document") hands back the text it wrote.
   const createDoc = (newText) => {
     setShowNew(false);
+    stopLinkedPlayback();
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
     setText(newText);
@@ -805,15 +845,20 @@ export default function App() {
   // Vilambit Phase 3A — attach the player's current A–B range to the live
   // CodeMirror selection using repairable musical endpoints. The recording
   // stays in Vilambit; Sargam stores only identity, seconds, and notation.
-  const sendVilambit = useCallback((type, payload = {}) => {
-    const frameWindow = vilambitRef.current?.contentWindow;
-    return postVilambitCommand(frameWindow, type, payload, window.location.origin);
-  }, []);
-
   const receiveVilambitState = useCallback((state) => {
+    const previous = vilambitStateRef.current;
+    const active = linkedPlaybackRef.current;
+    // A manually-started Vilambit transport owns playback and therefore stops
+    // an extracted clip. A linked source session clears when that transport is
+    // paused or reaches its end.
+    if (active?.kind === 'clip' && !previous.playing && state.playing) {
+      stopLinkedPlayback({ pauseSource: false });
+    } else if (active?.kind === 'source' && previous.playing && !state.playing) {
+      setLinkedPlaybackState(null);
+    }
     vilambitStateRef.current = state;
     setVilambitState(state);
-  }, []);
+  }, [setLinkedPlaybackState, stopLinkedPlayback]);
 
   const doAttachAudioLoop = (playerState = vilambitState) => {
     const el = editorRef.current;
@@ -839,16 +884,14 @@ export default function App() {
     else setTimeout(restore, 0);
   };
 
-  const stopExtractedClip = useCallback(() => {
-    const current = clipAudioRef.current;
-    if (current.audio) current.audio.pause();
-    if (current.url) URL.revokeObjectURL(current.url);
-    clipAudioRef.current = { audio: null, url: null };
-  }, []);
-
   const activateAudioLink = useCallback(async (link, { play = false } = {}) => {
     if (!link) return;
     setSelectedAudioLinkId(link.id);
+
+    if (play && linkedPlaybackRef.current?.linkId === link.id) {
+      stopLinkedPlayback({ announce: true });
+      return;
+    }
 
     if (link.clipAssetId && project) {
       const clip = (projectMedia.clips || []).find((item) => item.id === link.clipAssetId);
@@ -857,23 +900,46 @@ export default function App() {
           setNotice(`Extracted clip ${clip.id} is ready in “${project.name}”.`);
           return;
         }
+        let file = null;
         try {
-          const file = await projectIO.readClip(project, clip.path);
-          stopExtractedClip();
-          if (vilambitStateRef.current.loaded && vilambitStateRef.current.playing) sendVilambit('pause');
-          const url = URL.createObjectURL(file);
-          const audio = new Audio(url);
-          clipAudioRef.current = { audio, url };
-          audio.addEventListener('ended', () => {
-            if (clipAudioRef.current.audio === audio) stopExtractedClip();
-          }, { once: true });
-          await audio.play();
+          file = await projectIO.readClip(project, clip.path);
           setClipPresence((current) => ({ ...current, [clip.id]: true }));
-          setNotice(`Playing extracted clip ${clip.id} (${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s from the source).`);
-          return;
         } catch (error) {
           setClipPresence((current) => ({ ...current, [clip.id]: false }));
-          setNotice(`Extracted clip is missing or unreadable; trying the original recording. ${error?.message || ''}`.trim());
+          setNotice(`Extracted clip is missing; trying the original recording. ${error?.message || ''}`.trim());
+        }
+        if (file) {
+          try {
+            stopLinkedPlayback();
+            if (playing) {
+              player.pause();
+              setPlaying(false);
+              setPosition(player.position);
+            }
+            if (vilambitStateRef.current.loaded && vilambitStateRef.current.playing) sendVilambit('pause');
+            const url = URL.createObjectURL(file);
+            const audio = new Audio(url);
+            audio.loop = true;
+            clipAudioRef.current = { audio, url, linkId: link.id };
+            audio.addEventListener('error', () => {
+              if (clipAudioRef.current.audio !== audio) return;
+              stopLinkedPlayback();
+              setNotice(`Extracted clip ${clip.id} could not continue playing.`);
+            }, { once: true });
+            await audio.play();
+            setLinkedPlaybackState({
+              linkId: link.id,
+              clipAssetId: clip.id,
+              kind: 'clip',
+              startTime: link.startTime,
+              endTime: link.endTime,
+            });
+            setNotice(`Looping extracted clip ${clip.id}. Choose Stop Linked, start another phrase, or use another transport to stop it.`);
+            return;
+          } catch (error) {
+            stopExtractedClip();
+            setNotice(`Extracted clip could not play; trying the original recording. ${error?.message || ''}`.trim());
+          }
         }
       }
     }
@@ -882,12 +948,32 @@ export default function App() {
       setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit to use this phrase.`);
       return;
     }
-    stopExtractedClip();
+    stopLinkedPlayback();
+    if (play && playing) {
+      player.pause();
+      setPlaying(false);
+      setPosition(player.position);
+    }
     sendVilambit('set-loop', { a: link.startTime, b: link.endTime, on: true });
     sendVilambit('seek', { seconds: link.startTime });
-    if (play) sendVilambit('play');
-    setNotice(`${play ? 'Playing' : 'Loaded'} linked source loop ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s.`);
-  }, [project, projectIO, projectMedia.clips, sendVilambit, stopExtractedClip]);
+    if (play) {
+      const sent = sendVilambit('play');
+      if (!sent) {
+        setNotice('Vilambit is not ready to play the linked source loop.');
+        return;
+      }
+      setLinkedPlaybackState({
+        linkId: link.id,
+        kind: 'source',
+        startTime: link.startTime,
+        endTime: link.endTime,
+      });
+    }
+    setNotice(`${play ? 'Looping' : 'Loaded'} linked source range ${link.startTime.toFixed(1)}–${link.endTime.toFixed(1)}s.`);
+  }, [
+    player, playing, project, projectIO, projectMedia.clips, sendVilambit,
+    setLinkedPlaybackState, stopExtractedClip, stopLinkedPlayback,
+  ]);
 
   const receiveVilambitError = useCallback((message) => {
     if (!pendingClipRef.current) return;
@@ -990,6 +1076,7 @@ export default function App() {
   };
 
   const doRemoveAudioLink = (id = selectedAudioLinkId) => {
+    if (linkedPlaybackRef.current?.linkId === id) stopLinkedPlayback();
     const result = removeAudioLink(text, id);
     setNotice(result.message);
     if (!result.ok) return;
@@ -1010,6 +1097,7 @@ export default function App() {
       setNotice(`No autosave copy found for “${entry.title || entry.name || entry.id}”.`);
       return;
     }
+    stopLinkedPlayback();
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
     setText(snap);
@@ -1138,7 +1226,9 @@ export default function App() {
           onClipExtracted={receiveExtractedClip}
           onVilambitError={receiveVilambitError}
           selectedLink={selectedAudioLink}
+          linkedPlayback={linkedPlayback}
           onPlayLinked={(link) => activateAudioLink(link, { play: true })}
+          onStopLinked={() => stopLinkedPlayback({ announce: true })}
           onRemoveLinked={doRemoveAudioLink}
         />
       )}
