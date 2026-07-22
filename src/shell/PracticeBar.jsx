@@ -101,7 +101,7 @@ export default function PracticeBar({
             <button
               type="button"
               disabled={!projectOpen || !player.extractable || extracting || Boolean(selectedLink.clipAssetId)}
-              title={!projectOpen ? 'Open or create a Project Folder first' : !player.extractable ? 'Vilambit is still decoding this recording, or its audio track is unavailable for direct extraction' : selectedLink.clipAssetId ? 'This link already has an extracted clip' : 'Save a source-speed WAV of this linked A–B range'}
+              title={!projectOpen ? 'Open or create a Project Folder first' : !player.extractable ? 'This browser cannot extract audio from the loaded recording' : selectedLink.clipAssetId ? 'This link already has an extracted clip' : player.source?.kind === 'video' ? 'Capture this source-speed video loop as a small audio clip in real time' : 'Save a source-speed audio clip of this linked A–B range'}
               onClick={() => onExtractClip?.(player, selectedLink)}
             >
               {extracting ? 'Extracting…' : selectedLink.clipAssetId ? 'Clip Saved' : 'Extract Clip'}

@@ -39,6 +39,7 @@ let actx = null, master = null;
 let stretch = null;          // Signalsmith node (buffer or live mode)
 let srcNode = null;          // MediaElementSource (video / fallback)
 let granular = null, dryGain = null, wetGain = null;   // fallback shifter
+let realtimeCaptureActive = false;
 const GRAIN = 4096, RB_SIZE = 1 << 16, RB_MASK = RB_SIZE - 1;
 
 async function buildGraph(){
@@ -92,6 +93,177 @@ function bufferChannels(ab){
 }
 
 function setBadge(t){ $('engineBadge').textContent = t; }
+
+function preferredCaptureMimeType(){
+  if (!window.MediaRecorder) return '';
+  const supported = typeof window.MediaRecorder.isTypeSupported === 'function'
+    ? (type) => window.MediaRecorder.isTypeSupported(type)
+    : () => true;
+  return [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+  ].find(supported) || '';
+}
+
+function extensionForMimeType(mimeType){
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime.includes('mp4')) return 'm4a';
+  if (mime.includes('ogg')) return 'ogg';
+  if (mime.includes('wav')) return 'wav';
+  return 'webm';
+}
+
+function canCaptureMediaElement(){
+  const Context = window.AudioContext || window.webkitAudioContext;
+  return Boolean(
+    window.MediaRecorder &&
+    Context &&
+    Context.prototype &&
+    typeof Context.prototype.createMediaStreamDestination === 'function'
+  );
+}
+
+function seekMediaElement(target){
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      media.removeEventListener('seeked', finish);
+      resolve();
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      media.removeEventListener('seeked', finish);
+      reject(error);
+    };
+    const timer = window.setTimeout(() => {
+      if (Math.abs(media.currentTime - target) <= 0.08) finish();
+      else fail(new Error('The recording did not seek to the clip start in time.'));
+    }, 4000);
+    media.addEventListener('seeked', finish);
+    try {
+      media.currentTime = target;
+      if (Math.abs(media.currentTime - target) <= 0.02 && media.readyState >= 2) {
+        queueMicrotask(finish);
+      }
+    } catch (error) {
+      fail(error);
+    }
+  });
+}
+
+function waitForMediaRangeEnd(target, durationSeconds){
+  return new Promise((resolve, reject) => {
+    const startedAt = performance.now();
+    const timeoutMs = Math.max(5000, (durationSeconds + 8) * 1000);
+    const check = () => {
+      if (media.ended || media.currentTime >= target - 0.02) {
+        resolve();
+        return;
+      }
+      if (performance.now() - startedAt >= timeoutMs) {
+        reject(new Error('Real-time clip capture timed out before reaching the loop end.'));
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+}
+
+async function captureMediaRangeRealtime(startTime, endTime){
+  if (!canCaptureMediaElement()) {
+    throw new Error('This browser cannot capture audio from the loaded recording.');
+  }
+
+  const wasPaused = media.paused;
+  const previousTime = Number.isFinite(media.currentTime) ? media.currentTime : state.posPaused;
+  const previousRate = Number.isFinite(media.playbackRate) ? media.playbackRate : 1;
+  const previousLoopOn = state.loopOn;
+  const previousMasterGain = master ? master.gain.value : 1;
+  const previousLastEff = lastEff;
+  let destination = null;
+  let recorder = null;
+  let chunks = [];
+
+  realtimeCaptureActive = true;
+  try {
+    if (!actx || !srcNode) await buildGraph();
+    if (!actx || !srcNode) throw new Error('Vilambit could not prepare the recording for real-time clip capture.');
+    if (actx.state === 'suspended') await actx.resume();
+
+    destination = actx.createMediaStreamDestination();
+    srcNode.connect(destination);
+
+    const mimeType = preferredCaptureMimeType();
+    recorder = mimeType
+      ? new MediaRecorder(destination.stream, { mimeType })
+      : new MediaRecorder(destination.stream);
+
+    const stopped = new Promise((resolve, reject) => {
+      recorder.addEventListener('dataavailable', (event) => {
+        if (event.data && event.data.size) chunks.push(event.data);
+      });
+      recorder.addEventListener('stop', resolve, { once: true });
+      recorder.addEventListener('error', (event) => {
+        reject(event.error || new Error('The browser could not record this clip.'));
+      }, { once: true });
+    });
+
+    state.loopOn = false;
+    applyLoopToEngine();
+    renderLoop();
+    media.pause();
+    if (master) master.gain.setValueAtTime(0, actx.currentTime);
+    media.playbackRate = 1;
+    try { media.preservesPitch = true; } catch(_){}
+    try { media.webkitPreservesPitch = true; } catch(_){}
+    try { media.mozPreservesPitch = true; } catch(_){}
+
+    await seekMediaElement(startTime);
+    recorder.start(250);
+    await media.play();
+    await waitForMediaRangeEnd(endTime, endTime - startTime);
+    media.pause();
+    recorder.stop();
+    await stopped;
+
+    const actualMimeType = recorder.mimeType || mimeType || chunks[0]?.type || 'audio/webm';
+    const blob = new Blob(chunks, { type: actualMimeType });
+    if (!blob.size) throw new Error('The browser captured an empty audio clip.');
+    return {
+      blob,
+      mimeType: actualMimeType,
+      extension: extensionForMimeType(actualMimeType),
+    };
+  } finally {
+    media.pause();
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); } catch(_){}
+    }
+    if (destination && srcNode) {
+      try { srcNode.disconnect(destination); } catch(_){}
+    }
+    if (master && actx) master.gain.setValueAtTime(previousMasterGain, actx.currentTime);
+    state.loopOn = previousLoopOn;
+    renderLoop();
+    applyLoopToEngine();
+    media.playbackRate = previousRate;
+    lastEff = previousLastEff;
+    try { media.currentTime = previousTime; } catch(_){}
+    state.posPaused = previousTime;
+    realtimeCaptureActive = false;
+    if (!wasPaused) {
+      try { await media.play(); } catch(_){}
+    }
+  }
+}
 
 /* granular dual-tap pitch shifter — fallback only */
 function buildGranular(){
@@ -1210,11 +1382,11 @@ function tick(){
   if (state.fileURL){
     const p = pos();
     const active = state.engine === 'buffer' ? state.playing : !media.paused;
-    if (active){
+    if (active && !realtimeCaptureActive){
       const eff = effRateAt(p);
       if (lastEff === null || Math.abs(eff - lastEff) > 1e-9) setEngineRate(eff);
     }
-    if (state.engine !== 'buffer' &&
+    if (!realtimeCaptureActive && state.engine !== 'buffer' &&
         state.loopOn && state.loopA != null && state.loopB != null &&
         media.currentTime >= state.loopB - 0.02){
       media.currentTime = state.loopA;
@@ -1278,7 +1450,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       duration: state.duration,
       position: pos(),
       playing: bridgeIsPlaying(),
-      extractable: Boolean(state.decoded),
+      extractable: Boolean(state.decoded) || canCaptureMediaElement(),
       tempo: state.tempo,
       semitones: state.semitones,
       cents: state.cents,
@@ -1381,23 +1553,34 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       return;
     }
     if (type === 'extract-loop') {
-      if (!state.decoded) {
-        throw new Error('This recording has no decoded audio available for clip extraction. Audio files work now; some large videos will need the later real-time capture path.');
-      }
       const requestId = String(payload && payload.requestId || '');
       if (!requestId) throw new TypeError('Clip extraction requires a requestId.');
       const requestedA = payload && payload.a != null ? bridgeNumber(payload, 'a') : state.loopA;
       const requestedB = payload && payload.b != null ? bridgeNumber(payload, 'b') : state.loopB;
       const loop = Core.normalizeLoop(requestedA, requestedB, state.duration);
       if (!loop.ready || loop.loopB - loop.loopA < 0.05) throw new Error('Set a complete A–B loop before extracting a clip.');
-      const sliced = sliceChannels(state.decoded, loop.loopA, loop.loopB);
-      const blob = encodeWav(sliced.channels, sliced.sr);
+
+      let blob;
+      let mimeType;
+      let extension;
+      if (state.decoded) {
+        const sliced = sliceChannels(state.decoded, loop.loopA, loop.loopB);
+        blob = encodeWav(sliced.channels, sliced.sr);
+        mimeType = blob.type || 'audio/wav';
+        extension = 'wav';
+      } else {
+        const captured = await captureMediaRangeRealtime(loop.loopA, loop.loopB);
+        blob = captured.blob;
+        mimeType = captured.mimeType;
+        extension = captured.extension;
+      }
+
       const buffer = await blob.arrayBuffer();
       bridgePublishClip({
         requestId,
         buffer,
-        mimeType: blob.type || 'audio/wav',
-        extension: 'wav',
+        mimeType,
+        extension,
         startTime: loop.loopA,
         endTime: loop.loopB,
         source: {

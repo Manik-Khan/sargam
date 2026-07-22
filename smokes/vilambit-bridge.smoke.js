@@ -157,6 +157,28 @@ export const smokes = [
     },
   },
   {
+    name: 'vilambit bridge: MP4 and undecoded media use the real-time capture fallback',
+    async fn() {
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(app, /createMediaStreamDestination/);
+      assert.match(app, /new MediaRecorder/);
+      assert.match(app, /captureMediaRangeRealtime/);
+      assert.match(app, /extractable: Boolean\(state\.decoded\) \|\| canCaptureMediaElement\(\)/);
+      assert.match(app, /if \(state\.decoded\)[\s\S]*?sliceChannels\(state\.decoded[\s\S]*?else \{[\s\S]*?captureMediaRangeRealtime/);
+    },
+  },
+  {
+    name: 'vilambit bridge: real-time extraction preserves canonical source speed',
+    async fn() {
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(app, /realtimeCaptureActive = true/);
+      assert.match(app, /media\.playbackRate = 1/);
+      assert.match(app, /active && !realtimeCaptureActive/);
+      assert.match(app, /!realtimeCaptureActive && state\.engine !== 'buffer'/);
+      assert.match(app, /media\.playbackRate = previousRate/);
+    },
+  },
+  {
     name: 'vilambit bridge: notation shell mounts one remote bar against the persistent iframe',
     async fn() {
       const app = await read('../src/shell/App.jsx');
