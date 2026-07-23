@@ -64,7 +64,7 @@
   #volWrap{display:flex;align-items:center;gap:8px;margin-left:auto}
   #volWrap label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
 
-  #controls{display:none;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+  #controls{display:none;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
   #controls.on{display:grid}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px 16px;display:flex;flex-direction:column;gap:11px}
   .card h2{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
@@ -113,6 +113,27 @@
   .timeIn{width:100%;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
   .timeIn.invalid{border-color:var(--madder);box-shadow:0 0 0 1px var(--madder-soft)}
 
+
+  .playbackCard,.loopMarkersCard{gap:12px}
+  .playbackGrid,.loopMarkersGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+  .subPanel{display:flex;flex-direction:column;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);min-width:0}
+  .subPanelTitle{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .markerPanel #markerList{max-height:340px}
+  .markerToolbar{align-items:center}
+
+  .collapsibleCard{padding:0;overflow:hidden}
+  .cardSummary{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;padding:14px 16px;background:var(--panel)}
+  .cardSummary::-webkit-details-marker{display:none}
+  .summaryTitle{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .summaryHint{color:var(--wave-dim);font-size:12px;margin-left:auto}
+  .cardSummary::after{content:'▸';color:var(--wave-dim);font-size:12px;transition:transform .12s ease}
+  .collapsibleCard[open] .cardSummary::after{transform:rotate(90deg)}
+  .detailsBody{display:flex;flex-direction:column;gap:11px;padding:0 16px 16px}
+
+  @media (min-width:980px){
+    .playbackCard,.loopMarkersCard{grid-column:span 2}
+  }
+
   #tuneResult{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums;min-height:20px}
   #tuneResult .hz{color:var(--brass)}
   #tuneResult .off2{color:var(--wave-dim);font-size:13px}
@@ -133,10 +154,11 @@
     .waveToolGroup{border-right:none;padding-right:0}
     .mrow{grid-template-columns:auto minmax(70px,1fr) auto;grid-template-areas:"time label delete" ". actions actions"}
     .markerActions{justify-content:flex-start}
+    .playbackGrid,.loopMarkersGrid{grid-template-columns:1fr}
   }
   @media (max-width:480px){
     .loopBoundaryRow{grid-template-columns:18px minmax(80px,1fr);grid-template-areas:"point input" ". playhead" ". marker" ". nudges"}
     .loopPlayhead,.loopSaveMarker{justify-self:start}
     .loopNudgeGroup{justify-content:flex-start;flex-wrap:wrap}
   }
-  @media (max-width:640px){main{padding:12px}header{padding:12px 14px 10px}#clock{font-size:15px}}
+  @media (max-width:640px){main{padding:12px}header{padding:12px 14px 10px}#clock{font-size:15px}#controls{grid-template-columns:1fr}}

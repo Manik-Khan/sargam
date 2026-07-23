@@ -63,127 +63,144 @@
 
   <div id="controls">
 
-    <!-- TEMPO -->
-    <div class="card">
-      <h2>Speed</h2>
-      <div class="readout"><span id="tempoVal">100</span><small>% of original — pitch unchanged</small></div>
-      <input type="range" id="tempo" min="25" max="200" step="1" value="100" aria-label="Playback speed percent">
-      <div class="scaleMarks"><span>25%</span><span>100%</span><span>200%</span></div>
-      <div class="row tight">
-        <button class="btn small" data-tempo="-5">−5</button>
-        <button class="btn small" data-tempo="-1">−1</button>
-        <button class="btn small" data-tempo="1">+1</button>
-        <button class="btn small" data-tempo="5">+5</button>
-        <span style="flex:1"></span>
-        <button class="btn small" data-temposet="50">50%</button>
-        <button class="btn small" data-temposet="75">75%</button>
-        <button class="btn small" data-temposet="100">100%</button>
-      </div>
-    </div>
-
-    <!-- PITCH -->
-    <div class="card">
-      <h2>Pitch</h2>
-      <div class="readout"><span id="pitchVal">+0 st, +0 ¢</span><small>speed unchanged</small></div>
-      <div class="row">
-        <span class="lbl" style="width:66px">Semitones</span>
-        <button class="btn small" data-st="-1">−</button>
-        <span id="stVal" style="font-family:var(--mono);width:34px;text-align:center;font-variant-numeric:tabular-nums">0</span>
-        <button class="btn small" data-st="1">+</button>
-      </div>
-      <div class="row" style="flex-wrap:nowrap">
-        <span class="lbl" style="width:66px;flex:none">Cents</span>
-        <button class="btn small" data-cent="-1">−</button>
-        <input type="range" id="cents" min="-100" max="100" step="1" value="0" aria-label="Fine tune in cents">
-        <button class="btn small" data-cent="1">+</button>
-        <span id="centsVal" style="font-family:var(--mono);width:52px;flex:none;text-align:right;font-variant-numeric:tabular-nums">0 ¢</span>
-      </div>
-      <div class="row tight">
-        <button class="btn small" id="pitchReset">Reset to original pitch</button>
-      </div>
-    </div>
-
-    <!-- TUNING -->
-    <div class="card">
-      <h2>Tuning — detect &amp; retune</h2>
-      <div id="tuneResult"><span class="off2">Select a sustained stretch (drone, held note) with A–B, then detect.</span></div>
-      <div id="tuneLive" style="font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;min-height:16px"></div>
-      <div class="row tight">
-        <button class="btn small" id="detectBtn">Detect pitch</button>
-        <span class="lbl">Ref A4</span>
-        <input class="numIn" id="refA" type="number" value="440" min="400" max="480" step="0.1"> Hz
-      </div>
-      <div class="row tight">
-        <button class="btn small" id="snapBtn" disabled>Snap to nearest note</button>
-        <button class="btn small" id="retuneBtn" disabled>Move to</button>
-        <select id="targetNote" disabled>
-          <option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option>
-          <option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option>
-        </select>
-      </div>
-      <div class="hint">Snap removes the ¢ offset. Move to retargets a different note (e.g. pull a near-C♯ recording onto C). Both set the correction absolutely — pressing again won't stack. Fine-tune by ear with the ¢ steppers after; the line above tracks where the pitch now sits.</div>
-      <div class="radioRow">
-        <span class="lbl">Mode</span>
-        <label><input type="radio" name="tuneMode" value="pitch" checked> Pitch only</label>
-        <label><input type="radio" name="tuneMode" value="tape"> Tape speed (pitch + tempo)</label>
-      </div>
-      <div class="hint">Tape mode treats the offset as reel/tape drift and corrects speed and pitch together.</div>
-    </div>
-
-    <!-- LOOP -->
-    <div class="card loopCard">
+    <!-- PLAYBACK -->
+    <div class="card playbackCard">
       <div class="cardTitleRow">
-        <h2>Loop</h2>
+        <h2>Playback</h2>
+      </div>
+      <div class="playbackGrid">
+        <section class="subPanel">
+          <div class="subPanelTitle">Speed</div>
+          <div class="readout"><span id="tempoVal">100</span><small>% of original — pitch unchanged</small></div>
+          <input type="range" id="tempo" min="25" max="200" step="1" value="100" aria-label="Playback speed percent">
+          <div class="scaleMarks"><span>25%</span><span>100%</span><span>200%</span></div>
+          <div class="row tight">
+            <button class="btn small" data-tempo="-5">−5</button>
+            <button class="btn small" data-tempo="-1">−1</button>
+            <button class="btn small" data-tempo="1">+1</button>
+            <button class="btn small" data-tempo="5">+5</button>
+            <span style="flex:1"></span>
+            <button class="btn small" data-temposet="50">50%</button>
+            <button class="btn small" data-temposet="75">75%</button>
+            <button class="btn small" data-temposet="100">100%</button>
+          </div>
+        </section>
+
+        <section class="subPanel">
+          <div class="subPanelTitle">Pitch</div>
+          <div class="readout"><span id="pitchVal">+0 st, +0 ¢</span><small>speed unchanged</small></div>
+          <div class="row">
+            <span class="lbl" style="width:66px">Semitones</span>
+            <button class="btn small" data-st="-1">−</button>
+            <span id="stVal" style="font-family:var(--mono);width:34px;text-align:center;font-variant-numeric:tabular-nums">0</span>
+            <button class="btn small" data-st="1">+</button>
+          </div>
+          <div class="row" style="flex-wrap:nowrap">
+            <span class="lbl" style="width:66px;flex:none">Cents</span>
+            <button class="btn small" data-cent="-1">−</button>
+            <input type="range" id="cents" min="-100" max="100" step="1" value="0" aria-label="Fine tune in cents">
+            <button class="btn small" data-cent="1">+</button>
+            <span id="centsVal" style="font-family:var(--mono);width:52px;flex:none;text-align:right;font-variant-numeric:tabular-nums">0 ¢</span>
+          </div>
+          <div class="row tight">
+            <button class="btn small" id="pitchReset">Reset to original pitch</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- LOOP & MARKERS -->
+    <div class="card loopMarkersCard">
+      <div class="cardTitleRow">
+        <h2>Loop &amp; Markers</h2>
         <div class="row tight loopMainActions">
           <button class="btn small" id="loopToggle" disabled>Loop off</button>
           <button class="btn small" id="loopClear" disabled>Clear</button>
         </div>
       </div>
-      <div id="loopState"><span class="off">no loop set</span></div>
-      <div id="loopBoundaryGrid">
-        <div class="loopBoundaryRow">
-          <label for="loopAInput">A</label>
-          <input class="timeIn" id="loopAInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop start time">
-          <button class="btn small loopPlayhead" id="setA">Playhead → A <kbd>A</kbd></button>
-          <button class="btn small loopSaveMarker" id="saveAAsMarker" title="Save the current A boundary as a marker">A → Marker</button>
-          <div class="loopNudgeGroup" role="group" aria-label="Adjust loop start">
-            <button class="btn small" data-loop-point="A" data-loop-nudge="-0.1" title="Move A earlier by 100 milliseconds">−100</button>
-            <button class="btn small" data-loop-point="A" data-loop-nudge="-0.01" title="Move A earlier by 10 milliseconds">−10</button>
-            <span>ms</span>
-            <button class="btn small" data-loop-point="A" data-loop-nudge="0.01" title="Move A later by 10 milliseconds">+10</button>
-            <button class="btn small" data-loop-point="A" data-loop-nudge="0.1" title="Move A later by 100 milliseconds">+100</button>
+      <div class="loopMarkersGrid">
+        <section class="subPanel">
+          <div class="subPanelTitle">Loop</div>
+          <div id="loopState"><span class="off">no loop set</span></div>
+          <div id="loopBoundaryGrid">
+            <div class="loopBoundaryRow">
+              <label for="loopAInput">A</label>
+              <input class="timeIn" id="loopAInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop start time">
+              <button class="btn small loopPlayhead" id="setA">Playhead → A <kbd>A</kbd></button>
+              <button class="btn small loopSaveMarker" id="saveAAsMarker" title="Save the current A boundary as a marker">A → Marker</button>
+              <div class="loopNudgeGroup" role="group" aria-label="Adjust loop start">
+                <button class="btn small" data-loop-point="A" data-loop-nudge="-0.1" title="Move A earlier by 100 milliseconds">−100</button>
+                <button class="btn small" data-loop-point="A" data-loop-nudge="-0.01" title="Move A earlier by 10 milliseconds">−10</button>
+                <span>ms</span>
+                <button class="btn small" data-loop-point="A" data-loop-nudge="0.01" title="Move A later by 10 milliseconds">+10</button>
+                <button class="btn small" data-loop-point="A" data-loop-nudge="0.1" title="Move A later by 100 milliseconds">+100</button>
+              </div>
+            </div>
+            <div class="loopBoundaryRow">
+              <label for="loopBInput">B</label>
+              <input class="timeIn" id="loopBInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop end time">
+              <button class="btn small loopPlayhead" id="setB">Playhead → B <kbd>B</kbd></button>
+              <button class="btn small loopSaveMarker" id="saveBAsMarker" title="Save the current B boundary as a marker">B → Marker</button>
+              <div class="loopNudgeGroup" role="group" aria-label="Adjust loop end">
+                <button class="btn small" data-loop-point="B" data-loop-nudge="-0.1" title="Move B earlier by 100 milliseconds">−100</button>
+                <button class="btn small" data-loop-point="B" data-loop-nudge="-0.01" title="Move B earlier by 10 milliseconds">−10</button>
+                <span>ms</span>
+                <button class="btn small" data-loop-point="B" data-loop-nudge="0.01" title="Move B later by 10 milliseconds">+10</button>
+                <button class="btn small" data-loop-point="B" data-loop-nudge="0.1" title="Move B later by 100 milliseconds">+100</button>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="loopBoundaryRow">
-          <label for="loopBInput">B</label>
-          <input class="timeIn" id="loopBInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop end time">
-          <button class="btn small loopPlayhead" id="setB">Playhead → B <kbd>B</kbd></button>
-          <button class="btn small loopSaveMarker" id="saveBAsMarker" title="Save the current B boundary as a marker">B → Marker</button>
-          <div class="loopNudgeGroup" role="group" aria-label="Adjust loop end">
-            <button class="btn small" data-loop-point="B" data-loop-nudge="-0.1" title="Move B earlier by 100 milliseconds">−100</button>
-            <button class="btn small" data-loop-point="B" data-loop-nudge="-0.01" title="Move B earlier by 10 milliseconds">−10</button>
-            <span>ms</span>
-            <button class="btn small" data-loop-point="B" data-loop-nudge="0.01" title="Move B later by 10 milliseconds">+10</button>
-            <button class="btn small" data-loop-point="B" data-loop-nudge="0.1" title="Move B later by 100 milliseconds">+100</button>
+          <div id="loopDuration" class="hint">Set both boundaries to see the loop duration.</div>
+          <div class="hint">Drag across the waveform to make a loop, drag A/B to refine it, or save either boundary directly as a marker. Shift-click a marker sets A; Option/Alt-click sets B.</div>
+        </section>
+
+        <section class="subPanel markerPanel">
+          <div class="subPanelTitle">Markers</div>
+          <div class="row tight markerToolbar">
+            <button class="btn small" id="addMarker">Mark this moment <kbd style="font-size:10px">M</kbd></button>
+            <span style="flex:1"></span>
+            <button class="btn small" id="exportMk">Save session</button>
+            <button class="btn small" id="importMk">Load</button>
+            <input type="file" id="mkFile" accept=".json" hidden>
           </div>
-        </div>
+          <div id="markerList"><div class="empty">No markers yet — press M while listening.</div></div>
+          <div class="hint">Markers can jump, become A or B, or loop to the next marker.</div>
+        </section>
       </div>
-      <div id="loopDuration" class="hint">Set both boundaries to see the loop duration.</div>
-      <div class="hint">Drag across the waveform to make a loop, drag A/B to refine it, or save either boundary directly as a marker. Shift-click a marker sets A; Option/Alt-click sets B.</div>
     </div>
 
-    <!-- MARKERS -->
-    <div class="card">
-      <h2>Markers</h2>
-      <div class="row tight">
-        <button class="btn small" id="addMarker">Mark this moment <kbd style="font-size:10px">M</kbd></button>
-        <span style="flex:1"></span>
-        <button class="btn small" id="exportMk">Save session</button>
-        <button class="btn small" id="importMk">Load</button>
-        <input type="file" id="mkFile" accept=".json" hidden>
+    <!-- ADVANCED TUNING -->
+    <details class="card collapsibleCard tuningCard">
+      <summary class="cardSummary">
+        <span class="summaryTitle">Advanced tuning</span>
+        <span class="summaryHint">Detect &amp; retune</span>
+      </summary>
+      <div class="detailsBody">
+        <div class="subPanelTitle">Detect &amp; retune</div>
+        <div id="tuneResult"><span class="off2">Select a sustained stretch (drone, held note) with A–B, then detect.</span></div>
+        <div id="tuneLive" style="font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;min-height:16px"></div>
+        <div class="row tight">
+          <button class="btn small" id="detectBtn">Detect pitch</button>
+          <span class="lbl">Ref A4</span>
+          <input class="numIn" id="refA" type="number" value="440" min="400" max="480" step="0.1"> Hz
+        </div>
+        <div class="row tight">
+          <button class="btn small" id="snapBtn" disabled>Snap to nearest note</button>
+          <button class="btn small" id="retuneBtn" disabled>Move to</button>
+          <select id="targetNote" disabled>
+            <option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option>
+            <option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option>
+          </select>
+        </div>
+        <div class="hint">Snap removes the ¢ offset. Move to retargets a different note (e.g. pull a near-C♯ recording onto C). Both set the correction absolutely — pressing again won't stack. Fine-tune by ear with the ¢ steppers after; the line above tracks where the pitch now sits.</div>
+        <div class="radioRow">
+          <span class="lbl">Mode</span>
+          <label><input type="radio" name="tuneMode" value="pitch" checked> Pitch only</label>
+          <label><input type="radio" name="tuneMode" value="tape"> Tape speed (pitch + tempo)</label>
+        </div>
+        <div class="hint">Tape mode treats the offset as reel/tape drift and corrects speed and pitch together.</div>
       </div>
-      <div id="markerList"><div class="empty">No markers yet — press M while listening.</div></div>
-    </div>
+    </details>
 
     <!-- BEATS -->
     <div class="card">
@@ -231,7 +248,7 @@
       <div class="hint">Untick the checkbox for a pure trim — a bit-clean cut of the selection. Audio only; video exports its soundtrack.</div>
     </div>
 
-  </div>
+  </div>  </div>
 </main>
 
 <footer>
