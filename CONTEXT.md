@@ -1,80 +1,65 @@
-# Sargam — Project Context & Handoff (updated 2026-07-21, Clip Vault and Portable Projects handoff)
+# Sargam — Project Context & Handoff (updated 2026-07-23, Portable Projects and Vilambit Source Workspace)
 
-**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with the newest dated handoff, `SARGAM_NEXT_SESSION_CONTEXT_2026-07-21_CLIP_VAULT_PORTABLE_PROJECTS.md`, then inspect the actual GitHub Desktop clone. Manik is the musical authority; never invent raga, tala, bol, ornament, or notation semantics.
+**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with the newest dated handoff, `SARGAM_NEXT_SESSION_CONTEXT_2026-07-23_VILAMBIT_SOURCE_WORKSPACE_STANDALONE.md`, then inspect the actual GitHub Desktop clone. Manik is the musical authority; never invent raga, tala, bol, ornament, or notation semantics.
 
-## Authoritative recent-state update (2026-07-21 — supersedes older recent-state blocks)
+## Authoritative recent-state update (2026-07-23 — supersedes older recent-state blocks)
 
-### Accepted geometry and notation continuity
+### Accepted notation geometry and Phase 3A links
 
-The Anchor Geometry Stabilization work is now browser-accepted by Manik:
+Preserve the browser-accepted Anchor Geometry and linked-notation behavior:
 
-- Diri is a two-consecutive-attack `V`, attached to the exact timed-slot grid rather than drifting as a line-wide overlay.
-- The Diri V was reduced to a visually appropriate size while preserving its two endpoints.
-- Meter annotations render as a mirrored krintan-style bracket below the selected rhythmic span and retain their span in Preview, Export, and print/PDF.
-- Repeated local slides such as `{n~}D--{n~}D` preserve the rhythm of `D--D` and render as two independent ordinary over-arcs, one `n → D` approach per destination.
-- Repeat signs remain full-height, level with the notation, and sit outside the metric note grid without shifting ordinary lines.
-- Playback highlighting updates only the active class; it no longer rebuilds the score every beat or rhythmically scrolls the page downward.
-- Preview, Export, and print geometry now share the accepted rendering behavior for these features.
+- Diri remains a two-consecutive-attack `V` attached to exact timed-slot geometry.
+- Meter annotations use the accepted mirrored bracket below the selected rhythmic span and retain their width in Preview, Export, and print/PDF.
+- Repeated local approaches such as `{n~}D--{n~}D` preserve rhythm and draw independent ordinary arcs.
+- Repeat signs remain full-height and outside the metric note grid.
+- Playback highlighting updates only the active class and does not rebuild or rhythmically scroll the score.
+- A selected notation phrase can store and restore a Vilambit A–B range through the versioned `sargam-audio-links:v1` Markdown-safe block.
+- Clean mode folds generated anchors/audio links; Structure mode preserves the exact source.
 
-The last user-run pre-Phase-3A gate was:
+Do not reopen these areas without a concrete regression.
 
-```text
-424 passed, 0 failed
-vite build succeeded
-94 modules transformed
-```
+### Phase 3B — local project folders, clips, and clip-first playback
 
-### Vilambit Phase 3A — linked notation loops
-
-Vilambit Phase 3A is working in the browser and was positively accepted by Manik:
-
-- select a notation phrase in CodeMirror;
-- set an A–B loop in Vilambit;
-- attach the current loop to the notation selection;
-- store the relationship in a versioned `sargam-audio-links:v1` Markdown-safe metadata block;
-- show a subtle linked-audio indicator in Preview only;
-- click a linked phrase to restore the loop and seek to A without forced autoplay;
-- use **Play Linked** to restore, seek, and play;
-- remove a selected link;
-- fold generated audio-link metadata in Clean mode while preserving exact source in Structure mode.
-
-The Phase 3A package was verified by the assistant at `431 passed, 0 failed` with a successful Vite build (`96 modules transformed`). Manik confirmed the browser workflow is working nicely. The next session must still run the suite/build in the actual current clone before editing and record the real current count.
-
-### New product direction: local project folders, extracted clips, and one-file portable projects
-
-The next phase is **Vilambit Phase 3B — Local Project Folder, Clip Vault, and Portable Project Format**.
-
-The central decision is local-first storage:
-
-1. The user explicitly chooses a Sargam project folder. The browser may read and write only that user-approved folder; Sargam must never imply unrestricted filesystem access.
-2. The original multi-gigabyte source recording may remain outside the project folder as the archival source.
-3. Vilambit extracts only the linked A–B audio ranges into small audio clips.
-4. Binary media must never be embedded as Base64 or Blob data inside Markdown.
-5. Markdown stores notation and lightweight IDs/references; a media manifest stores asset metadata; the project folder stores actual clips.
-
-Proposed visible local project structure:
+The local-first media model is working in Manik's browser:
 
 ```text
-Raga Bageshri/
+Project Folder/
 ├── composition.md
 ├── media.json
 └── clips/
-    ├── clip-a1.opus
-    ├── clip-a2.opus
-    └── clip-a3.opus
+    └── clip-....wav/webm/m4a/etc.
 ```
 
-The project may remember the original source identity, filename, size/fingerprint, original A–B timestamps, and optional reconnection information. A browser file handle is a local permission object and should not be treated as portable JSON.
+Accepted behavior:
 
-### Portable single-source package
+- The user explicitly creates or opens a project folder; Sargam writes only inside the granted folder.
+- Audio links use explicit source and clip identities rather than filename-only binding.
+- Ordinary decodable audio can be sliced locally; long MP4/video sources can be captured in real time at source speed and pitch.
+- Binary audio is never embedded in Markdown or JSON.
+- `composition.md` stores notation relationships, source ranges, and lightweight IDs.
+- `media.json` stores source/clip asset records and refined clip-loop information.
+- Actual audio lives in `clips/`.
+- Linked playback priority is: extracted clip → loaded original source A–B range → locate/reload source.
+- Reloading the original recording does **not** supersede a valid extracted clip.
+- Original source timestamps remain available even if a clip is deleted.
 
-A user must not have to upload the notation, manifest, and clips separately. Sargam should support one portable archive, tentatively named:
+### Extracted clip transport and loop editing
 
-```text
-Raga-Bageshri.sargam
-```
+Manik browser-confirmed that extracted clips survive a hard refresh and play without the full source recording. The later linked transport and clip editor are also working well in browser testing:
 
-Internally it can be a ZIP-compatible container:
+- extracted linked clips loop continuously until stopped;
+- **Play Linked** becomes **Stop Linked** while active;
+- other transports yield cleanly rather than allowing competing playback;
+- clips use refined non-destructive `loopStart` / `loopEnd` points;
+- the Clip Loop Editor provides a waveform, draggable A/B points, ±10 ms and ±100 ms nudging, reset, preview looping, seam smoothing, and source reopening;
+- newer extractions preserve context padding around the intended loop so boundaries may be expanded or shortened later;
+- the original source range and the refined clip range remain distinct.
+
+This architecture is also the foundation for future Practice Sets: repetition counts, timed blocks, speed ladders, rests, and ordered queues. The routine-builder UI is not yet shipped.
+
+### Phase 3C — portable `.sargam` projects
+
+The one-file portable project is browser-accepted. Manik exported a `.sargam` package, opened it in a new session and destination folder, and confirmed that the project and linked clip worked without the original master recording.
 
 ```text
 Raga-Bageshri.sargam
@@ -82,65 +67,89 @@ Raga-Bageshri.sargam
 ├── composition.md
 ├── media.json
 └── clips/
-    ├── clip-a1.opus
-    └── clip-a2.opus
+    └── clip-....*
 ```
 
-The intended experience is:
+Binding behavior:
 
-```text
-drag/open one .sargam file
-→ Sargam unpacks it in the browser
-→ notation, links, and clips are immediately available
-→ the recipient can listen, edit, practice, save, or export a separate copy
-```
+- one package reconstructs the editable/listenable project;
+- notation text is preserved rather than regenerated on import;
+- clips and refined loop regions travel with the project;
+- import creates an independent copy and does not silently overwrite an existing project;
+- package validation rejects unsafe paths, duplicate paths, corruption/checksum failures, and unreasonable package conditions;
+- no account, Cloudinary dependency, or internet connection is required.
 
-This package is the first sharing mechanism. It does not require Cloudinary or user accounts.
+### Vilambit Source Workspace — Waves 1, 1B, and 1C
 
-### Cloud and collaboration direction
+The current source-workspace wave improves authoring against long recordings. Preserve the implemented behavior:
 
-Cloudinary is optional distribution storage for extracted clips, not the mandatory working store and not a replacement for project data. A future application backend would be required for project ownership, permissions, comments, suggestions, revision history, notifications, and collaborative editing.
+- the waveform has a visible time window independent of the full recording;
+- Zoom In/Out, Fit Loop, Show All, pan, Ctrl/Cmd+wheel zoom, Shift+wheel pan, and optional playhead-follow are present;
+- waveform selection, seeking, A/B handles, markers, beat grid, regions, and playhead all map through the visible window;
+- A and B accept precise timecodes and ±10 ms / ±100 ms nudging;
+- markers can **Set A**, **Set B**, or **Loop → next**;
+- Shift-clicking a marker sets A; Option/Alt-clicking sets B;
+- **A → Marker** and **B → Marker** save exact loop boundaries without moving playback; repeated saves avoid near-duplicate markers;
+- marker times are copied into loop boundaries rather than permanently binding the loop to a mutable marker.
 
-Planned sharing levels:
+Wave 1C is the current UI-consolidation candidate and still needs explicit browser acceptance after application:
 
-```text
-Export Copy        self-contained independent .sargam package
-Share Read-Only    hosted notation and clips
-Share for Comments anchored feedback and suggestions
-Invite as Editor   shared project state
-Create Fork        independent cloud copy
-```
+- Speed and Pitch are combined into one **Playback** card.
+- Loop and Markers are combined into one **Loop & Markers** card.
+- Tuning is a collapsed **Advanced tuning** section.
+- waveform navigation remains in the waveform toolbar.
+- the major workflow cards receive more room on wider screens and collapse responsively on smaller screens.
 
-Cloud media and collaboration are later phases. The immediate goal is a robust local project and portable archive.
+The latest complete smoke/build count after these later waves was not recorded in chat. Before editing, run the actual clone gate and record the result rather than repeating an old number.
 
 ### Next implementation order
 
-1. **Freeze and inspect the current clone.** Run `git status`, `npm run smoke`, and `npm run build` before editing.
-2. **Define media/project contracts first.** Create versioned, testable source-asset, clip-asset, manifest, and portable-package schemas.
-3. **Add explicit source identity.** Audio links must name a `sourceAssetId`; do not assume one global recording forever.
-4. **Choose/Open Project Folder.** Implement full local-folder mode where supported, with import/export fallback elsewhere.
-5. **Extract Current Loop.** Save the current A–B range as a small audio-only clip. Prefer source-speed/source-pitch extraction as the canonical clip and store practice settings separately.
-6. **Play extracted clips.** Linked notation should prefer its clip, then fall back to the original source A–B range, then offer **Locate recording**.
-7. **Clip Vault management.** Show storage used, missing clips, unused clips, export, delete, and relink actions.
-8. **Portable `.sargam` import/export.** One file must reconstruct the editable/listenable project without separate uploads.
-9. **Optional Cloudinary publishing.** Upload only selected clips or packages after the local system is reliable.
-10. **Collaboration backend later.** Add accounts, comments, suggestions, permissions, and revisions only after portable projects are settled.
+1. **Browser-accept Wave 1C.** Confirm the consolidated layout at Manik's normal screen width and correct any remaining crowding without changing working loop semantics.
+2. **Vilambit Source Workspace Wave 2 — project-native per-source workspace.** Persist current position, A/B loop, loop-on state, speed, pitch, markers, BPM, speed regions, visible waveform window, and follow preference by `sourceAssetId`; restore automatically when reopening the project; include it in `.sargam` packages.
+3. **Wave 3 — sources and large-file optimization.** Add a Sources panel, locate/reconnect/switch/resume behavior, stronger identity checks, cached waveform peaks for long/streamed recordings, and resource cleanup. Remove unused duplicate source files such as `public/vilambit/vilambit-app 2.js` and `src/shell/PracticeBar 2.jsx` only after confirming they are truly unreferenced in the exact clone.
+4. **Shared Vilambit Core.** Separate reusable media loading, stretch/pitch, waveform, loop, markers, workspace, and queue logic from the Sargam-specific notation/extraction shell. Do not rewrite the stable iframe integration prematurely.
+5. **Standalone browser Vilambit for the FileMaker library.** FileMaker remains the catalog and opens the player by stable record/library ID; the browser player resolves media served over the local network. Exact Windows, FileMaker, and browser versions must be recorded before setting the compatibility floor.
+6. **Playlist/queue.** Add tracks without interrupting the current item; reorder, remove, next/previous, repeat track/queue, shuffle, Clear Queue, Reset Session, and later named playlists. Infinite loops need explicit repeat-count or timed-advance options before queue continuation.
+7. **Practice Set Builder.** Use the same queue/transport foundation for recorded exercises, fixed repetitions, target minutes, speed ladders, rests, and teacher-authored routines packaged inside `.sargam`.
+8. **Cloud/collaboration later.** Optional publishing and a real application backend remain separate from local-first authoring and playback.
 
-### Binding media/storage rulings
+### Standalone/FileMaker direction
+
+The preferred archival-player direction is a browser-hosted Vilambit served on the local network, not a second unrelated copy of `vilambit.html`.
+
+```text
+Vilambit Core
+├── media loading and transport
+├── pitch / tempo engine
+├── waveform / zoom / loop / markers
+├── per-source workspace
+└── queue / playlist controller
+
+Sargam shell
+├── notation bridge
+├── clip extraction
+└── project / portable-package integration
+
+Library shell
+├── stable URL or FileMaker record-ID loading
+├── queue and saved playlists
+└── session reset / library workflow
+```
+
+The recordings are held on a server and accessed over the local network. The eventual library player should load media by server URL or stable library ID, keep FileMaker as the catalog/launcher, and avoid exposing raw filesystem paths as the identity model. Adding to a queue must not interrupt the currently playing recording.
+
+### Binding media, workspace, and packaging rulings
 
 - Text remains the source of truth for notation.
-- Do not place binary media in Markdown.
-- Keep both the original source A–B timestamps and the optional extracted `clipAssetId`.
-- Missing clips must degrade gracefully: extracted clip → loaded source range → locate source; never silently bind to a different recording.
-- Filenames alone are not stable asset identity.
-- The original source recording does not need to be copied or uploaded to make a portable teaching/practice project; extracted clips are sufficient.
-- A `.sargam` package must be openable as one source and must preserve notation, metadata, anchors, links, and included clips.
-- Cloudinary is optional and should not make local editing dependent on an internet connection.
-- Inspect and patch the exact current clone. Do not build patches against reconstructed patch chains or paraphrased fixtures.
-
-## Phase 3B Wave 1 implementation candidate (2026-07-21 — browser acceptance pending)
-
-An exact-clone implementation candidate now exists for the first local-project wave. It adds explicit source/clip IDs, versioned media and project contracts, user-approved project folders (`composition.md`, `media.json`, `clips/`), decoded-audio A–B extraction as source-speed WAV, extracted-clip-first playback with original-source fallback, and a Clip Vault for linked/missing/unused assets. Old `sargam-audio-links:v1` records normalize forward without losing source times or notation anchors. The automated gate is `448 passed, 0 failed`; Vite succeeds with `99 modules transformed`. This wave is not browser-accepted yet. Read `SARGAM_PHASE_3B_WAVE_1_2026-07-21.md` for the exact checklist and known boundaries.
+- Never embed binary media in Markdown.
+- Preserve both original source A–B timestamps and optional extracted-clip identity/range.
+- Prefer an included/local extracted clip over the master source; never silently bind to a different recording with the same filename.
+- Browser file/directory handles are local permission objects, not portable JSON.
+- `.sargam` remains the single-source exchange format for notation, manifests, clips, and later workspace/routines.
+- Marker-to-loop and loop-to-marker operations copy exact times; they do not create hidden mutable coupling.
+- The iframe remains mounted at full size and hidden with `visibility`, never `display:none`; preserve `allow="autoplay"` and seek-before-first-play reconciliation.
+- Inspect and patch the exact current clone. Do not generate against reconstructed patch chains when a fresh source archive is available.
+- Assistants do not commit or push; Manik reviews through GitHub Desktop.
 
 ## Earlier project history and rulings (retained; subordinate to the block above)
 
