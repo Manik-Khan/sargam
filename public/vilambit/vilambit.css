@@ -102,10 +102,11 @@
   #loopState .pt{color:var(--madder)}
   #loopState .off{color:var(--wave-dim)}
   #loopBoundaryGrid{display:flex;flex-direction:column;gap:7px}
-  .loopBoundaryRow{display:grid;grid-template-columns:18px minmax(92px,1fr) auto;grid-template-areas:"point input playhead" ". nudges nudges";gap:5px 7px;align-items:center;padding:7px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2)}
+  .loopBoundaryRow{display:grid;grid-template-columns:18px minmax(92px,1fr) auto auto;grid-template-areas:"point input playhead marker" ". nudges nudges nudges";gap:5px 7px;align-items:center;padding:7px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2)}
   .loopBoundaryRow label{grid-area:point;font-family:var(--mono);font-weight:700;color:var(--madder)}
   .loopBoundaryRow .timeIn{grid-area:input}
   .loopPlayhead{grid-area:playhead}
+  .loopSaveMarker{grid-area:marker}
   .loopPlayhead kbd{font-family:var(--mono);font-size:9px;opacity:.7}
   .loopNudgeGroup{grid-area:nudges;display:flex;align-items:center;gap:4px;justify-content:flex-end;color:var(--dim);font-family:var(--mono);font-size:10px}
   .loopNudgeGroup .btn{min-width:39px;padding-left:5px;padding-right:5px}
@@ -134,8 +135,8 @@
     .markerActions{justify-content:flex-start}
   }
   @media (max-width:480px){
-    .loopBoundaryRow{grid-template-columns:18px minmax(80px,1fr);grid-template-areas:"point input" ". playhead" ". nudges"}
-    .loopPlayhead{justify-self:start}
+    .loopBoundaryRow{grid-template-columns:18px minmax(80px,1fr);grid-template-areas:"point input" ". playhead" ". marker" ". nudges"}
+    .loopPlayhead,.loopSaveMarker{justify-self:start}
     .loopNudgeGroup{justify-content:flex-start;flex-wrap:wrap}
   }
   @media (max-width:640px){main{padding:12px}header{padding:12px 14px 10px}#clock{font-size:15px}}

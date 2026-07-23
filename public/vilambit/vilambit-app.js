@@ -1025,6 +1025,8 @@ function renderLoop(){
   const ready = state.loopA != null && state.loopB != null;
   $('loopToggle').disabled = !ready;
   $('loopClear').disabled = state.loopA == null && state.loopB == null;
+  if ($('saveAAsMarker')) $('saveAAsMarker').disabled = state.loopA == null;
+  if ($('saveBAsMarker')) $('saveBAsMarker').disabled = state.loopB == null;
   $('loopToggle').textContent = state.loopOn ? 'Loop on' : 'Loop off';
   $('loopToggle').classList.toggle('active', state.loopOn);
   if ($('addRegion')) $('addRegion').disabled = !ready;
@@ -1211,6 +1213,21 @@ function addMarker(){
   renderMarkers();
 }
 
+function saveLoopBoundaryAsMarker(point){
+  if (!state.fileURL) return;
+  const upper = String(point || 'A').toUpperCase();
+  const time = upper === 'B' ? state.loopB : state.loopA;
+  if (time == null) return;
+
+  const duplicateTolerance = 0.005;
+  const alreadySaved = state.markers.some(marker => Math.abs(marker.t - time) <= duplicateTolerance);
+  if (!alreadySaved){
+    state.markers = Core.addMarker(state.markers, time, state.duration);
+  }
+  renderMarkers();
+  drawWave();
+}
+
 function renderMarkers(){
   const list = $('markerList');
   list.innerHTML = '';
@@ -1266,6 +1283,8 @@ function renderMarkers(){
   });
 }
 $('addMarker').addEventListener('click', addMarker);
+$('saveAAsMarker').addEventListener('click', () => saveLoopBoundaryAsMarker('A'));
+$('saveBAsMarker').addEventListener('click', () => saveLoopBoundaryAsMarker('B'));
 $('exportMk').addEventListener('click', () => {
   const data = {
     file: state.fileName,

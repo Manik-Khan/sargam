@@ -145,6 +145,7 @@
           <label for="loopAInput">A</label>
           <input class="timeIn" id="loopAInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop start time">
           <button class="btn small loopPlayhead" id="setA">Playhead → A <kbd>A</kbd></button>
+          <button class="btn small loopSaveMarker" id="saveAAsMarker" title="Save the current A boundary as a marker">A → Marker</button>
           <div class="loopNudgeGroup" role="group" aria-label="Adjust loop start">
             <button class="btn small" data-loop-point="A" data-loop-nudge="-0.1" title="Move A earlier by 100 milliseconds">−100</button>
             <button class="btn small" data-loop-point="A" data-loop-nudge="-0.01" title="Move A earlier by 10 milliseconds">−10</button>
@@ -157,6 +158,7 @@
           <label for="loopBInput">B</label>
           <input class="timeIn" id="loopBInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop end time">
           <button class="btn small loopPlayhead" id="setB">Playhead → B <kbd>B</kbd></button>
+          <button class="btn small loopSaveMarker" id="saveBAsMarker" title="Save the current B boundary as a marker">B → Marker</button>
           <div class="loopNudgeGroup" role="group" aria-label="Adjust loop end">
             <button class="btn small" data-loop-point="B" data-loop-nudge="-0.1" title="Move B earlier by 100 milliseconds">−100</button>
             <button class="btn small" data-loop-point="B" data-loop-nudge="-0.01" title="Move B earlier by 10 milliseconds">−10</button>
@@ -167,7 +169,7 @@
         </div>
       </div>
       <div id="loopDuration" class="hint">Set both boundaries to see the loop duration.</div>
-      <div class="hint">Drag across the waveform to make a loop, drag A/B to refine it, or use marker actions below. Shift-click a marker sets A; Option/Alt-click sets B.</div>
+      <div class="hint">Drag across the waveform to make a loop, drag A/B to refine it, or save either boundary directly as a marker. Shift-click a marker sets A; Option/Alt-click sets B.</div>
     </div>
 
     <!-- MARKERS -->

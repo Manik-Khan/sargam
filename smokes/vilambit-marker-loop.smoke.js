@@ -37,6 +37,18 @@ export const smokes = [
     },
   },
   {
+    name: 'vilambit marker loop: loop boundaries can be saved directly as markers',
+    async fn() {
+      const html = await read('../public/vilambit.html');
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(html, /id=["']saveAAsMarker["'][^>]*>A → Marker/);
+      assert.match(html, /id=["']saveBAsMarker["'][^>]*>B → Marker/);
+      assert.match(app, /function saveLoopBoundaryAsMarker/);
+      assert.match(app, /duplicateTolerance = 0\.005/);
+      assert.match(app, /Core\.addMarker\(state\.markers, time, state\.duration\)/);
+    },
+  },
+  {
     name: 'vilambit marker loop: next-marker range skips duplicate timestamps and arms playback',
     async fn() {
       const core = await loadCore();
