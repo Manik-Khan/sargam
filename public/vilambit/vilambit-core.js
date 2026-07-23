@@ -214,6 +214,168 @@
     return sortMarkers(markers.filter((_, markerIndex) => markerIndex !== index), duration);
   }
 
+  function normalizeViewWindow(viewStart, viewEnd, duration, minSpan = 0.25) {
+    const safeDuration = clampDuration(duration);
+    if (!safeDuration) return { start: 0, end: 0, span: 0, full: true };
+
+    const safeMinSpan = Math.min(safeDuration, Math.max(0.01, finiteNumber(minSpan, 0.25)));
+    let start = finiteNumber(viewStart, 0);
+    let end = finiteNumber(viewEnd, safeDuration);
+    if (end < start) [start, end] = [end, start];
+
+    if (end - start >= safeDuration) {
+      return { start: 0, end: safeDuration, span: safeDuration, full: true };
+    }
+
+    if (end - start < safeMinSpan) {
+      const center = (start + end) / 2;
+      start = center - safeMinSpan / 2;
+      end = center + safeMinSpan / 2;
+    }
+
+    if (start < 0) {
+      end -= start;
+      start = 0;
+    }
+    if (end > safeDuration) {
+      start -= end - safeDuration;
+      end = safeDuration;
+    }
+
+    start = Math.max(0, start);
+    end = Math.min(safeDuration, end);
+    const span = Math.max(0, end - start);
+    return {
+      start,
+      end,
+      span,
+      full: start <= 1e-6 && end >= safeDuration - 1e-6,
+    };
+  }
+
+  function zoomViewWindow({
+    viewStart = 0,
+    viewEnd = 0,
+    duration = 0,
+    center = null,
+    factor = 1,
+    minSpan = 0.25,
+  } = {}) {
+    const current = normalizeViewWindow(viewStart, viewEnd || duration, duration, minSpan);
+    if (!current.span) return current;
+    const safeFactor = Math.max(0.01, finiteNumber(factor, 1));
+    const targetSpan = clamp(current.span * safeFactor, Math.min(current.span, minSpan), duration);
+    const pivot = center == null
+      ? (current.start + current.end) / 2
+      : clampPosition(center, duration);
+    return normalizeViewWindow(
+      pivot - targetSpan / 2,
+      pivot + targetSpan / 2,
+      duration,
+      minSpan,
+    );
+  }
+
+  function panViewWindow({
+    viewStart = 0,
+    viewEnd = 0,
+    duration = 0,
+    deltaSeconds = 0,
+    minSpan = 0.25,
+  } = {}) {
+    const current = normalizeViewWindow(viewStart, viewEnd || duration, duration, minSpan);
+    if (!current.span || current.full) return current;
+    const delta = finiteNumber(deltaSeconds, 0);
+    return normalizeViewWindow(
+      current.start + delta,
+      current.end + delta,
+      duration,
+      minSpan,
+    );
+  }
+
+  function ensureTimeVisible({
+    viewStart = 0,
+    viewEnd = 0,
+    duration = 0,
+    time = 0,
+    marginRatio = 0.12,
+    minSpan = 0.25,
+  } = {}) {
+    const current = normalizeViewWindow(viewStart, viewEnd || duration, duration, minSpan);
+    if (!current.span || current.full) return current;
+    const target = clampPosition(time, duration);
+    const ratio = clamp(marginRatio, 0, 0.45);
+    const margin = current.span * ratio;
+    const low = current.start + margin;
+    const high = current.end - margin;
+    if (target >= low && target <= high) return current;
+
+    const nextStart = target < low
+      ? target - margin
+      : target - (current.span - margin);
+    return normalizeViewWindow(
+      nextStart,
+      nextStart + current.span,
+      duration,
+      minSpan,
+    );
+  }
+
+  function setLoopBoundary({
+    loopA = null,
+    loopB = null,
+    point = 'A',
+    value = 0,
+    duration = 0,
+    minGap = 0.01,
+  } = {}) {
+    const safeDuration = clampDuration(duration);
+    const gap = Math.min(safeDuration, Math.max(0, finiteNumber(minGap, 0.01)));
+    let a = loopA == null ? null : clampPosition(loopA, safeDuration);
+    let b = loopB == null ? null : clampPosition(loopB, safeDuration);
+    const next = clampPosition(value, safeDuration);
+
+    if (String(point).toUpperCase() === 'B') {
+      b = a == null ? next : Math.max(Math.min(safeDuration, a + gap), next);
+    } else {
+      a = b == null ? next : Math.min(Math.max(0, b - gap), next);
+    }
+
+    return { loopA: a, loopB: b, ready: a !== null && b !== null };
+  }
+
+  function nudgeLoopBoundary(options = {}) {
+    const point = String(options.point || 'A').toUpperCase();
+    const current = point === 'B' ? options.loopB : options.loopA;
+    if (current == null) {
+      return {
+        loopA: options.loopA == null ? null : clampPosition(options.loopA, options.duration),
+        loopB: options.loopB == null ? null : clampPosition(options.loopB, options.duration),
+        ready: options.loopA != null && options.loopB != null,
+      };
+    }
+    return setLoopBoundary({
+      ...options,
+      point,
+      value: finiteNumber(current, 0) + finiteNumber(options.deltaSeconds, 0),
+    });
+  }
+
+  function parseTimecode(value) {
+    if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null;
+    const text = String(value == null ? '' : value).trim();
+    if (!text) return null;
+    const parts = text.split(':');
+    if (parts.length > 3 || parts.some((part) => part.trim() === '')) return null;
+    const numbers = parts.map(Number);
+    if (numbers.some((number) => !Number.isFinite(number) || number < 0)) return null;
+    if (parts.length > 1 && numbers.slice(1).some((number) => number >= 60)) return null;
+    if (parts.length === 1) return numbers[0];
+    if (parts.length === 2) return numbers[0] * 60 + numbers[1];
+    return numbers[0] * 3600 + numbers[1] * 60 + numbers[2];
+  }
+
   /**
    * Build the serializable player-state shape that the iframe bridge can
    * publish without exposing DOM nodes, AudioContext objects, buffers, or WASM.
@@ -296,6 +458,13 @@
     addMarker,
     moveMarker,
     removeMarker,
+    normalizeViewWindow,
+    zoomViewWindow,
+    panViewWindow,
+    ensureTimeVisible,
+    setLoopBoundary,
+    nudgeLoopBoundary,
+    parseTimecode,
     createPublicSnapshot,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

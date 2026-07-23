@@ -139,6 +139,55 @@ export const smokes = [
     },
   },
   {
+    name: 'vilambit core: waveform view zoom and pan preserve a bounded window',
+    async fn() {
+      const core = await loadCore();
+      assert.deepEqual(
+        { ...core.normalizeViewWindow(-5, 15, 100, 0.25) },
+        { start: 0, end: 20, span: 20, full: false },
+      );
+      assert.deepEqual(
+        { ...core.zoomViewWindow({ viewStart: 20, viewEnd: 40, duration: 100, center: 30, factor: 0.5 }) },
+        { start: 25, end: 35, span: 10, full: false },
+      );
+      assert.deepEqual(
+        { ...core.panViewWindow({ viewStart: 20, viewEnd: 40, duration: 100, deltaSeconds: 70 }) },
+        { start: 80, end: 100, span: 20, full: false },
+      );
+    },
+  },
+  {
+    name: 'vilambit core: playhead follow shifts only when time leaves the safe view',
+    async fn() {
+      const core = await loadCore();
+      assert.deepEqual(
+        { ...core.ensureTimeVisible({ viewStart: 20, viewEnd: 40, duration: 100, time: 30, marginRatio: 0.1 }) },
+        { start: 20, end: 40, span: 20, full: false },
+      );
+      assert.deepEqual(
+        { ...core.ensureTimeVisible({ viewStart: 20, viewEnd: 40, duration: 100, time: 39, marginRatio: 0.1 }) },
+        { start: 21, end: 41, span: 20, full: false },
+      );
+    },
+  },
+  {
+    name: 'vilambit core: precise loop boundaries parse and nudge without crossing',
+    async fn() {
+      const core = await loadCore();
+      assert.equal(core.parseTimecode('1:02:03.250'), 3723.25);
+      assert.equal(core.parseTimecode('42:17.5'), 2537.5);
+      assert.equal(core.parseTimecode('1:75'), null);
+      assert.deepEqual(
+        { ...core.setLoopBoundary({ loopA: 10, loopB: 12, point: 'A', value: 15, duration: 60, minGap: 0.01 }) },
+        { loopA: 11.99, loopB: 12, ready: true },
+      );
+      assert.deepEqual(
+        { ...core.nudgeLoopBoundary({ loopA: 10, loopB: 10.05, point: 'B', deltaSeconds: -1, duration: 60, minGap: 0.01 }) },
+        { loopA: 10, loopB: 10.01, ready: true },
+      );
+    },
+  },
+  {
     name: 'vilambit core: markers sort stably without mutating caller data',
     async fn() {
       const core = await loadCore();

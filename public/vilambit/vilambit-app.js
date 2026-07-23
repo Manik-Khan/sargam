@@ -32,6 +32,7 @@ const state = {
   regions: [],               // [{start, end, pct}]
   bpm: null,                 // {bpm, period, phaseAbs, confidence, tapped?}
   exportScope: 'sel',
+  viewStart: 0, viewEnd: 0, followPlayhead: false,
 };
 
 /* ---------------- shared audio context & nodes ---------------- */
@@ -399,6 +400,8 @@ function seekTo(t){
     lastEff = effRateAt(t);
     stretch.schedule({ input: t, rate: lastEff, semitones: totalSemis(), active: state.playing });
   }
+  followWaveAt(t, true);
+  if (state.duration) drawWave();
 }
 
 async function togglePlay(){
@@ -450,10 +453,12 @@ function loadFile(file){
   Object.assign(state, {
     fileURL: URL.createObjectURL(file), fileName: file.name,
     fileSize: Number.isFinite(Number(file.size)) ? Number(file.size) : null,
+    duration: 0, isVideo: false,
     fileLastModified: Number.isFinite(Number(file.lastModified)) ? Number(file.lastModified) : null,
     peaks: null, decoded: null, detected: null,
     loopA: null, loopB: null, loopOn: false, markers: [],
     regions: [], bpm: null,
+    viewStart: 0, viewEnd: 0, followPlayhead: false,
   });
   lastEff = null;
   renderMarkers(); renderLoop(); renderTune(); renderRegions(); renderBpm();
@@ -472,6 +477,7 @@ function loadFile(file){
     if (state.isVideo || !state.decoded){
       state.duration = media.duration || 0;
       $('dur').textContent = fmt(state.duration);
+      resetWaveView();
     }
     // engine choice happens on first play; rebuild if a file type flips engines
     if (actx && ((state.isVideo && state.engine === 'buffer') || (!state.isVideo && state.engine !== 'buffer'))){
@@ -491,14 +497,18 @@ function loadFile(file){
     const dctx = new (window.AudioContext || window.webkitAudioContext)();
     return dctx.decodeAudioData(buf.slice(0)).then(ab => {
       state.decoded = ab;
-      if (!state.isVideo){ state.duration = ab.duration; $('dur').textContent = fmt(ab.duration); }
+      if (!state.isVideo){
+        state.duration = ab.duration;
+        $('dur').textContent = fmt(ab.duration);
+        if (!state.viewEnd) resetWaveView();
+      }
       computePeaks(ab);
       $('expWav').disabled = $('expFlac').disabled = false;
       if (stretch && state.engine === 'buffer'){
         stretch.dropBuffers();
         stretch.addBuffers(bufferChannels(ab));
       }
-      waveCache = null; drawWave();
+      invalidateWaveCache(); drawWave();
       return dctx.close();
     });
   }).catch(() => {
@@ -509,7 +519,113 @@ function loadFile(file){
 /* ---------------- waveform ---------------- */
 const wave = $('wave');
 const wctx = wave.getContext && wave.getContext('2d');
-let waveCache = null;
+let waveCache = null, waveActiveCache = null;
+
+function invalidateWaveCache(){
+  waveCache = null;
+  waveActiveCache = null;
+}
+
+function currentWaveView(){
+  return Core.normalizeViewWindow(
+    state.viewStart,
+    state.viewEnd || state.duration,
+    state.duration,
+    0.25,
+  );
+}
+
+function setWaveView(start, end, { draw = true } = {}){
+  const view = Core.normalizeViewWindow(start, end, state.duration, 0.25);
+  const changed = Math.abs(view.start - state.viewStart) > 1e-6 || Math.abs(view.end - state.viewEnd) > 1e-6;
+  state.viewStart = view.start;
+  state.viewEnd = view.end;
+  if (changed) invalidateWaveCache();
+  renderWaveViewControls(view);
+  if (draw) drawWave();
+  return view;
+}
+
+function resetWaveView(){
+  return setWaveView(0, state.duration || 0);
+}
+
+function zoomWave(factor, center = null){
+  if (!state.duration) return;
+  const view = currentWaveView();
+  const pivot = center == null
+    ? (pos() >= view.start && pos() <= view.end ? pos() : (view.start + view.end) / 2)
+    : center;
+  const next = Core.zoomViewWindow({
+    viewStart: view.start,
+    viewEnd: view.end,
+    duration: state.duration,
+    center: pivot,
+    factor,
+    minSpan: 0.25,
+  });
+  setWaveView(next.start, next.end);
+}
+
+function panWave(deltaSeconds){
+  if (!state.duration) return;
+  const view = currentWaveView();
+  const next = Core.panViewWindow({
+    viewStart: view.start,
+    viewEnd: view.end,
+    duration: state.duration,
+    deltaSeconds,
+    minSpan: 0.25,
+  });
+  setWaveView(next.start, next.end);
+}
+
+function fitLoopInWave(){
+  if (state.loopA == null || state.loopB == null) return;
+  const span = Math.max(0.01, state.loopB - state.loopA);
+  const padding = Math.max(0.25, span * 0.18);
+  setWaveView(state.loopA - padding, state.loopB + padding);
+}
+
+function followWaveAt(time, force = false){
+  if (!state.followPlayhead || !state.duration || drag) return;
+  const view = currentWaveView();
+  const next = force
+    ? Core.zoomViewWindow({
+        viewStart: view.start,
+        viewEnd: view.end,
+        duration: state.duration,
+        center: time,
+        factor: 1,
+        minSpan: 0.25,
+      })
+    : Core.ensureTimeVisible({
+        viewStart: view.start,
+        viewEnd: view.end,
+        duration: state.duration,
+        time,
+        marginRatio: 0.12,
+        minSpan: 0.25,
+      });
+  if (Math.abs(next.start - view.start) > 1e-6 || Math.abs(next.end - view.end) > 1e-6){
+    setWaveView(next.start, next.end, { draw: false });
+  }
+}
+
+function renderWaveViewControls(view = currentWaveView()){
+  const range = $('waveViewRange');
+  if (range){
+    range.textContent = state.duration
+      ? `${fmtPrecise(view.start)} – ${fmtPrecise(view.end)} · ${formatSpan(view.span)} visible`
+      : 'No recording loaded';
+  }
+  if ($('waveZoomOut')) $('waveZoomOut').disabled = !state.duration || view.full;
+  if ($('waveZoomAll')) $('waveZoomAll').disabled = !state.duration || view.full;
+  if ($('wavePanBack')) $('wavePanBack').disabled = !state.duration || view.full || view.start <= 1e-6;
+  if ($('wavePanForward')) $('wavePanForward').disabled = !state.duration || view.full || view.end >= state.duration - 1e-6;
+  if ($('waveZoomLoop')) $('waveZoomLoop').disabled = state.loopA == null || state.loopB == null;
+  if ($('waveFollow')) $('waveFollow').checked = Boolean(state.followPlayhead);
+}
 
 function sizeWave(){
   if (!wctx) return;
@@ -517,8 +633,9 @@ function sizeWave(){
   const w = wave.clientWidth || wave.parentElement.clientWidth || 800;
   wave.width = Math.round(w * dpr);
   wave.height = Math.round(150 * dpr);
-  waveCache = null;
+  invalidateWaveCache();
 }
+
 function computePeaks(ab){
   const cols = 1600;
   const ch0 = ab.getChannelData(0);
@@ -528,163 +645,316 @@ function computePeaks(ab){
   for (let c = 0; c < cols; c++){
     let mn = 1, mx = -1;
     const s0 = c * step, s1 = Math.min(ch0.length, s0 + step);
-    for (let s = s0; s < s1; s += 4){
-      const v = (ch0[s] + ch1[s]) * 0.5;
-      if (v < mn) mn = v;
-      if (v > mx) mx = v;
+    for (let sample = s0; sample < s1; sample += Math.max(1, Math.floor(step / 24))){
+      const value = (ch0[sample] + ch1[sample]) * 0.5;
+      if (value < mn) mn = value;
+      if (value > mx) mx = value;
     }
-    peaks[c] = [mn, mx];
+    peaks[c] = mn <= mx ? [mn, mx] : [0, 0];
   }
   state.peaks = peaks;
+  invalidateWaveCache();
 }
+
 function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
-function drawWaveStatic(){
+
+function drawDecodedWave(context, view, color){
+  const ab = state.decoded;
+  if (!ab || !view.span) return false;
   const W = wave.width, H = wave.height, mid = H / 2;
-  waveCache = document.createElement('canvas');
-  waveCache.width = W; waveCache.height = H;
-  const c = waveCache.getContext('2d');
-  c.fillStyle = getCss('--panel-2'); c.fillRect(0, 0, W, H);
-  if (state.peaks){
-    c.strokeStyle = getCss('--wave-dim'); c.lineWidth = 1; c.beginPath();
-    const n = state.peaks.length;
-    for (let x = 0; x < W; x++){
-      const p = state.peaks[Math.floor(x / W * n)];
-      const y1 = mid + p[0]*mid*0.92, y2 = mid + p[1]*mid*0.92;
-      c.moveTo(x+.5, y1); c.lineTo(x+.5, Math.max(y2, y1+1));
+  const ch0 = ab.getChannelData(0);
+  const ch1 = ab.numberOfChannels > 1 ? ab.getChannelData(1) : ch0;
+  const sr = ab.sampleRate;
+  context.strokeStyle = color;
+  context.lineWidth = 1;
+  context.beginPath();
+  for (let x = 0; x < W; x++){
+    const t0 = view.start + x / W * view.span;
+    const t1 = view.start + (x + 1) / W * view.span;
+    const s0 = Math.max(0, Math.floor(t0 * sr));
+    const s1 = Math.min(ch0.length, Math.max(s0 + 1, Math.ceil(t1 * sr)));
+    const stride = Math.max(1, Math.floor((s1 - s0) / 24));
+    let mn = 1, mx = -1;
+    for (let sample = s0; sample < s1; sample += stride){
+      const value = (ch0[sample] + ch1[sample]) * 0.5;
+      if (value < mn) mn = value;
+      if (value > mx) mx = value;
     }
-    c.stroke();
-  } else {
-    c.strokeStyle = getCss('--line'); c.beginPath(); c.moveTo(0, mid); c.lineTo(W, mid); c.stroke();
+    if (mn > mx) mn = mx = 0;
+    const y1 = mid + mn * mid * 0.92;
+    const y2 = mid + mx * mid * 0.92;
+    context.moveTo(x + 0.5, y1);
+    context.lineTo(x + 0.5, Math.max(y2, y1 + 1));
   }
+  context.stroke();
+  return true;
 }
+
+function drawSummaryPeaks(context, view, color){
+  if (!state.peaks || !view.span || !state.duration) return false;
+  const W = wave.width, H = wave.height, mid = H / 2, n = state.peaks.length;
+  context.strokeStyle = color;
+  context.lineWidth = 1;
+  context.beginPath();
+  for (let x = 0; x < W; x++){
+    const time = view.start + (x + 0.5) / W * view.span;
+    const index = Math.min(n - 1, Math.max(0, Math.floor(time / state.duration * n)));
+    const peak = state.peaks[index] || [0, 0];
+    const y1 = mid + peak[0] * mid * 0.92;
+    const y2 = mid + peak[1] * mid * 0.92;
+    context.moveTo(x + 0.5, y1);
+    context.lineTo(x + 0.5, Math.max(y2, y1 + 1));
+  }
+  context.stroke();
+  return true;
+}
+
+function paintWaveCache(context, view, color){
+  context.fillStyle = getCss('--panel-2');
+  context.fillRect(0, 0, wave.width, wave.height);
+  if (drawDecodedWave(context, view, color)) return;
+  if (drawSummaryPeaks(context, view, color)) return;
+  context.strokeStyle = getCss('--line');
+  context.beginPath();
+  context.moveTo(0, wave.height / 2);
+  context.lineTo(wave.width, wave.height / 2);
+  context.stroke();
+}
+
+function drawWaveStatic(){
+  const view = currentWaveView();
+  waveCache = document.createElement('canvas');
+  waveCache.width = wave.width;
+  waveCache.height = wave.height;
+  paintWaveCache(waveCache.getContext('2d'), view, getCss('--wave-dim'));
+
+  waveActiveCache = document.createElement('canvas');
+  waveActiveCache.width = wave.width;
+  waveActiveCache.height = wave.height;
+  paintWaveCache(waveActiveCache.getContext('2d'), view, getCss('--wave'));
+}
+
+function waveTimeToCanvasX(time, view = currentWaveView()){
+  return view.span ? (time - view.start) / view.span * wave.width : 0;
+}
+
+function waveTimeToCssX(time, view = currentWaveView()){
+  return view.span ? (time - view.start) / view.span * waveWidthCss() : 0;
+}
+
+function timeInView(time, view = currentWaveView()){
+  return time >= view.start - 1e-9 && time <= view.end + 1e-9;
+}
+
 function drawWave(){
   if (!wctx) return;
   if (!wave.width) sizeWave();
-  if (!waveCache) drawWaveStatic();
+  if (!waveCache || !waveActiveCache) drawWaveStatic();
   const W = wave.width, H = wave.height;
+  const view = currentWaveView();
   wctx.drawImage(waveCache, 0, 0);
-  const dur = state.duration || 1;
-  const x = t => t / dur * W;
-  const px = x(pos());
-  wctx.save();
-  wctx.beginPath(); wctx.rect(0, 0, px, H); wctx.clip();
-  if (state.peaks){
-    wctx.strokeStyle = getCss('--wave'); wctx.lineWidth = 1; wctx.beginPath();
-    const n = state.peaks.length, mid = H/2;
-    for (let xx = 0; xx < Math.ceil(px); xx++){
-      const p = state.peaks[Math.floor(xx / W * n)];
-      const y1 = mid + p[0]*mid*0.92, y2 = mid + p[1]*mid*0.92;
-      wctx.moveTo(xx+.5, y1); wctx.lineTo(xx+.5, Math.max(y2, y1+1));
-    }
-    wctx.stroke();
+
+  const playhead = pos();
+  const playedX = Math.min(W, Math.max(0, waveTimeToCanvasX(playhead, view)));
+  if (playedX > 0){
+    wctx.drawImage(waveActiveCache, 0, 0, playedX, H, 0, 0, playedX, H);
   }
-  wctx.restore();
+
   const dpr = window.devicePixelRatio || 1;
-  for (const rg of state.regions){
-    const ra = x(rg.start), rb = x(rg.end);
+  for (const region of state.regions){
+    const start = Math.max(view.start, region.start);
+    const end = Math.min(view.end, region.end);
+    if (end <= start) continue;
+    const ra = waveTimeToCanvasX(start, view), rb = waveTimeToCanvasX(end, view);
     wctx.fillStyle = 'rgba(91,140,168,0.16)';
     wctx.fillRect(ra, 0, rb - ra, H);
     wctx.fillStyle = '#5b8ca8';
-    wctx.fillRect(ra, 0, 1.5, H); wctx.fillRect(rb - 1.5, 0, 1.5, H);
+    wctx.fillRect(ra, 0, 1.5, H);
+    wctx.fillRect(rb - 1.5, 0, 1.5, H);
     if (rb - ra > 34){
       wctx.font = Math.round(10 * dpr) + 'px monospace';
-      wctx.fillText(rg.pct + '%', ra + 4 * dpr, 11 * dpr);
+      wctx.fillText(region.pct + '%', ra + 4 * dpr, 11 * dpr);
     }
   }
+
   if (state.bpm){
-    const per = state.bpm.period;
-    const step = per * Math.max(1, Math.ceil((dur / per) / 600));
+    const period = state.bpm.period;
+    const step = period * Math.max(1, Math.ceil((view.span / period) / 600));
     wctx.fillStyle = 'rgba(159,176,198,0.35)';
-    let tg = state.bpm.phaseAbs % step;
-    if (tg < 0) tg += step;
-    for (let tt = tg; tt <= dur; tt += step) wctx.fillRect(x(tt), H - 10 * dpr, 1, 10 * dpr);
+    const first = state.bpm.phaseAbs + Math.ceil((view.start - state.bpm.phaseAbs) / step) * step;
+    for (let time = first; time <= view.end; time += step){
+      wctx.fillRect(waveTimeToCanvasX(time, view), H - 10 * dpr, 1, 10 * dpr);
+    }
   }
+
   if (state.loopA != null && state.loopB != null){
-    const a = x(state.loopA), b = x(state.loopB);
-    wctx.fillStyle = state.loopOn ? getCss('--madder-soft') : 'rgba(194,91,78,0.10)';
-    wctx.fillRect(a, 0, b - a, H);
+    const start = Math.max(view.start, state.loopA);
+    const end = Math.min(view.end, state.loopB);
+    if (end > start){
+      const a = waveTimeToCanvasX(start, view), b = waveTimeToCanvasX(end, view);
+      wctx.fillStyle = state.loopOn ? getCss('--madder-soft') : 'rgba(194,91,78,0.10)';
+      wctx.fillRect(a, 0, b - a, H);
+    }
     wctx.fillStyle = getCss('--madder');
-    wctx.fillRect(a, 0, 2, H); wctx.fillRect(b - 2, 0, 2, H);
-    wctx.fillRect(a - 3 * dpr, 0, 9 * dpr, 12 * dpr);
-    wctx.fillRect(b - 6 * dpr, H - 12 * dpr, 9 * dpr, 12 * dpr);
-  } else if (state.loopA != null){
-    wctx.fillStyle = getCss('--madder'); wctx.fillRect(x(state.loopA), 0, 2, H);
+    if (timeInView(state.loopA, view)){
+      const a = waveTimeToCanvasX(state.loopA, view);
+      wctx.fillRect(a, 0, 2, H);
+      wctx.fillRect(a - 3 * dpr, 0, 9 * dpr, 12 * dpr);
+    }
+    if (timeInView(state.loopB, view)){
+      const b = waveTimeToCanvasX(state.loopB, view);
+      wctx.fillRect(b - 2, 0, 2, H);
+      wctx.fillRect(b - 6 * dpr, H - 12 * dpr, 9 * dpr, 12 * dpr);
+    }
+  } else if (state.loopA != null && timeInView(state.loopA, view)){
+    wctx.fillStyle = getCss('--madder');
+    wctx.fillRect(waveTimeToCanvasX(state.loopA, view), 0, 2, H);
   }
+
   wctx.fillStyle = getCss('--brass');
-  for (const m of state.markers){
-    const mx = x(m.t);
+  for (const marker of state.markers){
+    if (!timeInView(marker.t, view)) continue;
+    const mx = waveTimeToCanvasX(marker.t, view);
     wctx.fillRect(mx, 0, 1.5, H);
-    wctx.beginPath(); wctx.moveTo(mx, 0); wctx.lineTo(mx+8, 0); wctx.lineTo(mx, 10); wctx.closePath(); wctx.fill();
+    wctx.beginPath();
+    wctx.moveTo(mx, 0);
+    wctx.lineTo(mx + 8, 0);
+    wctx.lineTo(mx, 10);
+    wctx.closePath();
+    wctx.fill();
   }
-  wctx.fillStyle = getCss('--brass');
-  wctx.fillRect(px - 1, 0, 2.5, H);
+
+  if (timeInView(playhead, view)){
+    const px = waveTimeToCanvasX(playhead, view);
+    wctx.fillStyle = getCss('--brass');
+    wctx.fillRect(px - 1, 0, 2.5, H);
+  } else {
+    const edge = playhead < view.start ? 0 : W;
+    wctx.fillStyle = getCss('--brass');
+    wctx.beginPath();
+    if (edge === 0){
+      wctx.moveTo(0, H / 2);
+      wctx.lineTo(8 * dpr, H / 2 - 6 * dpr);
+      wctx.lineTo(8 * dpr, H / 2 + 6 * dpr);
+    } else {
+      wctx.moveTo(W, H / 2);
+      wctx.lineTo(W - 8 * dpr, H / 2 - 6 * dpr);
+      wctx.lineTo(W - 8 * dpr, H / 2 + 6 * dpr);
+    }
+    wctx.closePath();
+    wctx.fill();
+  }
 }
+
 /* drag anywhere = selection · drag handles/markers to move · double-tap = seek */
 const HIT_PX = 10;
 function waveWidthCss(){ return wave.clientWidth || wave.getBoundingClientRect().width || 1; }
 function hitTest(xCss, wCss){
   if (!state.duration) return { mode: 'none' };
-  const xOf = t => t / state.duration * wCss;
-  const cands = [];
-  if (state.loopA != null) cands.push({ mode: 'a', d: Math.abs(xCss - xOf(state.loopA)) });
-  if (state.loopB != null) cands.push({ mode: 'b', d: Math.abs(xCss - xOf(state.loopB)) });
-  state.markers.forEach((m, idx) => cands.push({ mode: 'marker', idx, d: Math.abs(xCss - xOf(m.t)) + 2 }));
-  cands.sort((p, q) => p.d - q.d);
-  if (cands.length && cands[0].d <= HIT_PX) return { mode: cands[0].mode, idx: cands[0].idx };
+  const view = currentWaveView();
+  const candidates = [];
+  if (state.loopA != null && timeInView(state.loopA, view)) candidates.push({ mode: 'a', d: Math.abs(xCss - waveTimeToCssX(state.loopA, view)) });
+  if (state.loopB != null && timeInView(state.loopB, view)) candidates.push({ mode: 'b', d: Math.abs(xCss - waveTimeToCssX(state.loopB, view)) });
+  state.markers.forEach((marker, index) => {
+    if (timeInView(marker.t, view)) candidates.push({ mode: 'marker', idx: index, d: Math.abs(xCss - waveTimeToCssX(marker.t, view)) + 2 });
+  });
+  candidates.sort((left, right) => left.d - right.d);
+  if (candidates.length && candidates[0].d <= HIT_PX) return { mode: candidates[0].mode, idx: candidates[0].idx };
   return { mode: 'select' };
 }
+
 let drag = null, lastTap = { t: 0, x: -99 };
 wave.style.touchAction = 'none';
-function evX(e){ const r = wave.getBoundingClientRect(); return e.clientX - r.left; }
-function tAt(xCss){ return Math.min(state.duration, Math.max(0, xCss / waveWidthCss() * state.duration)); }
-wave.addEventListener('pointerdown', e => {
+function evX(event){ const rect = wave.getBoundingClientRect(); return event.clientX - rect.left; }
+function tAt(xCss){
+  const view = currentWaveView();
+  return Core.clampPosition(view.start + xCss / waveWidthCss() * view.span, state.duration);
+}
+
+wave.addEventListener('pointerdown', event => {
   if (!state.duration) return;
-  const x = evX(e);
+  const x = evX(event);
   drag = Object.assign(hitTest(x, waveWidthCss()), { startX: x, anchorT: tAt(x), moved: false });
-  try { wave.setPointerCapture(e.pointerId); } catch(_){}
+  try { wave.setPointerCapture(event.pointerId); } catch(_){}
 });
-wave.addEventListener('pointermove', e => {
-  const x = evX(e);
+
+wave.addEventListener('pointermove', event => {
+  const x = evX(event);
   if (!drag){
-    const h = hitTest(x, waveWidthCss());
-    wave.style.cursor = (h.mode === 'select' || h.mode === 'none') ? 'crosshair' : 'ew-resize';
+    const hit = hitTest(x, waveWidthCss());
+    wave.style.cursor = (hit.mode === 'select' || hit.mode === 'none') ? 'crosshair' : 'ew-resize';
     return;
   }
   if (Math.abs(x - drag.startX) > 4) drag.moved = true;
   if (!drag.moved) return;
-  const t = tAt(x);
+  const time = tAt(x);
   if (drag.mode === 'select'){
-    state.loopA = Math.min(drag.anchorT, t);
-    state.loopB = Math.max(drag.anchorT, t);
+    state.loopA = Math.min(drag.anchorT, time);
+    state.loopB = Math.max(drag.anchorT, time);
     renderLoop();
   } else if (drag.mode === 'a' || drag.mode === 'b'){
-    state[drag.mode === 'a' ? 'loopA' : 'loopB'] = t;
+    state[drag.mode === 'a' ? 'loopA' : 'loopB'] = time;
     if (state.loopA != null && state.loopB != null && state.loopA > state.loopB){
       [state.loopA, state.loopB] = [state.loopB, state.loopA];
       drag.mode = drag.mode === 'a' ? 'b' : 'a';
     }
     renderLoop();
   } else if (drag.mode === 'marker'){
-    state.markers[drag.idx].t = t;
+    state.markers[drag.idx].t = time;
+    drawWave();
   }
 });
-function endWaveDrag(e){
+
+function endWaveDrag(event){
   if (!drag) return;
-  const x = evX(e);
+  const x = evX(event);
   if (!drag.moved){
     if (drag.mode === 'select' || drag.mode === 'none'){
       const now = performance.now();
-      if (now - lastTap.t < 350 && Math.abs(x - lastTap.x) < 14){ seekTo(tAt(x)); lastTap = { t: 0, x: -99 }; }
-      else lastTap = { t: now, x };
+      if (now - lastTap.t < 350 && Math.abs(x - lastTap.x) < 14){
+        seekTo(tAt(x));
+        lastTap = { t: 0, x: -99 };
+      } else {
+        lastTap = { t: now, x };
+      }
     }
+  } else if (drag.mode === 'marker'){
+    state.markers = Core.sortMarkers(state.markers, state.duration);
+    renderMarkers();
   } else {
-    if (drag.mode === 'marker'){ state.markers = Core.sortMarkers(state.markers, state.duration); renderMarkers(); }
-    else { normLoop(); renderLoop(); applyLoopToEngine(); }
+    normLoop();
+    renderLoop();
+    applyLoopToEngine();
   }
   drag = null;
 }
+
 wave.addEventListener('pointerup', endWaveDrag);
 wave.addEventListener('pointercancel', () => { drag = null; });
+wave.addEventListener('wheel', event => {
+  if (!state.duration) return;
+  if (event.ctrlKey || event.metaKey){
+    event.preventDefault();
+    zoomWave(event.deltaY > 0 ? 1.35 : 0.74, tAt(evX(event)));
+  } else if (event.shiftKey){
+    event.preventDefault();
+    const view = currentWaveView();
+    panWave((event.deltaY || event.deltaX) / 400 * view.span);
+  }
+}, { passive: false });
+
+$('waveZoomIn').addEventListener('click', () => zoomWave(0.5));
+$('waveZoomOut').addEventListener('click', () => zoomWave(2));
+$('waveZoomLoop').addEventListener('click', fitLoopInWave);
+$('waveZoomAll').addEventListener('click', resetWaveView);
+$('wavePanBack').addEventListener('click', () => panWave(-currentWaveView().span * 0.5));
+$('wavePanForward').addEventListener('click', () => panWave(currentWaveView().span * 0.5));
+$('waveFollow').addEventListener('change', event => {
+  state.followPlayhead = Boolean(event.target.checked);
+  if (state.followPlayhead) followWaveAt(pos(), true);
+  renderWaveViewControls();
+  drawWave();
+});
 window.addEventListener('resize', () => { sizeWave(); drawWave(); });
 
 /* ---------------- transport & basic UI ---------------- */
@@ -710,13 +980,38 @@ $('pitchReset').addEventListener('click', () => {
 });
 
 /* ---------------- loop ---------------- */
+function fmtPrecise(time){
+  if (!Number.isFinite(time) || time < 0) return '0:00.000';
+  const hours = Math.floor(time / 3600);
+  const minutes = Math.floor((time - hours * 3600) / 60);
+  const seconds = time - hours * 3600 - minutes * 60;
+  const secText = seconds.toFixed(3).padStart(6, '0');
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${secText}`
+    : `${minutes}:${secText}`;
+}
+
+function formatSpan(seconds){
+  if (!Number.isFinite(seconds) || seconds < 0) return '0 ms';
+  if (seconds < 1) return `${Math.round(seconds * 1000)} ms`;
+  if (seconds < 60) return `${seconds.toFixed(3)} s`;
+  return fmtPrecise(seconds);
+}
+
+function syncLoopInput(id, value){
+  const input = $(id);
+  if (!input || document.activeElement === input) return;
+  input.value = value == null ? '' : fmtPrecise(value);
+  input.classList.remove('invalid');
+}
+
 function renderLoop(){
   const el = $('loopState');
   if (state.loopA == null && state.loopB == null){
     el.innerHTML = '<span class="off">no loop set</span>';
   } else {
-    const a = state.loopA != null ? fmt(state.loopA) : '—';
-    const b = state.loopB != null ? fmt(state.loopB) : '—';
+    const a = state.loopA != null ? fmtPrecise(state.loopA) : '—';
+    const b = state.loopB != null ? fmtPrecise(state.loopB) : '—';
     el.innerHTML = 'A <span class="pt">' + a + '</span> → B <span class="pt">' + b + '</span>' +
       (state.loopOn ? ' · <span class="pt">looping</span>' : '');
   }
@@ -727,20 +1022,137 @@ function renderLoop(){
   $('loopToggle').classList.toggle('active', state.loopOn);
   if ($('addRegion')) $('addRegion').disabled = !ready;
   if ($('snapBeats')) $('snapBeats').disabled = !(ready && state.bpm);
+  if ($('waveZoomLoop')) $('waveZoomLoop').disabled = !ready;
+
+  syncLoopInput('loopAInput', state.loopA);
+  syncLoopInput('loopBInput', state.loopB);
+  document.querySelectorAll('[data-loop-nudge]').forEach(button => {
+    const point = String(button.dataset.loopPoint || 'A').toUpperCase();
+    button.disabled = point === 'B' ? state.loopB == null : state.loopA == null;
+  });
+
+  const duration = $('loopDuration');
+  if (duration){
+    duration.textContent = ready
+      ? `Loop duration: ${formatSpan(Math.max(0, state.loopB - state.loopA))}`
+      : 'Set both boundaries to see the loop duration.';
+  }
+  renderWaveViewControls();
+  if (state.duration) drawWave();
 }
+
 function normLoop(){
   const loop = Core.normalizeLoop(state.loopA, state.loopB, state.duration);
   state.loopA = loop.loopA;
   state.loopB = loop.loopB;
 }
-function setA(){ if (!state.fileURL) return; state.loopA = pos(); normLoop(); renderLoop(); applyLoopToEngine(); }
-function setB(){ if (!state.fileURL) return; state.loopB = pos(); normLoop(); if (state.loopA != null) state.loopOn = true; renderLoop(); applyLoopToEngine(); }
-function toggleLoop(){ if (state.loopA != null && state.loopB != null){ state.loopOn = !state.loopOn; renderLoop(); applyLoopToEngine(); } }
+
+function commitLoopBoundary(point, rawValue){
+  const upper = String(point || 'A').toUpperCase();
+  const input = upper === 'B' ? $('loopBInput') : $('loopAInput');
+  const text = String(rawValue == null ? '' : rawValue).trim();
+  if (!text){
+    if (upper === 'B') state.loopB = null;
+    else state.loopA = null;
+    state.loopOn = false;
+    if (input) input.classList.remove('invalid');
+    renderLoop();
+    applyLoopToEngine();
+    return true;
+  }
+
+  const parsed = Core.parseTimecode(text);
+  if (parsed == null){
+    if (input) input.classList.add('invalid');
+    return false;
+  }
+  const next = Core.setLoopBoundary({
+    loopA: state.loopA,
+    loopB: state.loopB,
+    point: upper,
+    value: parsed,
+    duration: state.duration,
+    minGap: 0.01,
+  });
+  state.loopA = next.loopA;
+  state.loopB = next.loopB;
+  if (input){
+    input.classList.remove('invalid');
+    input.value = fmtPrecise(upper === 'B' ? state.loopB : state.loopA);
+  }
+  renderLoop();
+  applyLoopToEngine();
+  return true;
+}
+
+function nudgeLoopBoundary(point, deltaSeconds){
+  const next = Core.nudgeLoopBoundary({
+    loopA: state.loopA,
+    loopB: state.loopB,
+    point,
+    deltaSeconds,
+    duration: state.duration,
+    minGap: 0.01,
+  });
+  state.loopA = next.loopA;
+  state.loopB = next.loopB;
+  renderLoop();
+  applyLoopToEngine();
+}
+
+function setA(){
+  if (!state.fileURL) return;
+  state.loopA = pos();
+  normLoop();
+  renderLoop();
+  applyLoopToEngine();
+}
+function setB(){
+  if (!state.fileURL) return;
+  state.loopB = pos();
+  normLoop();
+  if (state.loopA != null) state.loopOn = true;
+  renderLoop();
+  applyLoopToEngine();
+}
+function toggleLoop(){
+  if (state.loopA != null && state.loopB != null){
+    state.loopOn = !state.loopOn;
+    renderLoop();
+    applyLoopToEngine();
+  }
+}
+
 $('setA').addEventListener('click', setA);
 $('setB').addEventListener('click', setB);
 $('loopToggle').addEventListener('click', toggleLoop);
 $('loopClear').addEventListener('click', () => {
-  state.loopA = state.loopB = null; state.loopOn = false; renderLoop(); applyLoopToEngine();
+  state.loopA = state.loopB = null;
+  state.loopOn = false;
+  renderLoop();
+  applyLoopToEngine();
+});
+['A', 'B'].forEach(point => {
+  const input = point === 'A' ? $('loopAInput') : $('loopBInput');
+  input.addEventListener('change', () => commitLoopBoundary(point, input.value));
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter'){
+      event.preventDefault();
+      if (commitLoopBoundary(point, input.value)) input.blur();
+    } else if (event.key === 'Escape'){
+      input.classList.remove('invalid');
+      input.value = point === 'A'
+        ? (state.loopA == null ? '' : fmtPrecise(state.loopA))
+        : (state.loopB == null ? '' : fmtPrecise(state.loopB));
+      input.blur();
+    }
+  });
+});
+document.querySelectorAll('[data-loop-nudge]').forEach(button => {
+  button.addEventListener('click', () => nudgeLoopBoundary(
+    button.dataset.loopPoint,
+    Number(button.dataset.loopNudge),
+  ));
 });
 
 /* ---------------- markers & session ---------------- */
@@ -776,7 +1188,8 @@ $('addMarker').addEventListener('click', addMarker);
 $('exportMk').addEventListener('click', () => {
   const data = {
     file: state.fileName,
-    loop: { a: state.loopA, b: state.loopB },
+    loop: { a: state.loopA, b: state.loopB, on: state.loopOn },
+    view: { start: state.viewStart, end: state.viewEnd, followPlayhead: state.followPlayhead },
     markers: state.markers,
     regions: state.regions,
     bpm: state.bpm,
@@ -792,7 +1205,12 @@ $('mkFile').addEventListener('change', e => {
     try {
       const d = JSON.parse(txt);
       if (Array.isArray(d.markers)) state.markers = d.markers.filter(m => typeof m.t === 'number');
-      if (d.loop){ state.loopA = d.loop.a ?? null; state.loopB = d.loop.b ?? null; }
+      if (d.loop){
+        state.loopA = d.loop.a ?? null;
+        state.loopB = d.loop.b ?? null;
+        normLoop();
+        state.loopOn = Boolean(d.loop.on) && state.loopA != null && state.loopB != null;
+      }
       if (d.settings){
         if (typeof d.settings.tempo === 'number') applyTempo(d.settings.tempo);
         if (typeof d.settings.semitones === 'number') state.semitones = d.settings.semitones;
@@ -801,6 +1219,12 @@ $('mkFile').addEventListener('change', e => {
       }
       if (Array.isArray(d.regions)) state.regions = d.regions.filter(r => typeof r.start === 'number' && typeof r.end === 'number' && typeof r.pct === 'number');
       if (d.bpm && typeof d.bpm.bpm === 'number') state.bpm = d.bpm;
+      if (d.view && typeof d.view === 'object'){
+        state.followPlayhead = Boolean(d.view.followPlayhead);
+        const start = Number(d.view.start);
+        const end = Number(d.view.end);
+        if (Number.isFinite(start) && Number.isFinite(end)) setWaveView(start, end, { draw: false });
+      }
       lastEff = null;
       state.markers = Core.sortMarkers(state.markers, state.duration);
       renderMarkers(); renderLoop(); applyLoopToEngine(); renderRegions(); renderBpm();
@@ -1398,6 +1822,7 @@ function tick(){
       paintPlayBtn();
     }
     $('cur').textContent = fmt(p);
+    if (active && state.followPlayhead) followWaveAt(p);
     if (state.duration) drawWave();
   }
   requestAnimationFrame(tick);
@@ -1408,18 +1833,25 @@ state.refA = 440;
 applyTempo(100);
 applyPitch();
 setExportScope('sel');
+renderLoop();
+renderWaveViewControls();
 renderRegions();
 renderBpm();
 
 /* pure functions exposed for the test harness */
 window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, resampleLinear, granularShift, fmt,
-  detectTempo, snapToGrid, segmentsFor, hitTest, effRateAt,
+  detectTempo, snapToGrid, segmentsFor, hitTest, effRateAt, fmtPrecise, formatSpan,
+  currentWaveView, setWaveView, zoomWave, panWave, fitLoopInWave, commitLoopBoundary, nudgeLoopBoundary,
   _setDetected: (hz) => { state.refA = parseFloat($('refA').value) || 440; state.detected = describePitch(hz, state.refA); renderTune(); },
   _getShift: () => ({ semitones: state.semitones, cents: state.cents, tempo: state.tempo }),
   _setDuration: (d) => { state.duration = d; },
   _setLoop: (a, b) => { state.loopA = a; state.loopB = b; renderLoop(); },
   _setMarkers: (ms) => { state.markers = ms; renderMarkers(); },
-  _getState: () => ({ loopA: state.loopA, loopB: state.loopB, regions: state.regions.map(r => ({...r})), bpm: state.bpm ? {...state.bpm} : null }) };
+  _getState: () => ({
+    loopA: state.loopA, loopB: state.loopB, regions: state.regions.map(r => ({...r})),
+    bpm: state.bpm ? {...state.bpm} : null,
+    view: { start: state.viewStart, end: state.viewEnd, followPlayhead: state.followPlayhead },
+  }) };
 /* SARGAM_VILAMBIT_BRIDGE_V1 — versioned, same-origin iframe contract. */
 (() => {
   const BRIDGE_CHANNEL = 'sargam.vilambit';

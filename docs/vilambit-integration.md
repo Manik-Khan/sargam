@@ -1,46 +1,84 @@
-# Vilambit integration phases
+# Vilambit integration and shared-player roadmap
 
-## Phase 1 — split the monolith without changing behavior
+## Current architecture
 
-Completed in this checkpoint.
+`public/vilambit.html` remains the stable iframe entry point used by Sargam.
+The player is split into:
 
-`public/vilambit.html` remains the stable iframe entry point used by Sargam. Its
-first-party CSS and JavaScript, plus the two generated vendor engines, now live
-in separate static assets:
+- `public/vilambit/vilambit-core.js` — pure transport, loop, marker, and waveform-window calculations;
+- `public/vilambit/vilambit-app.js` — browser media, Web Audio, WASM, canvas, and interaction controller;
+- `public/vilambit/vilambit.css` — player presentation;
+- generated engines under `public/vilambit/vendor/`.
 
-- `public/vilambit/vilambit.css`
-- `public/vilambit/vilambit-app.js`
-- `public/vilambit/vendor/signalsmith-stretch.js`
-- `public/vilambit/vendor/libflac.js`
+The iframe stays mounted at full size and is hidden with `visibility`, never
+`display:none`, so audio and loop state survive tab changes. The seek-before-
+first-play correction and the versioned, same-origin Sargam bridge remain
+binding behavior.
 
-The files are still loaded as ordinary blocking scripts in their original
-order. The iframe remains always mounted and is hidden with `visibility`, not
-`display:none`, so looping playback survives a switch back to Notation.
+## Completed integration waves
 
-The seek-before-first-play correction remains in `vilambit-app.js`:
+- split monolith into maintainable assets without changing playback;
+- pure `VilambitCore` with direct smoke coverage;
+- narrow postMessage bridge for source state, transport, loop restore, and clip extraction;
+- notation-linked A–B ranges;
+- extracted clips with source fallback;
+- non-destructive clip-loop editor;
+- portable `.sargam` projects containing notation, metadata, and clips.
 
-- while the engine is `none`, `seekTo()` writes both the media element and the
-  paused buffer position;
-- `pos()` trusts the paused position before engine selection;
-- first play reconciles the selected engine with that stored position.
+## Source Workspace Wave 1 — precision source editing
 
-This phase deliberately does **not** convert the player UI or audio engine to
-React. It only creates maintainable file boundaries while preserving behavior.
+Wave 1 adds a visible waveform window independent of the full recording:
 
-## Phase 2 — testable player core
+- zoom in/out around the playhead or pointer;
+- fit the current A–B loop;
+- return to the complete recording;
+- pan backward/forward or Shift+wheel;
+- optional playhead-follow paging;
+- waveform drawing, seeking, loop handles, markers, regions, and beat grid all map through the visible window;
+- typed A/B timecodes (`seconds`, `m:ss.sss`, or `h:mm:ss.sss`);
+- ±10 ms and ±100 ms loop-boundary nudges while playback continues;
+- exact loop-duration readout;
+- existing manual session files preserve the waveform view and loop-on state.
 
-Extract pure position, clamping, loop, marker, and transport helpers from
-`vilambit-app.js` into importable modules. Add direct smoke coverage for the
-pre-play seek path instead of relying only on source extraction.
+Decoded media is drawn directly from the source buffer at the current zoom, so
+zooming reveals real detail rather than enlarging the old whole-file summary.
+Undecodable media still has timeline zoom/pan; persistent waveform peaks for
+those large sources belong to Wave 3.
 
-## Phase 3 — Sargam/Vilambit bridge
+## Next shared Vilambit waves
 
-Add a small `postMessage` contract for current position, A–B loop boundaries,
-markers, filename, and playback state. This can support actions such as
-inserting a Vilambit timestamp or marker into a notation/layout annotation.
+### Wave 2 — project-native per-source workspace
 
-## Phase 4 — native Sargam view
+Store and restore, per stable `sourceAssetId`:
 
-Move the visible controls to React while keeping decoded buffers, Web Audio,
-WASM engines, media elements, animation frames, and object URLs in an
-imperative player controller. The view must remain mounted across tab changes.
+- position;
+- loop and loop-on state;
+- speed and pitch;
+- markers and labels;
+- BPM and speed regions;
+- waveform view and follow preference.
+
+This state should travel automatically inside project folders and portable
+`.sargam` packages. The standalone Save/Load session JSON remains a manual
+compatibility path, not the primary project workflow.
+
+### Wave 3 — sources and large-file optimization
+
+- Sources panel with locate, reconnect, switch, and resume;
+- strict source identity checks;
+- cached multi-resolution waveform peaks for long MP4 and other undecodable media;
+- release old object URLs, buffers, capture nodes, and media resources reliably;
+- interrupted extraction and unsupported-codec messaging;
+- remove obsolete duplicate source files.
+
+## Shared core and standalone library player
+
+After the source workspace is stable, extract reusable player/controller
+surfaces so both shells use one implementation:
+
+- **Sargam shell:** notation bridge, extraction, projects, and practice sets;
+- **Standalone library shell:** URL/library-ID loading, queue, playlists, and FileMaker adapter.
+
+The future LAN browser player should load stable record IDs rather than raw
+network paths, preserve the active recording while tracks are queued, and
+remain testable against the actual older Windows browser target.
