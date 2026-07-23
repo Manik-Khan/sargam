@@ -18,6 +18,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { metadataRanges } from '../engine/anchors.js';
 import { audioLinkMetadataRanges } from '../engine/audio-links.js';
+import { bolCaptureKeymap } from './bol-capture-keymap.js';
 
 class HiddenStructureWidget extends WidgetType {
   toDOM() {
@@ -118,6 +119,7 @@ export default function EditorPane({
           highlightActiveLine(),
           EditorView.lineWrapping,
           markdown(),
+          bolCaptureKeymap((key) => bolKeyRef.current?.(key)),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           structureCompartment.of(hiddenStructure),
           EditorView.domEventHandlers({
@@ -209,6 +211,7 @@ export default function EditorPane({
           type="button"
           className={`app-bol-capture-toggle${bolCapture ? ' active' : ''}`}
           aria-pressed={Boolean(bolCapture)}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => onToggleBolCapture?.()}
         >{bolCapture ? 'Bol Capture on' : 'Bol Capture'}</button>
         <span className={bolCapture ? 'app-bol-capture-help' : ''}>

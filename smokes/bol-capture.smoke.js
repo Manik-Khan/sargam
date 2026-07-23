@@ -6,20 +6,43 @@ import {
   setBolAtCursor,
 } from '../src/engine/bol-capture.js';
 import { parseAnchorDocument } from '../src/engine/anchors.js';
+import { createBolCaptureBindings } from '../src/shell/bol-capture-keymap.js';
 
 const source = 'tal: tintal\n\nS- SS SS SS\n';
 const lineStart = source.indexOf('S-');
 
 export const smokes = [
   {
-    name: 'bol capture: begins on the caret music line and follows note attacks, not held slots',
+    name: 'bol capture: begins at the phrase head and follows note attacks, not held slots',
     fn() {
-      const result = beginBolCapture(source, lineStart);
+      const result = beginBolCapture(source, source.indexOf('\n', lineStart));
       assert.equal(result.ok, true);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 0 });
       const done = moveBolCursor(source, result.cursor, 7);
       assert.deepEqual(done.cursor, { sourceLine: 3, ordinal: 7 });
       assert.match(done.message, /7\/7/);
+    },
+  },
+  {
+    name: 'bol capture: a blank line immediately after music needs no highlighted selection',
+    fn() {
+      const withBlank = `${source}\n`;
+      const result = beginBolCapture(withBlank, withBlank.length);
+      assert.equal(result.ok, true);
+      assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 0 });
+    },
+  },
+  {
+    name: 'bol capture: high-priority CodeMirror bindings claim arrows while active',
+    fn() {
+      const received = [];
+      const bindings = createBolCaptureBindings((key) => {
+        received.push(key);
+        return true;
+      });
+      assert.equal(bindings.find((binding) => binding.key === 'ArrowDown').run(), true);
+      assert.equal(bindings.find((binding) => binding.key === 'ArrowUp').run(), true);
+      assert.deepEqual(received, ['ArrowDown', 'ArrowUp']);
     },
   },
   {
@@ -88,6 +111,8 @@ export const smokes = [
       const preview = await fs.readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
       assert.match(editor, /Bol Capture on/);
       assert.match(editor, /↓ da · ↑ ra · v diri/);
+      assert.match(editor, /bolCaptureKeymap/);
+      assert.match(editor, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/);
       assert.match(app, /applyBolCaptureKey/);
       assert.match(preview, /bolCapture/);
     },

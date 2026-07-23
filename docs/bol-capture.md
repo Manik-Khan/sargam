@@ -16,8 +16,15 @@ annotation tools.
 - `Delete`: remove the bol at the current attack
 - `Esc`: leave Bol Capture
 
-Start the mode with the text cursor on the music line. The highlighted score
-attack is the Bol Capture cursor.
+No text selection is required. Start the mode with the text cursor anywhere on
+the music line—or on the blank line immediately beneath a freshly typed
+phrase. Capture always begins at the phrase's first struck note. The
+highlighted score attack is the Bol Capture cursor.
+
+The Bol Capture keymap has higher priority than CodeMirror's ordinary cursor
+navigation while the mode is active. Therefore `↑` and `↓` enter strokes
+rather than moving between source lines. Outside Bol Capture they immediately
+return to ordinary editor navigation.
 
 Held dashes, rests, matra spacing, subdivisions, and local meter remain owned
 by the note line. The capture cursor visits struck notes only. A diri consumes

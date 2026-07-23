@@ -37,7 +37,21 @@ export function sourceLineAtPosition(text, position) {
 
 export function beginBolCapture(text, position) {
   const line = sourceLineAtPosition(text, position);
-  const info = attacksForLine(text, line.sourceLine);
+  let sourceLine = line.sourceLine;
+  let info = attacksForLine(text, sourceLine);
+  // After finishing a phrase, the writer will often press Enter before
+  // switching modes. Accept the blank/attachment line immediately below the
+  // phrase rather than requiring a selection or a trip back to its first note.
+  if ((info.error || info.attacks.length === 0) && /^\s*(?:$|>|"|<!--)/.test(line.text)) {
+    for (let candidate = line.sourceLine - 1; candidate >= Math.max(1, line.sourceLine - 2); candidate--) {
+      const previous = attacksForLine(text, candidate);
+      if (!previous.error && previous.attacks.length) {
+        sourceLine = candidate;
+        info = previous;
+        break;
+      }
+    }
+  }
   if (info.error || info.attacks.length === 0) {
     return {
       ok: false,
@@ -47,11 +61,12 @@ export function beginBolCapture(text, position) {
         : 'Place the text cursor on a music line before starting Bol Capture.',
     };
   }
-  const atOrAfterCaret = info.attacks.findIndex((attack) => attack.index >= line.local);
-  const ordinal = atOrAfterCaret === -1 ? info.attacks.length - 1 : atOrAfterCaret;
+  // Capture is phrase-oriented. Starting at attack zero is predictable even
+  // when the text caret remains at the end of the freshly typed note line.
+  const ordinal = 0;
   return {
     ok: true,
-    cursor: { sourceLine: line.sourceLine, ordinal },
+    cursor: { sourceLine, ordinal },
     message: captureStatus(info.attacks.length, ordinal),
   };
 }
