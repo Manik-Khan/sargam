@@ -32,6 +32,7 @@ export default function PreviewPane({
   meterDraft = null,
   anchorMarks = [],
   anchorTool = null,
+  bolCapture = null,
   selectedMarkId = null,
   onAnchorGesture,
   onSelectMark,
@@ -69,6 +70,7 @@ export default function PreviewPane({
     mountMeterOverlays(mount.current, meterSpans, meterDraft);
     const cleanupAnchors = mountAnchorOverlays(mount.current, anchorMarks, {
       selectedMarkId,
+      bolCapture,
       onSelectMark,
       onHandleStart(event, markId, side) {
         handleDrag.current = { markId, side };
@@ -81,7 +83,7 @@ export default function PreviewPane({
     });
     applyPlaybackCursor(mount.current, activeCursorRef.current);
     return () => { cleanupAudio?.(); cleanupAnchors?.(); };
-  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink]);
+  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink]);
 
   useEffect(() => {
     applyPlaybackCursor(mount.current, activeCursor);

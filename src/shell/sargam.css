@@ -1042,6 +1042,15 @@
 .app-editor-mode button { border: 1px solid var(--sr-line); border-radius: 0.35rem; background: transparent; color: inherit; padding: 0.16rem 0.42rem; font: inherit; }
 .app-editor-mode button.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
 .app-editor-mode span { opacity: 0.68; margin-left: 0.25rem; }
+.app-editor-mode .app-bol-capture-toggle { margin-left: 0.35rem; border-color: color-mix(in srgb, var(--sr-accent) 55%, var(--sr-line)); }
+.app-editor-mode .app-bol-capture-toggle.active { background: var(--sr-accent); color: var(--sr-paper-raised); }
+.app-editor-mode .app-bol-capture-help { color: var(--sr-accent); opacity: 1; }
+.sr-bol-capture-cursor {
+  border-radius: 0.24em;
+  outline: 2px solid var(--sr-accent);
+  outline-offset: 0.12em;
+  background: color-mix(in srgb, var(--sr-accent) 12%, transparent);
+}
 .app-editor-shell > .app-editor { padding: 0; overflow: hidden; background: var(--sr-paper-raised); }
 .app-editor.cm-editor, .app-editor .cm-editor { height: 100%; min-height: 0; background: transparent; color: inherit; font: inherit; }
 .app-editor .cm-scroller { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1.68; overflow: auto; }

@@ -85,6 +85,7 @@ import ClipLoopEditor from './ClipLoopEditor.jsx';
 import PortableProjectImport from './PortableProjectImport.jsx';
 import { EMPTY_VILAMBIT_STATE, postVilambitCommand } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
+import { applyBolCaptureKey, beginBolCapture } from '../engine/bol-capture.js';
 import './sargam.css';
 
 const STARTER = BAGESHRI_STARTER;
@@ -155,6 +156,8 @@ export default function App() {
     'Choose a mark, then click or drag directly on the rendered notation.'
   );
   const [selectedMarkId, setSelectedMarkId] = useState(null);
+  const [bolCapture, setBolCapture] = useState(null);
+  const [bolMessage, setBolMessage] = useState('');
   const [selectedAudioLinkId, setSelectedAudioLinkId] = useState(null);
   const [vilambitState, setVilambitState] = useState(EMPTY_VILAMBIT_STATE);
   const vilambitStateRef = useRef(EMPTY_VILAMBIT_STATE);
@@ -534,6 +537,38 @@ export default function App() {
   };
 
   const doEditorBeforeEdit = (el) => clearJumpSelection(el);
+
+  const doToggleBolCapture = () => {
+    if (bolCapture) {
+      setBolCapture(null);
+      setBolMessage('Bol Capture ended.');
+      return;
+    }
+    const position = editorRef.current?.selectionStart ?? cursorPos;
+    const result = beginBolCapture(text, position);
+    setBolMessage(result.message);
+    if (!result.ok) return;
+    setBolCapture(result.cursor);
+    setActiveLine(result.cursor.sourceLine);
+    editorRef.current?.focus();
+  };
+
+  const doBolCaptureKey = (key, event) => {
+    if (!bolCapture) return false;
+    if (key === 'Escape') {
+      setBolCapture(null);
+      setBolMessage('Bol Capture ended.');
+      return true;
+    }
+    if (event?.metaKey || event?.ctrlKey || event?.altKey) return false;
+    const result = applyBolCaptureKey(text, bolCapture, key);
+    if (!result.handled) return false;
+    setBolMessage(result.message || '');
+    if (result.cursor) setBolCapture(result.cursor);
+    if (result.text !== undefined && result.text !== text) setText(result.text);
+    setSelectedMarkId(result.mark?.id || null);
+    return true;
+  };
 
   useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
 
@@ -1626,6 +1661,7 @@ export default function App() {
             sourceText={text}
             anchorMarks={anchorModel.marks}
             anchorTool={anchorTool}
+            bolCapture={bolCapture}
             selectedMarkId={selectedMarkId}
             onAnchorGesture={doAnchorGesture}
             onSelectMark={setSelectedMarkId}
@@ -1650,6 +1686,10 @@ export default function App() {
               onCursorLine={setActiveLine}
               onCursorPos={setCursorPos}
               onBeforeEdit={doEditorBeforeEdit}
+              bolCapture={bolCapture}
+              bolMessage={bolMessage}
+              onToggleBolCapture={doToggleBolCapture}
+              onBolCaptureKey={doBolCaptureKey}
               editorRef={editorRef}
             />
           </div>

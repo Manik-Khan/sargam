@@ -81,6 +81,10 @@ export default function EditorPane({
   onCursorLine,
   onCursorPos,
   onBeforeEdit,
+  bolCapture,
+  bolMessage,
+  onToggleBolCapture,
+  onBolCaptureKey,
   editorRef,
 }) {
   const mount = useRef(null);
@@ -89,6 +93,7 @@ export default function EditorPane({
   const lineRef = useRef(onCursorLine);
   const posRef = useRef(onCursorPos);
   const beforeRef = useRef(onBeforeEdit);
+  const bolKeyRef = useRef(onBolCaptureKey);
   const [showStructure, setShowStructure] = useState(false);
   const structureCompartment = useMemo(() => new Compartment(), []);
 
@@ -96,6 +101,7 @@ export default function EditorPane({
   lineRef.current = onCursorLine;
   posRef.current = onCursorPos;
   beforeRef.current = onBeforeEdit;
+  bolKeyRef.current = onBolCaptureKey;
 
   useEffect(() => {
     if (!mount.current) return undefined;
@@ -120,6 +126,10 @@ export default function EditorPane({
               return false;
             },
             keydown(event) {
+              if (bolKeyRef.current?.(event.key, event)) {
+                event.preventDefault();
+                return true;
+              }
               if (facade && (event.key.length === 1 || ['Backspace', 'Delete', 'Enter'].includes(event.key))) {
                 beforeRef.current?.(facade);
               }
@@ -195,7 +205,17 @@ export default function EditorPane({
           className={showStructure ? 'active' : ''}
           onClick={() => setShowStructure(true)}
         >Structure</button>
-        <span>{showStructure ? 'Generated anchors and audio links are editable.' : 'Generated anchors and audio links are folded.'}</span>
+        <button
+          type="button"
+          className={`app-bol-capture-toggle${bolCapture ? ' active' : ''}`}
+          aria-pressed={Boolean(bolCapture)}
+          onClick={() => onToggleBolCapture?.()}
+        >{bolCapture ? 'Bol Capture on' : 'Bol Capture'}</button>
+        <span className={bolCapture ? 'app-bol-capture-help' : ''}>
+          {bolCapture
+            ? `↓ da · ↑ ra · v diri · ^/c chikari · ←/→ move · Esc done — ${bolMessage || ''}`
+            : (showStructure ? 'Generated anchors and audio links are editable.' : 'Generated anchors and audio links are folded.')}
+        </span>
       </div>
       <div className="app-editor" ref={mount} />
     </div>

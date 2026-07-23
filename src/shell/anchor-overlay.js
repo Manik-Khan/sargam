@@ -310,6 +310,15 @@ export function mountAnchorOverlays(root, marks = [], options = {}) {
       }
     }
   }
+  const capture = options.bolCapture;
+  if (capture && Number.isInteger(Number(capture.sourceLine)) && Number.isInteger(Number(capture.ordinal))) {
+    const cursorTarget = findTarget(root, {
+      kind: 'attack',
+      sourceLine: Number(capture.sourceLine),
+      ordinal: Number(capture.ordinal),
+    });
+    cursorTarget?.classList.add('sr-bol-capture-cursor');
+  }
   return () => {};
 }
 
