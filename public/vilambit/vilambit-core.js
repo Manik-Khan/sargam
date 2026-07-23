@@ -214,6 +214,60 @@
     return sortMarkers(markers.filter((_, markerIndex) => markerIndex !== index), duration);
   }
 
+  /**
+   * Create a loop from one marker to the next marker at a later time.
+   * Duplicate timestamps are skipped so the result never creates a zero-length
+   * loop. The caller may seek to loopA after applying the returned state.
+   */
+  function setLoopBoundaryFromMarker({
+    loopA = null,
+    loopB = null,
+    point = 'A',
+    markerTime = 0,
+    duration = 0,
+    minGap = 0.01,
+  } = {}) {
+    const safeDuration = clampDuration(duration);
+    const gap = Math.min(safeDuration, Math.max(0.001, finiteNumber(minGap, 0.01)));
+    const marker = clampPosition(markerTime, safeDuration);
+    let a = loopA == null ? null : clampPosition(loopA, safeDuration);
+    let b = loopB == null ? null : clampPosition(loopB, safeDuration);
+
+    if (String(point).toUpperCase() === 'B') {
+      if (a !== null && marker < a + gap) a = null;
+      b = marker;
+    } else {
+      if (b !== null && marker > b - gap) b = null;
+      a = marker;
+    }
+
+    return { loopA: a, loopB: b, ready: a !== null && b !== null };
+  }
+
+  function loopFromMarkerToNext(markers, index, duration = Number.POSITIVE_INFINITY, minGap = 0.01) {
+    const sorted = sortMarkers(markers, duration);
+    const markerIndex = Number.isInteger(index) ? index : -1;
+    const current = markerIndex >= 0 && markerIndex < sorted.length ? sorted[markerIndex] : null;
+    if (!current) {
+      return { loopA: null, loopB: null, ready: false, loopOn: false, nextMarkerIndex: -1 };
+    }
+
+    const gap = Math.max(0.001, finiteNumber(minGap, 0.01));
+    const nextMarkerIndex = sorted.findIndex((marker, candidateIndex) =>
+      candidateIndex > markerIndex && marker.t >= current.t + gap);
+    if (nextMarkerIndex < 0) {
+      return { loopA: current.t, loopB: null, ready: false, loopOn: false, nextMarkerIndex: -1 };
+    }
+
+    return {
+      loopA: current.t,
+      loopB: sorted[nextMarkerIndex].t,
+      ready: true,
+      loopOn: true,
+      nextMarkerIndex,
+    };
+  }
+
   function normalizeViewWindow(viewStart, viewEnd, duration, minSpan = 0.25) {
     const safeDuration = clampDuration(duration);
     if (!safeDuration) return { start: 0, end: 0, span: 0, full: true };
@@ -458,6 +512,8 @@
     addMarker,
     moveMarker,
     removeMarker,
+    setLoopBoundaryFromMarker,
+    loopFromMarkerToNext,
     normalizeViewWindow,
     zoomViewWindow,
     panViewWindow,

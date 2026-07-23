@@ -909,7 +909,14 @@ function endWaveDrag(event){
   if (!drag) return;
   const x = evX(event);
   if (!drag.moved){
-    if (drag.mode === 'select' || drag.mode === 'none'){
+    if (drag.mode === 'marker'){
+      if (event.shiftKey) setLoopBoundaryFromMarker(drag.idx, 'A');
+      else if (event.altKey) setLoopBoundaryFromMarker(drag.idx, 'B');
+      else {
+        const marker = state.markers[drag.idx];
+        if (marker) seekTo(marker.t);
+      }
+    } else if (drag.mode === 'select' || drag.mode === 'none'){
       const now = performance.now();
       if (now - lastTap.t < 350 && Math.abs(x - lastTap.x) < 14){
         seekTo(tAt(x));
@@ -1156,6 +1163,48 @@ document.querySelectorAll('[data-loop-nudge]').forEach(button => {
 });
 
 /* ---------------- markers & session ---------------- */
+function applyMarkerLoop(next, { seekStart = false } = {}){
+  state.loopA = next.loopA;
+  state.loopB = next.loopB;
+  state.loopOn = Boolean(next.loopOn && next.ready);
+  renderLoop();
+  applyLoopToEngine();
+  if (seekStart && state.loopA != null) seekTo(state.loopA);
+}
+
+function setLoopBoundaryFromMarker(index, point){
+  state.markers = Core.sortMarkers(state.markers, state.duration);
+  const marker = state.markers[index];
+  if (!marker) return;
+  const next = Core.setLoopBoundaryFromMarker({
+    loopA: state.loopA,
+    loopB: state.loopB,
+    point,
+    markerTime: marker.t,
+    duration: state.duration,
+    minGap: 0.01,
+  });
+  applyMarkerLoop({ ...next, loopOn: point === 'B' ? next.ready : state.loopOn && next.ready });
+}
+
+function loopFromMarkerToNext(index){
+  state.markers = Core.sortMarkers(state.markers, state.duration);
+  const next = Core.loopFromMarkerToNext(state.markers, index, state.duration, 0.01);
+  if (!next.ready) return;
+  applyMarkerLoop(next, { seekStart: true });
+}
+
+function markerAction(label, title, onClick, { disabled = false } = {}){
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn small markerAction';
+  button.textContent = label;
+  button.title = title;
+  button.disabled = disabled;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
 function addMarker(){
   if (!state.fileURL) return;
   state.markers = Core.addMarker(state.markers, pos(), state.duration);
@@ -1165,22 +1214,54 @@ function addMarker(){
 function renderMarkers(){
   const list = $('markerList');
   list.innerHTML = '';
+  state.markers = Core.sortMarkers(state.markers, state.duration);
   if (!state.markers.length){
     list.innerHTML = '<div class="empty">No markers yet — press M while listening.</div>';
     return;
   }
   state.markers.forEach((m, i) => {
-    const row = document.createElement('div'); row.className = 'mrow';
-    const t = document.createElement('span');
-    t.className = 'mt'; t.textContent = fmt(m.t); t.title = 'Jump here';
-    t.addEventListener('click', () => seekTo(m.t));
+    const row = document.createElement('div');
+    row.className = 'mrow';
+
+    const time = document.createElement('button');
+    time.type = 'button';
+    time.className = 'markerTime';
+    time.textContent = fmtPrecise(m.t);
+    time.title = 'Jump here · Shift-click sets A · Option/Alt-click sets B';
+    time.addEventListener('click', event => {
+      if (event.shiftKey) setLoopBoundaryFromMarker(i, 'A');
+      else if (event.altKey) setLoopBoundaryFromMarker(i, 'B');
+      else seekTo(m.t);
+    });
+
     const inp = document.createElement('input');
-    inp.placeholder = 'label…'; inp.value = m.label;
+    inp.placeholder = 'label…';
+    inp.value = m.label;
+    inp.setAttribute('aria-label', `Marker label at ${fmtPrecise(m.t)}`);
     inp.addEventListener('input', () => { m.label = inp.value; });
+
+    const actions = document.createElement('div');
+    actions.className = 'markerActions';
+    const nextRange = Core.loopFromMarkerToNext(state.markers, i, state.duration, 0.01);
+    actions.append(
+      markerAction('Set A', 'Use this marker as the loop start', () => setLoopBoundaryFromMarker(i, 'A')),
+      markerAction('Set B', 'Use this marker as the loop end', () => setLoopBoundaryFromMarker(i, 'B')),
+      markerAction('Loop → next', 'Loop from this marker to the next later marker', () => loopFromMarkerToNext(i), { disabled: !nextRange.ready }),
+    );
+
     const del = document.createElement('button');
-    del.className = 'del'; del.textContent = '×'; del.title = 'Delete marker';
-    del.addEventListener('click', () => { state.markers.splice(i, 1); renderMarkers(); });
-    row.append(t, inp, del);
+    del.type = 'button';
+    del.className = 'del';
+    del.textContent = '×';
+    del.title = 'Delete marker';
+    del.setAttribute('aria-label', `Delete marker at ${fmtPrecise(m.t)}`);
+    del.addEventListener('click', () => {
+      state.markers = Core.removeMarker(state.markers, i, state.duration);
+      renderMarkers();
+      drawWave();
+    });
+
+    row.append(time, inp, actions, del);
     list.appendChild(row);
   });
 }
