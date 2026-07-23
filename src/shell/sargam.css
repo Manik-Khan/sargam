@@ -1043,8 +1043,16 @@
 .app-editor-mode button.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
 .app-editor-mode span { opacity: 0.68; margin-left: 0.25rem; }
 .app-editor-mode .app-bol-capture-toggle { margin-left: 0.35rem; border-color: color-mix(in srgb, var(--sr-accent) 55%, var(--sr-line)); }
-.app-editor-mode .app-bol-capture-toggle.active { background: var(--sr-accent); color: var(--sr-paper-raised); }
-.app-editor-mode .app-bol-capture-help { color: var(--sr-accent); opacity: 1; }
+.app-editor-mode .app-bol-capture-toggle.active {
+  background: var(--sr-accent);
+  color: var(--sr-paper-raised);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sr-accent) 22%, transparent);
+}
+.app-editor-mode .app-bol-capture-help {
+  color: var(--sr-accent);
+  opacity: 1;
+  font-weight: 650;
+}
 .sr-bol-capture-cursor {
   border-radius: 0.24em;
   outline: 2px solid var(--sr-accent);

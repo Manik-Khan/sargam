@@ -1,9 +1,9 @@
 // src/engine/bol-capture.js — keyboard-first bol entry on the score's exact
-// attack grid. Notes remain the rhythmic authority; capture only adds or
-// replaces score-side articulation anchors.
+// attack grid. Notes remain the rhythmic authority. Unlike score-side drawing
+// annotations, captured bols are written to the composition's ordinary,
+// editable `>` attachment line.
 
 import {
-  addAnchorMark,
   attacksForLine,
   parseAnchorMetadata,
   writeAnchorMetadata,
@@ -20,6 +20,18 @@ const INSERT_KEYS = new Map([
   ['C', 'chikari'],
 ]);
 
+function sourceParts(text) {
+  const source = String(text ?? '');
+  const eol = source.includes('\r\n') ? '\r\n' : '\n';
+  return { source, eol, lines: source.split(/\r?\n/) };
+}
+
+function lineStartOffset(lines, index, eol) {
+  let offset = 0;
+  for (let i = 0; i < index; i++) offset += lines[i].length + eol.length;
+  return offset;
+}
+
 export function sourceLineAtPosition(text, position) {
   const source = String(text ?? '');
   const safe = Math.max(0, Math.min(source.length, Number(position) || 0));
@@ -31,19 +43,147 @@ export function sourceLineAtPosition(text, position) {
     start,
     end,
     local: safe - start,
-    text: source.slice(start, end),
+    text: source.slice(start, end).replace(/\r$/, ''),
   };
+}
+
+function findBolLane(text, sourceLine) {
+  const parts = sourceParts(text);
+  const musicIndex = Number(sourceLine) - 1;
+  if (!Number.isInteger(musicIndex) || musicIndex < 0 || musicIndex >= parts.lines.length) {
+    return { ...parts, musicIndex, laneIndex: -1, insertIndex: -1, tokens: [] };
+  }
+
+  let insertIndex = musicIndex + 1;
+  let laneIndex = -1;
+  // Meter and lyric attachments may sit between the music and bol lanes.
+  // Stop at the first blank, label, directive, or subsequent music line.
+  for (let i = musicIndex + 1; i < parts.lines.length; i++) {
+    const trimmed = parts.lines[i].trim();
+    if (trimmed.startsWith('>>') || trimmed.startsWith('"')) {
+      insertIndex = i + 1;
+      continue;
+    }
+    if (trimmed.startsWith('>')) {
+      laneIndex = i;
+      insertIndex = i;
+    }
+    break;
+  }
+
+  const raw = laneIndex >= 0 ? parts.lines[laneIndex].trim().slice(1).trim() : '';
+  const tokens = raw ? raw.split(/\s+/) : [];
+  return { ...parts, musicIndex, laneIndex, insertIndex, tokens };
+}
+
+function trimBolTokens(tokens) {
+  const next = [...tokens];
+  // Preserve the explicit gap following a final diri: it documents the
+  // two-attack span in the editable lane.
+  while (next.at(-1) === '.' && next.at(-2) !== 'diri') next.pop();
+  return next;
+}
+
+function writeBolLane(text, sourceLine, tokens, { keepEmpty = true } = {}) {
+  const lane = findBolLane(text, sourceLine);
+  if (lane.insertIndex < 0) {
+    return { ok: false, text, message: 'The active music line no longer exists.' };
+  }
+  const normalized = trimBolTokens(tokens);
+  const bolText = normalized.length ? `> ${normalized.join(' ')}` : '> ';
+  const lines = [...lane.lines];
+  let laneIndex = lane.laneIndex;
+
+  if (!normalized.length && !keepEmpty && laneIndex >= 0) {
+    lines.splice(laneIndex, 1);
+    laneIndex = -1;
+  } else if (laneIndex >= 0) {
+    const indent = lines[laneIndex].match(/^\s*/)?.[0] || '';
+    lines[laneIndex] = indent + bolText;
+  } else {
+    laneIndex = lane.insertIndex;
+    lines.splice(laneIndex, 0, bolText);
+  }
+
+  return {
+    ok: true,
+    text: lines.join(lane.eol),
+    tokens: normalized,
+    bolSourceLine: laneIndex >= 0 ? laneIndex + 1 : null,
+  };
+}
+
+function bolAnchorRange(mark) {
+  if (!BOL_KINDS.has(mark?.kind) || mark.start?.kind !== 'attack') return null;
+  const sourceLine = Number(mark.start.sourceLine);
+  const from = Number(mark.start.ordinal);
+  const endOrdinal = mark.kind === 'diri' && mark.end?.kind === 'attack'
+    ? Number(mark.end.ordinal)
+    : from;
+  if (!Number.isInteger(sourceLine) || !Number.isInteger(from) || !Number.isInteger(endOrdinal)) {
+    return null;
+  }
+  return { sourceLine, from, to: Math.max(from, endOrdinal), kind: mark.kind };
+}
+
+function migrateBolAnchors(text, sourceLine) {
+  const metadata = parseAnchorMetadata(text);
+  if (metadata.problems.length) {
+    return { ok: false, text, count: 0, message: metadata.problems[0].msg };
+  }
+  const migrated = [];
+  const retained = metadata.marks.filter((mark) => {
+    const range = bolAnchorRange(mark);
+    if (range?.sourceLine === sourceLine) {
+      migrated.push(range);
+      return false;
+    }
+    return true;
+  });
+  if (!migrated.length) return { ok: true, text, count: 0 };
+
+  const withoutAnchors = writeAnchorMetadata(text, retained);
+  const lane = findBolLane(withoutAnchors, sourceLine);
+  const tokens = [...lane.tokens];
+  for (const mark of migrated) {
+    while (tokens.length <= mark.to) tokens.push('.');
+    tokens[mark.from] = mark.kind;
+    if (mark.kind === 'diri') {
+      for (let i = mark.from + 1; i <= mark.to; i++) tokens[i] = '.';
+    }
+  }
+  const written = writeBolLane(withoutAnchors, sourceLine, tokens);
+  return { ...written, count: migrated.length };
+}
+
+export function bolCursorSelection(text, cursor) {
+  const sourceLine = Number(cursor?.sourceLine);
+  const ordinal = Number(cursor?.ordinal);
+  if (!Number.isInteger(sourceLine) || !Number.isInteger(ordinal)) return null;
+  const lane = findBolLane(text, sourceLine);
+  if (lane.laneIndex < 0) return null;
+  const line = lane.lines[lane.laneIndex];
+  const lineStart = lineStartOffset(lane.lines, lane.laneIndex, lane.eol);
+  const bodyOffset = line.indexOf('>') + 1;
+  const body = line.slice(bodyOffset);
+  const matches = [...body.matchAll(/\S+/g)];
+  const match = matches[ordinal];
+  if (match) {
+    const from = lineStart + bodyOffset + match.index;
+    return { from, to: from + match[0].length };
+  }
+  const at = lineStart + line.length;
+  return { from: at, to: at };
 }
 
 export function beginBolCapture(text, position) {
   const line = sourceLineAtPosition(text, position);
   let sourceLine = line.sourceLine;
   let info = attacksForLine(text, sourceLine);
-  // After finishing a phrase, the writer will often press Enter before
-  // switching modes. Accept the blank/attachment line immediately below the
-  // phrase rather than requiring a selection or a trip back to its first note.
+  // Accept an immediately following blank or attachment line so the writer
+  // never has to highlight a phrase before entering capture.
   if ((info.error || info.attacks.length === 0) && /^\s*(?:$|>|"|<!--)/.test(line.text)) {
-    for (let candidate = line.sourceLine - 1; candidate >= Math.max(1, line.sourceLine - 2); candidate--) {
+    for (let candidate = line.sourceLine - 1; candidate >= Math.max(1, line.sourceLine - 3); candidate--) {
       const previous = attacksForLine(text, candidate);
       if (!previous.error && previous.attacks.length) {
         sourceLine = candidate;
@@ -55,45 +195,27 @@ export function beginBolCapture(text, position) {
   if (info.error || info.attacks.length === 0) {
     return {
       ok: false,
+      text,
       cursor: null,
       message: info.error
         ? `Bol Capture cannot use this line: ${info.error}`
         : 'Place the text cursor on a music line before starting Bol Capture.',
     };
   }
-  // Capture is phrase-oriented. Starting at attack zero is predictable even
-  // when the text caret remains at the end of the freshly typed note line.
-  const ordinal = 0;
+
+  const migrated = migrateBolAnchors(text, sourceLine);
+  if (!migrated.ok) return { ...migrated, cursor: null };
+  const ready = writeBolLane(migrated.text, sourceLine, findBolLane(migrated.text, sourceLine).tokens);
+  if (!ready.ok) return { ...ready, cursor: null };
+  const cursor = { sourceLine, ordinal: 0 };
   return {
     ok: true,
-    cursor: { sourceLine, ordinal },
-    message: captureStatus(info.attacks.length, ordinal),
-  };
-}
-
-function gestureFor(info, sourceLine, ordinal) {
-  const attack = info.attacks[ordinal];
-  if (!attack) return null;
-  return {
-    anchorKind: 'attack',
-    sourceLine,
-    time: attack.timeLabel,
-    ordinal,
-    note: attack.ch,
-  };
-}
-
-function markRange(mark) {
-  if (!BOL_KINDS.has(mark?.kind) || mark.start?.kind !== 'attack') return null;
-  const a = Number(mark.start.ordinal);
-  const b = mark.kind === 'diri' && mark.end?.kind === 'attack'
-    ? Number(mark.end.ordinal)
-    : a;
-  if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
-  return {
-    sourceLine: Number(mark.start.sourceLine),
-    from: Math.min(a, b),
-    to: Math.max(a, b),
+    text: ready.text,
+    cursor,
+    selection: bolCursorSelection(ready.text, cursor),
+    message: migrated.count
+      ? `Bol Capture ready. Moved ${migrated.count} existing bol mark${migrated.count === 1 ? '' : 's'} into the editable > line.`
+      : `Bol Capture ready on the editable > line. ${captureStatus(info.attacks.length, 0)}`,
   };
 }
 
@@ -101,25 +223,26 @@ function rangesOverlap(aFrom, aTo, bFrom, bTo) {
   return aFrom <= bTo && bFrom <= aTo;
 }
 
-function clearBolRange(text, sourceLine, from, to) {
-  const metadata = parseAnchorMetadata(text);
-  if (metadata.problems.length) {
-    return { ok: false, text, message: metadata.problems[0].msg, removed: [] };
-  }
-  const removed = [];
-  const marks = metadata.marks.filter((mark) => {
-    const range = markRange(mark);
-    const conflict = range
-      && range.sourceLine === sourceLine
-      && rangesOverlap(range.from, range.to, from, to);
-    if (conflict) removed.push(mark);
-    return !conflict;
-  });
+function tokenRange(tokens, index) {
+  if (!tokens[index] || tokens[index] === '.') return null;
   return {
-    ok: true,
-    text: removed.length ? writeAnchorMetadata(text, marks) : text,
-    removed,
+    from: index,
+    to: tokens[index] === 'diri' ? Math.min(tokens.length - 1, index + 1) : index,
   };
+}
+
+function clearBolRange(tokens, from, to) {
+  const next = [...tokens];
+  let removed = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const range = tokenRange(tokens, i);
+    if (range && rangesOverlap(range.from, range.to, from, to)) {
+      next[i] = '.';
+      if (tokens[i] === 'diri' && i + 1 < next.length) next[i + 1] = '.';
+      removed++;
+    }
+  }
+  return { tokens: next, removed };
 }
 
 export function removeBolAtCursor(text, cursor) {
@@ -128,11 +251,15 @@ export function removeBolAtCursor(text, cursor) {
   if (!Number.isInteger(sourceLine) || !Number.isInteger(ordinal)) {
     return { ok: false, text, message: 'Bol Capture has no active attack.' };
   }
-  const result = clearBolRange(text, sourceLine, ordinal, ordinal);
-  if (!result.ok) return result;
+  const lane = findBolLane(text, sourceLine);
+  const cleared = clearBolRange(lane.tokens, ordinal, ordinal);
+  const written = writeBolLane(text, sourceLine, cleared.tokens);
+  if (!written.ok) return written;
   return {
-    ...result,
-    message: result.removed.length ? 'Bol removed.' : 'No bol is attached to this attack.',
+    ...written,
+    cursor,
+    selection: bolCursorSelection(written.text, cursor),
+    message: cleared.removed ? 'Bol removed from the editable > line.' : 'No bol is attached to this attack.',
   };
 }
 
@@ -149,18 +276,22 @@ export function setBolAtCursor(text, cursor, kind) {
     return { ok: false, text, message: 'Diri needs two consecutive attacks; only one remains.' };
   }
 
-  const cleared = clearBolRange(text, sourceLine, ordinal, ordinal + span - 1);
-  if (!cleared.ok) return cleared;
-  const refreshed = attacksForLine(cleared.text, sourceLine);
-  const start = gestureFor(refreshed, sourceLine, ordinal);
-  const end = kind === 'diri' ? gestureFor(refreshed, sourceLine, ordinal + 1) : null;
-  const placed = addAnchorMark(cleared.text, { kind, start, ...(end ? { end } : {}) });
-  if (!placed.ok) return placed;
-  const nextOrdinal = Math.min(refreshed.attacks.length, ordinal + span);
+  const lane = findBolLane(text, sourceLine);
+  const cleared = clearBolRange(lane.tokens, ordinal, ordinal + span - 1);
+  const tokens = cleared.tokens;
+  while (tokens.length < ordinal + span) tokens.push('.');
+  tokens[ordinal] = kind;
+  if (kind === 'diri') tokens[ordinal + 1] = '.';
+
+  const written = writeBolLane(text, sourceLine, tokens);
+  if (!written.ok) return written;
+  const nextOrdinal = Math.min(info.attacks.length, ordinal + span);
+  const nextCursor = { sourceLine, ordinal: nextOrdinal };
   return {
-    ...placed,
-    cursor: { sourceLine, ordinal: nextOrdinal },
-    message: `${kind === 'diri' ? 'Diri' : kind} entered. ${captureStatus(refreshed.attacks.length, nextOrdinal)}`,
+    ...written,
+    cursor: nextCursor,
+    selection: bolCursorSelection(written.text, nextCursor),
+    message: `${kind === 'diri' ? 'Diri' : kind} written to the > line. ${captureStatus(info.attacks.length, nextOrdinal)}`,
   };
 }
 
@@ -171,9 +302,12 @@ export function moveBolCursor(text, cursor, delta) {
     return { ok: false, cursor, message: 'The active music line no longer has note attacks.' };
   }
   const ordinal = Math.max(0, Math.min(info.attacks.length, Number(cursor?.ordinal || 0) + delta));
+  const nextCursor = { sourceLine, ordinal };
   return {
     ok: true,
-    cursor: { sourceLine, ordinal },
+    text,
+    cursor: nextCursor,
+    selection: bolCursorSelection(text, nextCursor),
     message: captureStatus(info.attacks.length, ordinal),
   };
 }
@@ -181,8 +315,8 @@ export function moveBolCursor(text, cursor, delta) {
 export function captureStatus(total, ordinal) {
   const done = Math.max(0, Math.min(total, Number(ordinal) || 0));
   return done >= total
-    ? `Bol Capture complete: ${total}/${total} attacks.`
-    : `Bol Capture: attack ${done + 1} of ${total}.`;
+    ? `Complete: ${total}/${total} attacks. Use ← to review or Esc to edit the > line directly.`
+    : `Attack ${done + 1} of ${total}.`;
 }
 
 export function applyBolCaptureKey(text, cursor, key) {
@@ -203,7 +337,8 @@ export function applyBolCaptureKey(text, cursor, key) {
       ok: true,
       text,
       cursor,
-      message: 'The note line already owns “-” and its held time; Bol Capture moves only between attacks.',
+      selection: bolCursorSelection(text, cursor),
+      message: 'The music line already owns “-”. Use ←/→ to move between attacks.',
     };
   }
   const kind = INSERT_KEYS.get(key);

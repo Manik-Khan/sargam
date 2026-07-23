@@ -18,6 +18,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { metadataRanges } from '../engine/anchors.js';
 import { audioLinkMetadataRanges } from '../engine/audio-links.js';
+import { bolCursorSelection } from '../engine/bol-capture.js';
 import { bolCaptureKeymap } from './bol-capture-keymap.js';
 
 class HiddenStructureWidget extends WidgetType {
@@ -188,6 +189,19 @@ export default function EditorPane({
 
   useEffect(() => {
     const view = viewRef.current;
+    if (!view || !bolCapture) return;
+    const range = bolCursorSelection(text, bolCapture);
+    if (!range) return;
+    const selection = view.state.selection.main;
+    if (selection.from === range.from && selection.to === range.to) return;
+    view.dispatch({
+      selection: { anchor: range.from, head: range.to },
+      scrollIntoView: true,
+    });
+  }, [text, bolCapture]);
+
+  useEffect(() => {
+    const view = viewRef.current;
     if (!view) return;
     view.dispatch({
       effects: structureCompartment.reconfigure(showStructure ? [] : hiddenStructure),
@@ -213,10 +227,14 @@ export default function EditorPane({
           aria-pressed={Boolean(bolCapture)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onToggleBolCapture?.()}
-        >{bolCapture ? 'Bol Capture on' : 'Bol Capture'}</button>
-        <span className={bolCapture ? 'app-bol-capture-help' : ''}>
+        >{bolCapture ? 'Bol Capture: ON' : 'Bol Capture'}</button>
+        <span
+          className={bolCapture ? 'app-bol-capture-help' : ''}
+          role={bolCapture ? 'status' : undefined}
+          aria-live={bolCapture ? 'polite' : undefined}
+        >
           {bolCapture
-            ? `↓ da · ↑ ra · v diri · ^/c chikari · ←/→ move · Esc done — ${bolMessage || ''}`
+            ? `WRITING > BOL LINE · ↓ da · ↑ ra · v diri · ^/c chikari · ←/→ move · Delete erase · Esc direct edit — ${bolMessage || ''}`
             : (showStructure ? 'Generated anchors and audio links are editable.' : 'Generated anchors and audio links are folded.')}
         </span>
       </div>

@@ -158,6 +158,10 @@ export default function App() {
   const [selectedMarkId, setSelectedMarkId] = useState(null);
   const [bolCapture, setBolCapture] = useState(null);
   const [bolMessage, setBolMessage] = useState('');
+  const textRef = useRef(text);
+  const bolCaptureRef = useRef(null);
+  textRef.current = text;
+  bolCaptureRef.current = bolCapture;
   const [selectedAudioLinkId, setSelectedAudioLinkId] = useState(null);
   const [vilambitState, setVilambitState] = useState(EMPTY_VILAMBIT_STATE);
   const vilambitStateRef = useRef(EMPTY_VILAMBIT_STATE);
@@ -539,34 +543,50 @@ export default function App() {
   const doEditorBeforeEdit = (el) => clearJumpSelection(el);
 
   const doToggleBolCapture = () => {
-    if (bolCapture) {
+    if (bolCaptureRef.current) {
+      bolCaptureRef.current = null;
       setBolCapture(null);
-      setBolMessage('Bol Capture ended.');
+      setBolMessage('Bol Capture ended. The > bol line is now directly editable.');
       return;
     }
     const position = editorRef.current?.selectionStart ?? cursorPos;
-    const result = beginBolCapture(text, position);
+    const currentText = textRef.current;
+    const result = beginBolCapture(currentText, position);
     setBolMessage(result.message);
     if (!result.ok) return;
+    if (result.text !== currentText) {
+      textRef.current = result.text;
+      setText(result.text);
+    }
+    bolCaptureRef.current = result.cursor;
     setBolCapture(result.cursor);
     setActiveLine(result.cursor.sourceLine);
     editorRef.current?.focus();
   };
 
   const doBolCaptureKey = (key, event) => {
-    if (!bolCapture) return false;
+    const currentCursor = bolCaptureRef.current;
+    if (!currentCursor) return false;
     if (key === 'Escape') {
+      bolCaptureRef.current = null;
       setBolCapture(null);
-      setBolMessage('Bol Capture ended.');
+      setBolMessage('Bol Capture ended. The > bol line is now directly editable.');
       return true;
     }
     if (event?.metaKey || event?.ctrlKey || event?.altKey) return false;
-    const result = applyBolCaptureKey(text, bolCapture, key);
+    const currentText = textRef.current;
+    const result = applyBolCaptureKey(currentText, currentCursor, key);
     if (!result.handled) return false;
     setBolMessage(result.message || '');
-    if (result.cursor) setBolCapture(result.cursor);
-    if (result.text !== undefined && result.text !== text) setText(result.text);
-    setSelectedMarkId(result.mark?.id || null);
+    if (result.cursor) {
+      bolCaptureRef.current = result.cursor;
+      setBolCapture(result.cursor);
+    }
+    if (result.text !== undefined && result.text !== currentText) {
+      textRef.current = result.text;
+      setText(result.text);
+    }
+    setSelectedMarkId(null);
     return true;
   };
 
