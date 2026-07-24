@@ -226,6 +226,34 @@ export const smokes = [
     },
   },
   {
+    name: 'vilambit core: project workspace restores as one bounded state',
+    async fn() {
+      const core = await loadCore();
+      const restored = core.normalizeWorkspaceState({
+        lastPosition: 130,
+        loop: { a: 80, b: 20, on: true },
+        tempoPercent: 74,
+        pitchSemitones: 3,
+        pitchCents: -12,
+        markers: [{ t: 150, label: 'end' }, { t: 10, label: 'start' }],
+        bpm: { bpm: 120, period: 0.5, phaseAbs: 15, confidence: 0.8 },
+        speedRegions: [{ start: 30, end: 40, pct: 65 }],
+        waveformView: { start: 25, end: 50, followPlayhead: true },
+      }, 120);
+      assert.deepEqual(JSON.parse(JSON.stringify(restored)), {
+        lastPosition: 120,
+        loop: { a: 20, b: 80, on: true, ready: true },
+        tempoPercent: 74,
+        pitchSemitones: 3,
+        pitchCents: -12,
+        markers: [{ t: 10, label: 'start' }, { t: 120, label: 'end' }],
+        bpm: { bpm: 120, period: 0.5, phaseAbs: 15, confidence: 0.8 },
+        speedRegions: [{ start: 30, end: 40, pct: 65 }],
+        waveformView: { start: 25, end: 50, followPlayhead: true },
+      });
+    },
+  },
+  {
     name: 'vilambit core: public snapshot is serializable and bridge-safe',
     async fn() {
       const core = await loadCore();
@@ -257,6 +285,9 @@ export const smokes = [
         pitch: { semitones: 3, cents: -12, totalSemitones: 2.88 },
         loop: { a: 20, b: 40, on: true, ready: true },
         markers: [{ t: 10, label: 'sthayi' }, { t: 80, label: 'taan' }],
+        bpm: null,
+        speedRegions: [],
+        waveformView: { start: 0, end: 120, followPlayhead: false },
         error: null,
       });
     },

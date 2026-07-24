@@ -430,6 +430,79 @@
     return numbers[0] * 3600 + numbers[1] * 60 + numbers[2];
   }
 
+  function normalizeSpeedRegions(regions, duration = Number.POSITIVE_INFINITY) {
+    if (!Array.isArray(regions)) return [];
+    const cap = Number.isFinite(duration) ? clampDuration(duration) : Number.POSITIVE_INFINITY;
+    return regions
+      .filter((region) => region && typeof region === 'object')
+      .map((region) => {
+        const start = Number.isFinite(cap)
+          ? clampPosition(region.start, cap)
+          : Math.max(0, finiteNumber(region.start, 0));
+        const end = Number.isFinite(cap)
+          ? clampPosition(region.end, cap)
+          : Math.max(0, finiteNumber(region.end, 0));
+        if (end <= start) return null;
+        return { ...region, start, end, pct: clampTempo(region.pct) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+
+  function normalizeBpm(value, duration = Number.POSITIVE_INFINITY) {
+    if (!value || typeof value !== 'object') return null;
+    const bpm = finiteNumber(value.bpm, 0);
+    const period = finiteNumber(value.period, 0);
+    if (bpm <= 0 || period <= 0) return null;
+    const phaseAbs = Number.isFinite(duration)
+      ? clampPosition(value.phaseAbs, duration)
+      : Math.max(0, finiteNumber(value.phaseAbs, 0));
+    return {
+      ...value,
+      bpm,
+      period,
+      phaseAbs,
+      confidence: clamp(value.confidence, 0, 1),
+      ...(value.tapped != null ? { tapped: Boolean(value.tapped) } : {}),
+    };
+  }
+
+  function normalizeWorkspaceState(value = {}, duration = 0) {
+    const source = value && typeof value === 'object' ? value : {};
+    const safeDuration = clampDuration(duration);
+    const loopSource = source.loop && typeof source.loop === 'object' ? source.loop : {};
+    const loop = normalizeLoop(loopSource.a, loopSource.b, safeDuration);
+    const viewSource = source.waveformView && typeof source.waveformView === 'object'
+      ? source.waveformView
+      : {};
+    const view = normalizeViewWindow(
+      viewSource.start,
+      viewSource.end || safeDuration,
+      safeDuration,
+      0.25,
+    );
+    return {
+      lastPosition: clampPosition(source.lastPosition, safeDuration),
+      loop: {
+        a: loop.loopA,
+        b: loop.loopB,
+        on: Boolean(loopSource.on) && loop.ready,
+        ready: loop.ready,
+      },
+      tempoPercent: clampTempo(finiteNumber(source.tempoPercent, 100)),
+      pitchSemitones: clampSemitones(finiteNumber(source.pitchSemitones, 0)),
+      pitchCents: clampCents(finiteNumber(source.pitchCents, 0)),
+      markers: sortMarkers(source.markers, safeDuration),
+      bpm: normalizeBpm(source.bpm, safeDuration),
+      speedRegions: normalizeSpeedRegions(source.speedRegions, safeDuration),
+      waveformView: {
+        start: view.start,
+        end: view.end,
+        followPlayhead: Boolean(viewSource.followPlayhead),
+      },
+    };
+  }
+
   /**
    * Build the serializable player-state shape that the iframe bridge can
    * publish without exposing DOM nodes, AudioContext objects, buffers, or WASM.
@@ -452,10 +525,16 @@
     loopB = null,
     loopOn = false,
     markers = [],
+    bpm = null,
+    speedRegions = [],
+    viewStart = 0,
+    viewEnd = 0,
+    followPlayhead = false,
     error = null,
   } = {}) {
     const safeDuration = clampDuration(duration);
     const loop = normalizeLoop(loopA, loopB, safeDuration);
+    const view = normalizeViewWindow(viewStart, viewEnd || safeDuration, safeDuration, 0.25);
     const loaded = Boolean(fileURL);
 
     return {
@@ -486,6 +565,13 @@
         ready: loop.ready,
       },
       markers: sortMarkers(markers, safeDuration),
+      bpm: normalizeBpm(bpm, safeDuration),
+      speedRegions: normalizeSpeedRegions(speedRegions, safeDuration),
+      waveformView: {
+        start: view.start,
+        end: view.end,
+        followPlayhead: Boolean(followPlayhead),
+      },
       error: typeof error === 'string' && error ? error : null,
     };
   }
@@ -521,6 +607,9 @@
     setLoopBoundary,
     nudgeLoopBoundary,
     parseTimecode,
+    normalizeSpeedRegions,
+    normalizeBpm,
+    normalizeWorkspaceState,
     createPublicSnapshot,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

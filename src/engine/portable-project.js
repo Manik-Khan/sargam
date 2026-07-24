@@ -16,6 +16,13 @@ import {
   normalizeProjectManifest,
   serializeMediaManifest,
 } from './project-media.js';
+import {
+  SOURCE_WORKSPACE_FILE,
+  createEmptySourceWorkspace,
+  normalizeSourceWorkspace,
+  parseSourceWorkspace,
+  serializeSourceWorkspace,
+} from './source-workspace.js';
 
 export const PORTABLE_EXTENSION = '.sargam';
 export const PORTABLE_MIME = 'application/vnd.sargam+zip';
@@ -290,21 +297,39 @@ function fileRecord(path, bytes) {
  * `files` may contain extra safe future files; required text and current media
  * always replace same-named entries without rewriting the notation itself.
  */
-export function buildPortableProject({ manifest, composition, media, files = new Map(), exportedAt } = {}) {
+export function buildPortableProject({
+  manifest,
+  composition,
+  media,
+  workspace = createEmptySourceWorkspace(),
+  files = new Map(),
+  exportedAt,
+} = {}) {
   const normalizedMedia = normalizeMediaManifest(media);
   if (normalizedMedia.problems.length) throw new TypeError(`Cannot export media.json: ${normalizedMedia.problems.join('; ')}`);
+  const normalizedWorkspace = normalizeSourceWorkspace(workspace);
+  if (normalizedWorkspace.problems.length) {
+    throw new TypeError(`Cannot export workspace.json: ${normalizedWorkspace.problems.join('; ')}`);
+  }
   const compositionBytes = asBytes(String(composition ?? ''));
   const mediaBytes = asBytes(serializeMediaManifest(normalizedMedia.manifest));
+  const workspaceBytes = asBytes(serializeSourceWorkspace(normalizedWorkspace.workspace));
   const payload = new Map(files instanceof Map ? files : Object.entries(files || {}));
   payload.delete(MANIFEST_FILE);
   payload.set(COMPOSITION_FILE, compositionBytes);
   payload.set(MEDIA_FILE, mediaBytes);
+  payload.set(SOURCE_WORKSPACE_FILE, workspaceBytes);
 
   for (const clip of normalizedMedia.manifest.clips) {
     if (!payload.has(clip.path)) throw new TypeError(`Portable export is missing clip file ${clip.path}.`);
   }
 
-  const knownPaths = new Set([COMPOSITION_FILE, MEDIA_FILE, ...normalizedMedia.manifest.clips.map((clip) => clip.path)]);
+  const knownPaths = new Set([
+    COMPOSITION_FILE,
+    MEDIA_FILE,
+    SOURCE_WORKSPACE_FILE,
+    ...normalizedMedia.manifest.clips.map((clip) => clip.path),
+  ]);
   for (const path of payload.keys()) safePortablePath(path);
   const fileList = [...payload.entries()]
     .map(([path, value]) => fileRecord(path, asBytes(value)))
@@ -326,7 +351,12 @@ export function buildPortableProject({ manifest, composition, media, files = new
     },
   };
   payload.set(MANIFEST_FILE, `${JSON.stringify(portableManifest, null, 2)}\n`);
-  return { bytes: createStoredZip(payload), manifest: portableManifest, media: normalizedMedia.manifest };
+  return {
+    bytes: createStoredZip(payload),
+    manifest: portableManifest,
+    media: normalizedMedia.manifest,
+    workspace: normalizedWorkspace.workspace,
+  };
 }
 
 /** Validate and unpack one .sargam package without touching the filesystem. */
@@ -340,10 +370,12 @@ export function parsePortableProject(value, options = {}) {
   let manifestText;
   let composition;
   let mediaText;
+  let workspaceText = '';
   try {
     manifestText = decodeText(entries, MANIFEST_FILE);
     composition = decodeText(entries, COMPOSITION_FILE);
     mediaText = decodeText(entries, MEDIA_FILE);
+    if (entries.has(SOURCE_WORKSPACE_FILE)) workspaceText = decodeText(entries, SOURCE_WORKSPACE_FILE);
   } catch (error) {
     return { ok: false, problems: [error.message], warnings, entries };
   }
@@ -360,6 +392,9 @@ export function parsePortableProject(value, options = {}) {
   if (portable?.format !== 'zip-store') problems.push(`unsupported portable package format: ${portable?.format ?? 'missing'}`);
   if (projectResult.manifest.composition !== COMPOSITION_FILE) problems.push('portable project composition path must be composition.md');
   if (projectResult.manifest.media !== MEDIA_FILE) problems.push('portable project media path must be media.json');
+  if (projectResult.manifest.workspace !== SOURCE_WORKSPACE_FILE) {
+    problems.push('portable project workspace path must be workspace.json');
+  }
 
   let mediaValue;
   try { mediaValue = JSON.parse(mediaText); }
@@ -369,6 +404,8 @@ export function parsePortableProject(value, options = {}) {
   for (const clip of mediaResult.manifest.clips) {
     if (!entries.has(clip.path)) problems.push(`portable project is missing clip ${clip.path}`);
   }
+  const workspaceResult = parseSourceWorkspace(workspaceText);
+  problems.push(...workspaceResult.problems);
 
   const declaredFiles = Array.isArray(portable?.files) ? portable.files : [];
   if (!Array.isArray(portable?.files)) problems.push('portable manifest requires a files list');
@@ -397,7 +434,12 @@ export function parsePortableProject(value, options = {}) {
     .filter(([path]) => path !== MANIFEST_FILE)
     .map(([path, bytes]) => fileRecord(path, bytes))
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  const knownPaths = new Set([COMPOSITION_FILE, MEDIA_FILE, ...mediaResult.manifest.clips.map((clip) => clip.path)]);
+  const knownPaths = new Set([
+    COMPOSITION_FILE,
+    MEDIA_FILE,
+    SOURCE_WORKSPACE_FILE,
+    ...mediaResult.manifest.clips.map((clip) => clip.path),
+  ]);
   const actualExtras = actualFiles.filter((file) => !knownPaths.has(file.path)).map((file) => file.path);
   const validatedManifest = {
     ...projectResult.manifest,
@@ -415,6 +457,7 @@ export function parsePortableProject(value, options = {}) {
     ok: problems.length === 0,
     manifest: validatedManifest,
     media: mediaResult.manifest,
+    workspace: workspaceResult.workspace,
     composition,
     entries,
     problems,

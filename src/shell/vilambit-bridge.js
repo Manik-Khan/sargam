@@ -16,6 +16,7 @@ export const VILAMBIT_COMMANDS = Object.freeze([
   'clear-loop',
   'jump-marker',
   'extract-loop',
+  'apply-workspace',
 ]);
 
 const COMMAND_SET = new Set(VILAMBIT_COMMANDS);
@@ -33,6 +34,9 @@ export const EMPTY_VILAMBIT_STATE = Object.freeze({
   pitch: Object.freeze({ semitones: 0, cents: 0, totalSemitones: 0 }),
   loop: Object.freeze({ a: null, b: null, on: false, ready: false }),
   markers: Object.freeze([]),
+  bpm: null,
+  speedRegions: Object.freeze([]),
+  waveformView: Object.freeze({ start: 0, end: 0, followPlayhead: false }),
   error: null,
 });
 
@@ -77,6 +81,37 @@ export function sanitizeVilambitState(value) {
         }))
         .sort((a, b) => a.t - b.t)
     : [];
+  const bpmSource = value.bpm && typeof value.bpm === 'object' && !Array.isArray(value.bpm)
+    ? value.bpm
+    : null;
+  const bpm = bpmSource && finite(bpmSource.bpm) > 0 && finite(bpmSource.period) > 0
+    ? {
+        ...bpmSource,
+        bpm: finite(bpmSource.bpm),
+        period: finite(bpmSource.period),
+        phaseAbs: Math.min(duration, Math.max(0, finite(bpmSource.phaseAbs))),
+        confidence: Math.min(1, Math.max(0, finite(bpmSource.confidence))),
+        ...(bpmSource.tapped != null ? { tapped: Boolean(bpmSource.tapped) } : {}),
+      }
+    : null;
+  const speedRegions = Array.isArray(value.speedRegions)
+    ? value.speedRegions
+        .filter((region) => region && typeof region === 'object')
+        .map((region) => ({
+          ...region,
+          start: Math.min(duration, Math.max(0, finite(region.start))),
+          end: Math.min(duration, Math.max(0, finite(region.end))),
+          pct: Math.min(200, Math.max(25, Math.round(finite(region.pct, 100)))),
+        }))
+        .filter((region) => region.end > region.start)
+        .sort((a, b) => a.start - b.start || a.end - b.end)
+    : [];
+  const view = value.waveformView && typeof value.waveformView === 'object'
+    ? value.waveformView
+    : {};
+  let viewStart = Math.min(duration, Math.max(0, finite(view.start)));
+  let viewEnd = Math.min(duration, Math.max(0, finite(view.end, duration)));
+  if (viewEnd < viewStart) [viewStart, viewEnd] = [viewEnd, viewStart];
 
   return {
     ready: Boolean(value.ready),
@@ -99,6 +134,13 @@ export function sanitizeVilambitState(value) {
       ready: Boolean(loop.ready),
     },
     markers,
+    bpm,
+    speedRegions,
+    waveformView: {
+      start: viewStart,
+      end: viewEnd,
+      followPlayhead: Boolean(view.followPlayhead),
+    },
     error: typeof value.error === 'string' && value.error ? value.error : null,
   };
 }

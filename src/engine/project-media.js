@@ -2,6 +2,8 @@
 // projects. Binary audio never enters Markdown or these JSON records; manifests
 // contain stable identities, source ranges, file paths, and lightweight facts.
 
+import { SOURCE_WORKSPACE_FILE } from './source-workspace.js';
+
 export const MEDIA_MANIFEST_VERSION = 1;
 export const PROJECT_MANIFEST_VERSION = 1;
 export const MEDIA_MANIFEST_KIND = 'sargam-media';
@@ -313,6 +315,7 @@ export function createProjectManifest({ id, name, createdAt, modifiedAt } = {}) 
     name: nonEmpty(name, 'Untitled Sargam Project'),
     composition: COMPOSITION_FILE,
     media: MEDIA_FILE,
+    workspace: SOURCE_WORKSPACE_FILE,
     clips: CLIPS_DIRECTORY,
     ...(createdAt ? { createdAt } : {}),
     ...(modifiedAt ? { modifiedAt } : {}),
@@ -335,10 +338,14 @@ export function normalizeProjectManifest(value = {}) {
     ...createProjectManifest(value),
     composition: isSafeProjectPath(value.composition || COMPOSITION_FILE) ? (value.composition || COMPOSITION_FILE) : COMPOSITION_FILE,
     media: isSafeProjectPath(value.media || MEDIA_FILE) ? (value.media || MEDIA_FILE) : MEDIA_FILE,
+    workspace: isSafeProjectPath(value.workspace || SOURCE_WORKSPACE_FILE)
+      ? (value.workspace || SOURCE_WORKSPACE_FILE)
+      : SOURCE_WORKSPACE_FILE,
     clips: isSafeProjectPath(value.clips || CLIPS_DIRECTORY) ? (value.clips || CLIPS_DIRECTORY) : CLIPS_DIRECTORY,
   };
   if (manifest.composition !== (value.composition || COMPOSITION_FILE)) problems.push('unsafe project composition path');
   if (manifest.media !== (value.media || MEDIA_FILE)) problems.push('unsafe project media path');
+  if (manifest.workspace !== (value.workspace || SOURCE_WORKSPACE_FILE)) problems.push('unsafe project workspace path');
   if (manifest.clips !== (value.clips || CLIPS_DIRECTORY)) problems.push('unsafe project clips path');
   return { manifest, problems };
 }

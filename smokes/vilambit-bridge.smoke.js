@@ -26,6 +26,9 @@ function statePayload(overrides = {}) {
     pitch: { semitones: 0, cents: 0, totalSemitones: 0 },
     loop: { a: 2538, b: 2558, on: true, ready: true },
     markers: [{ t: 2550, label: 'taan' }],
+    bpm: { bpm: 120, period: 0.5, phaseAbs: 2538, confidence: 0.8 },
+    speedRegions: [{ start: 2540, end: 2545, pct: 65 }],
+    waveformView: { start: 2530, end: 2560, followPlayhead: true },
     error: null,
     ...overrides,
   };
@@ -59,6 +62,8 @@ export const smokes = [
       assert.equal(message.state.source.name, 'Summer class.wav');
       assert.equal(message.state.position, 2541);
       assert.equal(message.state.source.size, 123456);
+      assert.equal(message.state.waveformView.start, 2530);
+      assert.equal(message.state.speedRegions[0].pct, 65);
       assert.equal(readVilambitMessage({ ...message, channel: 'other' }), null);
       assert.equal(readVilambitMessage({
         channel: VILAMBIT_CHANNEL, version: 2, direction: 'event', type: 'state', payload: statePayload(),
@@ -87,6 +92,7 @@ export const smokes = [
         payload: { requestId: 'bad', startTime: 1, endTime: 2 },
       }), null);
       assert.equal(makeVilambitCommand('extract-loop', { requestId: 'r', a: 1, b: 2 }).type, 'extract-loop');
+      assert.equal(makeVilambitCommand('apply-workspace', { lastPosition: 42 }).type, 'apply-workspace');
     },
   },
   {
@@ -149,6 +155,7 @@ export const smokes = [
       assert.match(app, /event\.source !== window\.parent/);
       assert.match(app, /event\.origin !== window\.location\.origin/);
       assert.match(app, /request-state/);
+      assert.match(app, /apply-workspace/);
       assert.match(app, /jump-marker/);
       assert.match(app, /extract-loop/);
       assert.match(app, /sliceChannels\(state\.decoded/);

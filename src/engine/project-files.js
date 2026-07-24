@@ -18,6 +18,12 @@ import {
   serializeProjectManifest,
   stableAssetId,
 } from './project-media.js';
+import {
+  SOURCE_WORKSPACE_FILE,
+  createEmptySourceWorkspace,
+  parseSourceWorkspace,
+  serializeSourceWorkspace,
+} from './source-workspace.js';
 
 function isAbort(error) {
   return error && error.name === 'AbortError';
@@ -158,7 +164,7 @@ export function createProjectIO(env = {}) {
     }
   }
 
-  async function projectConflict(directory, paths = [PROJECT_FILE, COMPOSITION_FILE, MEDIA_FILE]) {
+  async function projectConflict(directory, paths = [PROJECT_FILE, COMPOSITION_FILE, MEDIA_FILE, SOURCE_WORKSPACE_FILE]) {
     for (const path of paths) {
       if (await pathExists(directory, path)) return path;
     }
@@ -168,6 +174,7 @@ export function createProjectIO(env = {}) {
   async function initialize(directory, {
     text,
     media = createEmptyMediaManifest(),
+    workspace = createEmptySourceWorkspace(),
     manifest = createProjectManifest({ name: directory.name }),
     allowExisting = false,
   } = {}) {
@@ -186,6 +193,7 @@ export function createProjectIO(env = {}) {
     // destination is not left looking like a complete project.
     await writePath(directory, COMPOSITION_FILE, String(text ?? ''));
     await writePath(directory, MEDIA_FILE, serializeMediaManifest(media));
+    await writePath(directory, SOURCE_WORKSPACE_FILE, serializeSourceWorkspace(workspace));
     await directory.getDirectoryHandle(CLIPS_DIRECTORY, { create: true });
     await writePath(directory, PROJECT_FILE, serializeProjectManifest(normalizedManifest));
     return {
@@ -194,6 +202,7 @@ export function createProjectIO(env = {}) {
       name: directory.name || 'Project Folder',
       text: String(text ?? ''),
       media: parseMediaManifest(serializeMediaManifest(media)).manifest,
+      workspace: parseSourceWorkspace(serializeSourceWorkspace(workspace)).workspace,
       manifest: normalizedManifest,
     };
   }
@@ -201,10 +210,10 @@ export function createProjectIO(env = {}) {
   return {
     supportsDirectory,
 
-    async create({ text, media, manifest } = {}) {
+    async create({ text, media, workspace, manifest } = {}) {
       const directory = await choose('readwrite');
       if (!directory) return null;
-      return initialize(directory, { text, media, manifest, allowExisting: false });
+      return initialize(directory, { text, media, workspace, manifest, allowExisting: false });
     },
 
     async open() {
@@ -212,39 +221,59 @@ export function createProjectIO(env = {}) {
       if (!directory) return null;
       const composition = await readTextFile(directory, COMPOSITION_FILE, { required: true });
       const mediaFile = await readTextFile(directory, MEDIA_FILE);
+      const workspaceFile = await readTextFile(directory, SOURCE_WORKSPACE_FILE);
       const projectFile = await readTextFile(directory, PROJECT_FILE);
       const parsedMedia = parseMediaManifest(mediaFile?.text || '');
+      const parsedWorkspace = parseSourceWorkspace(workspaceFile?.text || '');
       const parsedProject = projectFile
         ? parseProjectManifest(projectFile.text)
         : { ok: true, manifest: createProjectManifest({ name: directory.name || 'Project Folder' }), problems: [] };
       await directory.getDirectoryHandle(CLIPS_DIRECTORY, { create: true });
       return {
-        ok: parsedMedia.ok && parsedProject.ok,
+        ok: parsedMedia.ok && parsedWorkspace.ok && parsedProject.ok,
         directory,
         name: directory.name || parsedProject.manifest.name || 'Project Folder',
         text: composition.text,
         media: parsedMedia.manifest,
+        workspace: parsedWorkspace.workspace,
         manifest: normalizedProjectManifest(parsedProject.manifest, directory.name || parsedProject.manifest.name),
-        problems: [...parsedProject.problems, ...parsedMedia.problems],
+        problems: [...parsedProject.problems, ...parsedMedia.problems, ...parsedWorkspace.problems],
       };
     },
 
-    async save(project, { text, media, manifest, now } = {}) {
+    async save(project, { text, media, workspace, manifest, now } = {}) {
       const name = project?.directory?.name || project?.name || 'Project Folder';
       const nextManifest = normalizedProjectManifest(manifest || project?.manifest, name, now);
+      const nextWorkspace = workspace || createEmptySourceWorkspace();
       if (project?.entries instanceof Map) {
         project.entries.set(COMPOSITION_FILE, String(text ?? ''));
         project.entries.set(MEDIA_FILE, serializeMediaManifest(media || createEmptyMediaManifest()));
+        project.entries.set(SOURCE_WORKSPACE_FILE, serializeSourceWorkspace(nextWorkspace));
         project.entries.set(PROJECT_FILE, serializeProjectManifest(nextManifest));
-        return { ok: true, directory: null, name, manifest: nextManifest, memory: true, entries: project.entries };
+        return {
+          ok: true,
+          directory: null,
+          name,
+          manifest: nextManifest,
+          workspace: parseSourceWorkspace(serializeSourceWorkspace(nextWorkspace)).workspace,
+          memory: true,
+          entries: project.entries,
+        };
       }
       const directory = project?.directory;
       if (!directory) throw new TypeError('No project folder is open.');
       await writePath(directory, COMPOSITION_FILE, String(text ?? ''));
       await writePath(directory, MEDIA_FILE, serializeMediaManifest(media || createEmptyMediaManifest()));
+      await writePath(directory, SOURCE_WORKSPACE_FILE, serializeSourceWorkspace(nextWorkspace));
       await directory.getDirectoryHandle(CLIPS_DIRECTORY, { create: true });
       await writePath(directory, PROJECT_FILE, serializeProjectManifest(nextManifest));
-      return { ok: true, directory, name, manifest: nextManifest };
+      return {
+        ok: true,
+        directory,
+        name,
+        manifest: nextManifest,
+        workspace: parseSourceWorkspace(serializeSourceWorkspace(nextWorkspace)).workspace,
+      };
     },
 
     /** Import a validated package into a user-chosen independent folder. */
@@ -263,6 +292,7 @@ export function createProjectIO(env = {}) {
           name,
           text: portable.composition,
           media: portable.media,
+          workspace: portable.workspace || createEmptySourceWorkspace(),
           manifest,
           problems: [...(portable.warnings || []), 'Temporary browser project: export a .sargam copy before closing or refreshing.'],
         };
@@ -302,6 +332,7 @@ export function createProjectIO(env = {}) {
         name: directory.name || manifest.name,
         text: portable.composition,
         media: portable.media,
+        workspace: portable.workspace || createEmptySourceWorkspace(),
         manifest,
         problems: portable.warnings || [],
       };

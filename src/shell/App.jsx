@@ -53,6 +53,7 @@ import {
   nextClipId,
   normalizeSourceAsset,
   removeClipAsset,
+  sourceAssetIdFromReference,
   upsertClipAsset,
   upsertSourceAsset,
 } from '../engine/project-media.js';
@@ -64,6 +65,14 @@ import {
   parsePortableProject,
   portableProjectName,
 } from '../engine/portable-project.js';
+import {
+  SOURCE_WORKSPACE_FILE,
+  createEmptySourceWorkspace,
+  serializeSourceWorkspace,
+  sourceWorkspaceEntry,
+  sourceWorkspaceEntryFromPlayer,
+  upsertSourceWorkspaceEntry,
+} from '../engine/source-workspace.js';
 import {
   extractionRangeForLink,
   updateClipLoopAsset,
@@ -110,6 +119,7 @@ export default function App() {
   const [handle, setHandle] = useState(null);
   const [project, setProject] = useState(null);
   const [projectMedia, setProjectMedia] = useState(() => createEmptyMediaManifest());
+  const [projectWorkspace, setProjectWorkspace] = useState(() => createEmptySourceWorkspace());
   const [showClipVault, setShowClipVault] = useState(false);
   const [portableImport, setPortableImport] = useState(null);
   const [importingPortable, setImportingPortable] = useState(false);
@@ -165,6 +175,10 @@ export default function App() {
   const [selectedAudioLinkId, setSelectedAudioLinkId] = useState(null);
   const [vilambitState, setVilambitState] = useState(EMPTY_VILAMBIT_STATE);
   const vilambitStateRef = useRef(EMPTY_VILAMBIT_STATE);
+  const projectWorkspaceRef = useRef(projectWorkspace);
+  const workspaceBindingRef = useRef(null);
+  const workspaceWriteRef = useRef({ timer: null, project: null, projectId: null, workspace: null });
+  projectWorkspaceRef.current = projectWorkspace;
   const editorRef = useRef(null);
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
@@ -213,6 +227,91 @@ export default function App() {
     [problems, meterModel, anchorModel, audioLinkModel]
   );
   const dirty = text !== lastSaved;
+
+  useEffect(() => {
+    const pending = workspaceWriteRef.current;
+    const projectId = project?.manifest?.id || null;
+
+    if (pending.timer && pending.projectId !== projectId) {
+      window.clearTimeout(pending.timer);
+      pending.timer = null;
+      const priorProject = pending.project;
+      const priorWorkspace = pending.workspace;
+      if (priorProject && priorWorkspace) {
+        projectIO.writeProjectFile(
+          priorProject,
+          SOURCE_WORKSPACE_FILE,
+          serializeSourceWorkspace(priorWorkspace),
+        ).catch((error) => setNotice(`Workspace save failed: ${error?.message || error}`));
+      }
+    } else if (pending.timer) {
+      window.clearTimeout(pending.timer);
+      pending.timer = null;
+    }
+
+    if (!project) return;
+    pending.project = project;
+    pending.projectId = projectId;
+    pending.workspace = projectWorkspace;
+    pending.timer = window.setTimeout(() => {
+      const queued = workspaceWriteRef.current;
+      queued.timer = null;
+      if (!queued.project || !queued.workspace) return;
+      projectIO.writeProjectFile(
+        queued.project,
+        SOURCE_WORKSPACE_FILE,
+        serializeSourceWorkspace(queued.workspace),
+      ).catch((error) => setNotice(`Workspace save failed: ${error?.message || error}`));
+    }, 1200);
+  }, [project, projectIO, projectWorkspace]);
+
+  useEffect(() => () => {
+    const pending = workspaceWriteRef.current;
+    if (!pending.timer || !pending.project || !pending.workspace) return;
+    window.clearTimeout(pending.timer);
+    pending.timer = null;
+    projectIO.writeProjectFile(
+      pending.project,
+      SOURCE_WORKSPACE_FILE,
+      serializeSourceWorkspace(pending.workspace),
+    ).catch(() => {});
+  }, [projectIO]);
+
+  useEffect(() => {
+    if (!project || !vilambitState.loaded || !vilambitState.source || vilambitState.duration <= 0) {
+      workspaceBindingRef.current = null;
+      return;
+    }
+    const sourceAssetId = sourceAssetIdFromReference({
+      ...vilambitState.source,
+      duration: vilambitState.duration,
+    });
+    const binding = `${project.manifest?.id || project.name || 'project'}:${sourceAssetId}`;
+    const savedEntry = sourceWorkspaceEntry(projectWorkspace, sourceAssetId);
+
+    if (workspaceBindingRef.current !== binding) {
+      workspaceBindingRef.current = binding;
+      if (savedEntry) sendVilambit('apply-workspace', savedEntry);
+      else {
+        setProjectWorkspace((current) => upsertSourceWorkspaceEntry(
+          current,
+          sourceAssetId,
+          sourceWorkspaceEntryFromPlayer(vilambitState),
+        ));
+      }
+      return;
+    }
+
+    const nextEntry = sourceWorkspaceEntryFromPlayer(vilambitState);
+    const currentEntry = sourceWorkspaceEntry(projectWorkspaceRef.current, sourceAssetId);
+    if (JSON.stringify(currentEntry) === JSON.stringify(nextEntry)) return;
+    setProjectWorkspace((current) => upsertSourceWorkspaceEntry(current, sourceAssetId, {
+      ...(currentEntry || {}),
+      ...nextEntry,
+      loop: { ...(currentEntry?.loop || {}), ...nextEntry.loop },
+      waveformView: { ...(currentEntry?.waveformView || {}), ...nextEntry.waveformView },
+    }));
+  }, [project, projectWorkspace, sendVilambit, vilambitState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -629,7 +728,12 @@ export default function App() {
     setRecents(store.listRecents());
   };
 
-  const doSaveProject = async ({ textOverride = text, mediaOverride = projectMedia, quiet = false } = {}) => {
+  const doSaveProject = async ({
+    textOverride = text,
+    mediaOverride = projectMedia,
+    workspaceOverride = projectWorkspace,
+    quiet = false,
+  } = {}) => {
     if (!project) {
       if (!quiet) setNotice('Open or create a Project Folder first.');
       return null;
@@ -641,6 +745,7 @@ export default function App() {
       saved = await projectIO.save(project, {
         text: withId.text,
         media,
+        workspace: workspaceOverride,
         manifest: project.manifest,
         now: clock.now(),
       });
@@ -655,6 +760,7 @@ export default function App() {
     setFileName('composition.md');
     setHandle(null);
     setProjectMedia(media);
+    setProjectWorkspace(saved.workspace);
     // Project copies keep their Markdown byte-for-byte compatible while the
     // project manifest supplies an independent recent/snapshot identity.
     recordSavedDocument(withId, `${project.name}/composition.md`, saved.manifest.id);
@@ -697,12 +803,14 @@ export default function App() {
     }
     const withId = ensureIdentity(text, clock);
     const media = mediaWithCurrentSources(createEmptyMediaManifest());
+    const workspace = createEmptySourceWorkspace();
     const projectCreatedAt = clock.now();
     let result;
     try {
       result = await projectIO.create({
         text: withId.text,
         media,
+        workspace,
         manifest: createProjectManifest({
           name: doc.directives.title || doc.directives.raga || 'Untitled Sargam Project',
           createdAt: projectCreatedAt,
@@ -722,12 +830,13 @@ export default function App() {
     const nextProject = { directory: result.directory, name: result.name, manifest: result.manifest };
     setProject(nextProject);
     setProjectMedia(result.media);
+    setProjectWorkspace(result.workspace);
     setText(withId.text);
     setLastSaved(withId.text);
     setFileName('composition.md');
     setHandle(null);
     recordSavedDocument(withId, `${result.name}/composition.md`, result.manifest.id);
-    setNotice(`Created project folder “${result.name}” with manifest.json, composition.md, media.json, and clips/.`);
+    setNotice(`Created project folder “${result.name}” with manifest.json, composition.md, media.json, workspace.json, and clips/.`);
   };
 
   const doOpenProject = async () => {
@@ -753,6 +862,7 @@ export default function App() {
       ...(result.memory ? { memory: true } : {}),
     });
     setProjectMedia(result.media);
+    setProjectWorkspace(result.workspace);
     setText(result.text);
     setLastSaved(result.text);
     setFileName('composition.md');
@@ -834,6 +944,7 @@ export default function App() {
       ...(result.memory ? { memory: true } : {}),
     });
     setProjectMedia(result.media);
+    setProjectWorkspace(result.workspace);
     setText(result.text);
     setLastSaved(result.text);
     setFileName(COMPOSITION_FILE);
@@ -865,7 +976,13 @@ export default function App() {
         const file = await projectIO.readClip(saved.project, clip.path);
         files.set(clip.path, new Uint8Array(await file.arrayBuffer()));
       }
-      const known = new Set([PROJECT_FILE, COMPOSITION_FILE, MEDIA_FILE, ...saved.media.clips.map((clip) => clip.path)]);
+      const known = new Set([
+        PROJECT_FILE,
+        COMPOSITION_FILE,
+        MEDIA_FILE,
+        SOURCE_WORKSPACE_FILE,
+        ...saved.media.clips.map((clip) => clip.path),
+      ]);
       const extraPaths = new Set(saved.manifest?.portable?.extraFiles || []);
       // Compatibility with early Phase 3C imports that retained the complete
       // archive inventory in the editable project manifest.
@@ -889,6 +1006,7 @@ export default function App() {
         manifest: { ...saved.manifest, name: project.name },
         composition: saved.withId.text,
         media: saved.media,
+        workspace: projectWorkspaceRef.current,
         files,
         exportedAt: clock.now(),
       });
@@ -927,6 +1045,7 @@ export default function App() {
     stopLinkedPlayback();
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
+    setProjectWorkspace(createEmptySourceWorkspace());
     setText(res.text);
     setFileName(res.name);
     setHandle(res.handle);
@@ -945,6 +1064,7 @@ export default function App() {
     stopLinkedPlayback();
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
+    setProjectWorkspace(createEmptySourceWorkspace());
     setText(newText);
     setFileName(null);
     setHandle(null);
@@ -1459,6 +1579,7 @@ export default function App() {
     stopLinkedPlayback();
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
+    setProjectWorkspace(createEmptySourceWorkspace());
     setText(snap);
     setFileName(entry.name || null);
     setHandle(null); // snapshots restore content, not the on-disk handle (v1)

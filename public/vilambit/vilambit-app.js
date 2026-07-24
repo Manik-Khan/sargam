@@ -1958,7 +1958,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   const BRIDGE_VERSION = 1;
   const BRIDGE_COMMANDS = new Set([
     'request-state', 'play', 'pause', 'toggle', 'seek', 'skip',
-    'set-loop', 'clear-loop', 'jump-marker', 'extract-loop',
+    'set-loop', 'clear-loop', 'jump-marker', 'extract-loop', 'apply-workspace',
   ]);
   const bridgeTargetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
   let bridgeError = null;
@@ -1990,6 +1990,11 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       loopB: state.loopB,
       loopOn: state.loopOn,
       markers: state.markers,
+      bpm: state.bpm,
+      speedRegions: state.regions,
+      viewStart: state.viewStart,
+      viewEnd: state.viewEnd,
+      followPlayhead: state.followPlayhead,
       error: bridgeError,
     });
   }
@@ -2041,6 +2046,32 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   async function bridgeRunCommand(type, payload){
     if (type === 'request-state') return;
     if (!state.fileURL) throw new Error('Load a recording in Vilambit first.');
+
+    if (type === 'apply-workspace') {
+      const restored = Core.normalizeWorkspaceState(payload, state.duration);
+      state.loopA = restored.loop.a;
+      state.loopB = restored.loop.b;
+      state.loopOn = restored.loop.on;
+      state.markers = restored.markers;
+      state.bpm = restored.bpm;
+      state.regions = restored.speedRegions;
+      state.followPlayhead = restored.waveformView.followPlayhead;
+      state.semitones = restored.pitchSemitones;
+      state.cents = restored.pitchCents;
+      $('cents').value = state.cents;
+      applyTempo(restored.tempoPercent);
+      applyPitch();
+      setWaveView(restored.waveformView.start, restored.waveformView.end, { draw: false });
+      lastEff = null;
+      renderMarkers();
+      renderLoop();
+      applyLoopToEngine();
+      renderRegions();
+      renderBpm();
+      seekTo(restored.lastPosition);
+      drawWave();
+      return;
+    }
 
     if (type === 'play') {
       if (!bridgeIsPlaying()) await togglePlay();
@@ -2154,4 +2185,3 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   window.setInterval(() => bridgePublish('state'), 250);
   bridgePublish('ready', true);
 })();
-

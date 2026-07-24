@@ -14,6 +14,10 @@ import {
   upsertClipAsset,
   upsertSourceAsset,
 } from '../src/engine/project-media.js';
+import {
+  createEmptySourceWorkspace,
+  upsertSourceWorkspaceEntry,
+} from '../src/engine/source-workspace.js';
 
 function fixture() {
   let media = upsertSourceAsset(createEmptyMediaManifest(), {
@@ -25,10 +29,17 @@ function fixture() {
     loopStart: 0.4, loopEnd: 7.5, defaultLoopStart: 0.4, defaultLoopEnd: 7.5,
     path: 'clips/clip-0001.wav', mimeType: 'audio/wav', bytes: 5,
   });
+  const workspace = upsertSourceWorkspaceEntry(createEmptySourceWorkspace(), media.sources[0].id, {
+    lastPosition: 3041.2,
+    loop: { a: 3039, b: 3046.8, on: true },
+    tempoPercent: 75,
+    waveformView: { start: 3025, end: 3060, followPlayhead: false },
+  });
   return {
     manifest: createProjectManifest({ id: 'project-bageshri', name: 'Raga Bageshri' }),
     composition: 'title: Bageshri\n\nGAT\nS R G',
     media,
+    workspace,
     files: new Map([
       ['clips/clip-0001.wav', new Uint8Array([1, 2, 3, 4, 5])],
       ['future/teacher-notes.json', '{"note":"preserve me"}\n'],
@@ -45,6 +56,8 @@ export const smokes = [
       assert.equal(parsed.ok, true, parsed.problems.join('; '));
       assert.equal(parsed.composition, fixture().composition);
       assert.equal(parsed.media.clips[0].loopStart, 0.4);
+      assert.equal(parsed.workspace.sources['source-class'].lastPosition, 3041.2);
+      assert.ok(parsed.entries.has('workspace.json'));
       assert.deepEqual([...parsed.entries.get('clips/clip-0001.wav')], [1, 2, 3, 4, 5]);
       assert.equal(new TextDecoder().decode(parsed.entries.get('future/teacher-notes.json')), '{"note":"preserve me"}\n');
       assert.deepEqual(parsed.manifest.portable.extraFiles, ['future/teacher-notes.json']);

@@ -5,6 +5,10 @@ import {
   createEmptyMediaManifest, createProjectManifest, upsertClipAsset, upsertSourceAsset,
 } from '../src/engine/project-media.js';
 import { buildPortableProject, parsePortableProject } from '../src/engine/portable-project.js';
+import {
+  createEmptySourceWorkspace,
+  upsertSourceWorkspaceEntry,
+} from '../src/engine/source-workspace.js';
 
 function notFound() {
   const error = new Error('not found');
@@ -71,6 +75,7 @@ export const smokes = [
       assert.equal(await textOf(directory, 'composition.md'), 'GAT\nS R G');
       assert.match(await textOf(directory, 'media.json'), /"sargam-media"/);
       assert.match(await textOf(directory, 'manifest.json'), /"sargam-project"/);
+      assert.match(await textOf(directory, 'workspace.json'), /"sargam-source-workspace"/);
       assert.equal(directory.directories.has('clips'), true);
     },
   },
@@ -96,6 +101,31 @@ export const smokes = [
       assert.equal(result.text, 'ALAP\nS---');
       assert.deepEqual(result.media.clips, []);
       assert.equal(directory.directories.has('clips'), true);
+    },
+  },
+  {
+    name: 'project files: workspace round-trips and legacy folders open empty',
+    async fn() {
+      const directory = new MemoryDirectory('Workspace');
+      const io = createProjectIO({ pickDirectory: async () => directory });
+      const workspace = upsertSourceWorkspaceEntry(createEmptySourceWorkspace(), 'source-class', {
+        lastPosition: 42.5,
+        markers: [{ t: 40, label: 'phrase' }],
+      });
+      const created = await io.create({
+        text: 'S R G',
+        media: createEmptyMediaManifest(),
+        workspace,
+      });
+      assert.equal(created.workspace.sources['source-class'].lastPosition, 42.5);
+      const opened = await io.open();
+      assert.equal(opened.workspace.sources['source-class'].markers[0].label, 'phrase');
+
+      const legacy = new MemoryDirectory('Legacy');
+      legacy.files.set('composition.md', new MemoryFileHandle('composition.md', 'S---'));
+      const legacyIO = createProjectIO({ pickDirectory: async () => legacy });
+      const legacyOpened = await legacyIO.open();
+      assert.deepEqual(legacyOpened.workspace.sources, {});
     },
   },
   {

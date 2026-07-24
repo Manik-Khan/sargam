@@ -26,6 +26,7 @@ The local-first media model is working in Manik's browser:
 Project Folder/
 ├── composition.md
 ├── media.json
+├── workspace.json
 └── clips/
     └── clip-....wav/webm/m4a/etc.
 ```
@@ -66,6 +67,7 @@ Raga-Bageshri.sargam
 ├── manifest.json
 ├── composition.md
 ├── media.json
+├── workspace.json
 └── clips/
     └── clip-....*
 ```
@@ -100,18 +102,27 @@ Wave 1C is the current UI-consolidation candidate and still needs explicit brows
 - waveform navigation remains in the waveform toolbar.
 - the major workflow cards receive more room on wider screens and collapse responsively on smaller screens.
 
-The latest complete smoke/build count after these later waves was not recorded in chat. Before editing, run the actual clone gate and record the result rather than repeating an old number.
+Source Workspace Wave 2 is now implemented in the exact clone. It adds a
+versioned `workspace.json` keyed by `sourceAssetId`, debounced folder writes,
+identity-matched atomic restore, and `.sargam` package inclusion. It persists
+position, loop and loop-on state, speed, pitch, markers, BPM, speed regions,
+waveform window, and Follow Playhead. Existing folders and packages without
+`workspace.json` still open with an empty workspace. Browser acceptance is
+still required.
+
+The 2026-07-23 Wave 2 gate is **510 smokes passed, 0 failed**, plus a successful
+Vite production build (107 modules transformed). The existing large-chunk
+warning remains non-blocking.
 
 ### Next implementation order
 
-1. **Browser-accept Wave 1C.** Confirm the consolidated layout at Manik's normal screen width and correct any remaining crowding without changing working loop semantics.
-2. **Vilambit Source Workspace Wave 2 — project-native per-source workspace.** Persist current position, A/B loop, loop-on state, speed, pitch, markers, BPM, speed regions, visible waveform window, and follow preference by `sourceAssetId`; restore automatically when reopening the project; include it in `.sargam` packages.
-3. **Wave 3 — sources and large-file optimization.** Add a Sources panel, locate/reconnect/switch/resume behavior, stronger identity checks, cached waveform peaks for long/streamed recordings, and resource cleanup. Remove unused duplicate source files such as `public/vilambit/vilambit-app 2.js` and `src/shell/PracticeBar 2.jsx` only after confirming they are truly unreferenced in the exact clone.
-4. **Shared Vilambit Core.** Separate reusable media loading, stretch/pitch, waveform, loop, markers, workspace, and queue logic from the Sargam-specific notation/extraction shell. Do not rewrite the stable iframe integration prematurely.
-5. **Standalone browser Vilambit for the FileMaker library.** FileMaker remains the catalog and opens the player by stable record/library ID; the browser player resolves media served over the local network. Exact Windows, FileMaker, and browser versions must be recorded before setting the compatibility floor.
-6. **Playlist/queue.** Add tracks without interrupting the current item; reorder, remove, next/previous, repeat track/queue, shuffle, Clear Queue, Reset Session, and later named playlists. Infinite loops need explicit repeat-count or timed-advance options before queue continuation.
-7. **Practice Set Builder.** Use the same queue/transport foundation for recorded exercises, fixed repetitions, target minutes, speed ladders, rests, and teacher-authored routines packaged inside `.sargam`.
-8. **Cloud/collaboration later.** Optional publishing and a real application backend remain separate from local-first authoring and playback.
+1. **Browser-accept Wave 1C and Wave 2.** Confirm the consolidated layout at Manik's normal screen width, then run the `docs/source-workspace.md` save/restore/package checks.
+2. **Wave 3 — sources and large-file optimization.** Add a Sources panel, locate/reconnect/switch/resume behavior, stronger identity checks, cached waveform peaks for long/streamed recordings, and resource cleanup. Remove unused duplicate source files such as `public/vilambit/vilambit-app 2.js` and `src/shell/PracticeBar 2.jsx` only after confirming they are truly unreferenced in the exact clone.
+3. **Shared Vilambit Core.** Separate reusable media loading, stretch/pitch, waveform, loop, markers, workspace, and queue logic from the Sargam-specific notation/extraction shell. Do not rewrite the stable iframe integration prematurely.
+4. **Standalone browser Vilambit for the FileMaker library.** FileMaker remains the catalog and opens the player by stable record/library ID; the browser player resolves media served over the local network. Exact Windows, FileMaker, and browser versions must be recorded before setting the compatibility floor.
+5. **Playlist/queue.** Add tracks without interrupting the current item; reorder, remove, next/previous, repeat track/queue, shuffle, Clear Queue, Reset Session, and later named playlists. Infinite loops need explicit repeat-count or timed-advance options before queue continuation.
+6. **Practice Set Builder.** Use the same queue/transport foundation for recorded exercises, fixed repetitions, target minutes, speed ladders, rests, and teacher-authored routines packaged inside `.sargam`.
+7. **Cloud/collaboration later.** Optional publishing and a real application backend remain separate from local-first authoring and playback.
 
 ### Standalone/FileMaker direction
 
