@@ -5,6 +5,7 @@
 // never through an ornament/repeat span. Written `|` dividers, then derived
 // sam/khali/vibhag boundaries, are preferred over an arbitrary beat edge.
 import { markerAtMatra, vibhagOfMatra, wrapMatra } from './tala.js';
+import { performedOffsetAt } from './performed-time.js';
 
 // ExportView can measure the browser's real rendered matra widths before it
 // asks this pure planner to fold the line. A WeakMap keeps that short-lived
@@ -71,7 +72,7 @@ function boundaryPriority(line, tal, k) {
   const after = k + 1;
   if ((line?._bars || []).includes(after)) return 4; // author's phrase hint
   if (!tal) return 1;
-  const nextMatra = wrapMatra(tal, (line.startMatra || 1) + after);
+  const nextMatra = wrapMatra(tal, (line.startMatra || 1) + performedOffsetAt(line, after));
   const marker = markerAtMatra(tal, nextMatra);
   if (marker === null) return 1;
   const vibhag = vibhagOfMatra(tal, nextMatra);
@@ -82,7 +83,7 @@ function boundaryPriority(line, tal, k) {
 /** True when a continuation after `k` begins exactly on sam. */
 function isSamBoundary(line, tal, k) {
   if (!tal) return false;
-  const nextMatra = wrapMatra(tal, (line.startMatra || 1) + k + 1);
+  const nextMatra = wrapMatra(tal, (line.startMatra || 1) + performedOffsetAt(line, k + 1));
   return vibhagOfMatra(tal, nextMatra) === tal.samVibhag && markerAtMatra(tal, nextMatra) !== null;
 }
 
@@ -166,7 +167,10 @@ export function planLineSystems(line, tal, { maxEm = Infinity } = {}) {
     ? (i) => widths[i]
     : (i) =>
         widths[i] +
-        (i < count - 1 && tal && markerAtMatra(tal, (line.startMatra || 1) + i + 1) !== null ? 0.5 : 0);
+        (i < count - 1 && tal && markerAtMatra(
+          tal,
+          (line.startMatra || 1) + performedOffsetAt(line, i + 1)
+        ) !== null ? 0.5 : 0);
 
   // Rupak is compact enough that an internal vibhag fold is both unnecessary
   // and musically confusing. Its continuation rows begin only on sam.

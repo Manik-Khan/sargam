@@ -15,6 +15,7 @@ import { getTal, wrapMatra, vibhagOfMatra, markerAtMatra } from './tala.js';
 import { serializeRepeatedSlideMatra } from './repeated-slide.js';
 import { serializeReturnCue } from './return-cue.js';
 import { assignmentsFromBols, formatBolLane } from './bol-lane.js';
+import { performedOffsetAt } from './performed-time.js';
 
 // Canonical header order. `composition`/`type`/`laya` added 2026-07-16 (M2.5)
 // after `tempo` and before identity — Appendix A's relative order is
@@ -69,8 +70,7 @@ export function serializeDocument(doc) {
       out.push(serializeMusicLine(line, tal));
       const lyric = serializeLyrics(line, tal);
       if (lyric !== null) out.push(lyric);
-      const bol = serializeBols(line);
-      if (bol !== null) out.push(bol);
+      for (const bol of serializeBols(line)) out.push(bol);
     }
   }
 
@@ -174,7 +174,7 @@ function serializeMusicLine(line, tal) {
 
 /** True if a derived barline falls after 0-based matra index k. */
 function boundaryAfter(line, k, tal) {
-  return markerAtMatra(tal, line.startMatra + k + 1) !== null;
+  return markerAtMatra(tal, line.startMatra + performedOffsetAt(line, k + 1)) !== null;
 }
 
 /**
@@ -186,7 +186,7 @@ function holdRunLength(line, k, tal) {
   if (!isWholeSustain(first) || first.events[0].holdToVibhag !== true) return 0;
   let expected = 1;
   if (tal) {
-    const pos = wrapMatra(tal, line.startMatra + k);
+    const pos = wrapMatra(tal, line.startMatra + performedOffsetAt(line, k));
     const v = vibhagOfMatra(tal, pos);
     let vibhagStart = 1;
     for (let i = 0; i < v; i++) vibhagStart += tal.vibhags[i];
@@ -396,8 +396,19 @@ function withinMatraTilde(line, matraIndex, atoms, eventIndexOfAtom) {
       s.to.matraIndex === matraIndex
   );
   if (!span) return atoms.join('');
-  if (!eventIndexOfAtom.includes(span.from.eventIndex)) return atoms.join('');
-  return '~' + atoms.join('');
+  const fromAtom = eventIndexOfAtom.indexOf(span.from.eventIndex);
+  const toAtom = eventIndexOfAtom.indexOf(span.to.eventIndex);
+  if (fromAtom < 0 || toAtom < fromAtom) return atoms.join('');
+  if (fromAtom === 0 && toAtom === atoms.length - 1 && !span.scoped) {
+    return '~' + atoms.join('');
+  }
+  return (
+    atoms.slice(0, fromAtom).join('') +
+    '~(' +
+    atoms.slice(fromAtom, toAtom + 1).join('') +
+    ')' +
+    atoms.slice(toAtom + 1).join('')
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +443,18 @@ function serializeLyrics(line, tal) {
 }
 
 function serializeBols(line) {
-  if ((!line.bols || line.bols.length === 0) && !line._bolLane) return null;
-  const lane = line._bolLane || assignmentsFromBols(line);
-  return '> ' + formatBolLane(line, lane.assignments, lane.coveredBy).text;
+  const parsedPasses = line._bolPasses || [];
+  const passes = parsedPasses.length
+    ? parsedPasses
+    : (line.bols?.length || line._bolLane)
+      ? [{
+          pass: 1,
+          ...(line._bolLane || assignmentsFromBols(line)),
+        }]
+      : [];
+  const numbered = passes.length > 1 || passes.some((lane) => Number(lane.pass) > 1);
+  return passes.map((lane) => {
+    const prefix = numbered ? `>${Number(lane.pass) || 1}` : '>';
+    return `${prefix} ${formatBolLane(line, lane.assignments, lane.coveredBy).text}`;
+  });
 }

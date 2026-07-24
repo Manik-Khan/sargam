@@ -126,6 +126,7 @@ export function renderTick(accent, sampleRate) {
     khali: { dur: 0.07, bright: 0.18, gain: 0.5, thump: 0 },
     vibhag: { dur: 0.05, bright: 0.7, gain: 0.6, thump: 0 },
     plain: { dur: 0.035, bright: 0.55, gain: 0.35, thump: 0 },
+    subdivision: { dur: 0.022, bright: 0.42, gain: 0.2, thump: 0 },
   };
   const s = shapes[accent] || shapes.plain;
   const n = Math.round(s.dur * sampleRate);

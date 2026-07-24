@@ -22,9 +22,9 @@ const parses = (fragment) => {
 export const smokes = [
   // ---------- slide ----------
   {
-    name: 'slide: a single cluster gets the leading tilde (within-matra meend)',
+    name: 'slide: a partial cluster gets an explicit scoped meend',
     fn() {
-      assert.equal(applySlide('mg'), '~mg');
+      assert.equal(applySlide('mg'), '~(mg)');
       parses(applySlide('mg'));
     },
   },
@@ -123,7 +123,7 @@ export const smokes = [
   {
     name: 'commands: surrounding whitespace is preserved, transform applies inside',
     fn() {
-      assert.equal(applySlide('  mg  '), '  ~mg  ');
+      assert.equal(applySlide('  mg  '), '  ~(mg)  ');
       assert.equal(shiftOctave(' S R ', 1), " 'S 'R ");
     },
   },

@@ -37,8 +37,11 @@ export default function CommandBar({
   onAnchorTool,
   anchorMeter,
   onAnchorMeter,
+  onApplyMeter,
   onRemoveSelectedMark,
   anchorMessage,
+  rhythmGrid = false,
+  onRhythmGrid,
 }) {
   const [customMeter, setCustomMeter] = useState(anchorMeter || '');
   const chooseMeter = (value) => {
@@ -72,11 +75,30 @@ export default function CommandBar({
             placeholder="3, 6, 5/7, 4/3"
             onFocus={() => onAnchorTool?.('meter')}
             onChange={(event) => chooseMeter(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              onApplyMeter?.(customMeter);
+            }}
           />
           <datalist id="sargam-common-meters">
             {['2', '3', '4', '5', '6', '7', '8', '9', '10', '12', '4/3', '5/7'].map((value) => <option key={value} value={value} />)}
           </datalist>
+          <button
+            type="button"
+            className="cmd-btn cmd-meter-apply"
+            title="Apply this meter to the selected notes in the source editor"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onApplyMeter?.(customMeter)}
+          >Apply Meter</button>
           <button type="button" className="cmd-btn" onClick={() => onRemoveSelectedMark?.()}>Remove</button>
+          <button
+            type="button"
+            className={`cmd-btn cmd-rhythm-grid${rhythmGrid ? ' active' : ''}`}
+            aria-pressed={rhythmGrid}
+            title="Show one shared rhythmic cell grid for notes, repeats, meter, and bols"
+            onClick={() => onRhythmGrid?.(!rhythmGrid)}
+          >Rhythm Grid</button>
           {anchorTool && <button type="button" className="cmd-btn" onClick={() => onAnchorTool?.(null)}>Done</button>}
         </div>
       </div>

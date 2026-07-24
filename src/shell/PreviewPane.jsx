@@ -8,6 +8,13 @@ import { mountMeterOverlays } from './meter-overlay.js';
 import { applyPlaybackCursor } from './playback-cursor.js';
 import { mountAudioLinkOverlays } from './audio-link-overlay.js';
 import {
+  lineAnchoredScrollTop,
+  previewAnchorElement,
+  previewAnchorIdentity,
+  previewSourceLine,
+  restorePreviewAnchor,
+} from './preview-scroll.js';
+import {
   closestAnchorTarget,
   mountAnchorOverlays,
   stampAnchorTargets,
@@ -40,6 +47,7 @@ export default function PreviewPane({
   audioLinks = [],
   selectedAudioLinkId = null,
   onActivateAudioLink,
+  rhythmGrid = false,
 }) {
   const mount = useRef(null);
   const gesture = useRef(null);
@@ -61,14 +69,26 @@ export default function PreviewPane({
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mount.current) return undefined;
+    const scroller = mount.current;
+    const sourceLine = previewSourceLine(doc, activeLine, bolCapture);
+    const beforeAnchor = previewAnchorElement(scroller, sourceLine, bolCapture);
+    const anchorIdentity = previewAnchorIdentity(beforeAnchor);
+    const scrollerRect = scroller.getBoundingClientRect();
+    const beforeRect = beforeAnchor?.getBoundingClientRect();
+    const rail = scrollerRect.top + Math.min(96, Math.max(24, scroller.clientHeight * 0.28));
+    const beforeVisible = beforeRect &&
+      beforeRect.bottom >= scrollerRect.top &&
+      beforeRect.top <= scrollerRect.bottom;
+    const beforeTop = beforeVisible ? beforeRect.top : rail;
+    const beforeScrollTop = scroller.scrollTop;
     const el = renderDocument(doc, { activeLine, noteNames, maxSystemEm });
-    mount.current.replaceChildren(el);
-    stampAnchorTargets(mount.current, sourceText);
+    scroller.replaceChildren(el);
+    stampAnchorTargets(scroller, sourceText);
     // Keep legacy >> spans visible while new work is stored in anchor metadata.
-    mountMeterOverlays(mount.current, meterSpans, meterDraft);
-    const cleanupAnchors = mountAnchorOverlays(mount.current, anchorMarks, {
+    mountMeterOverlays(scroller, meterSpans, meterDraft, { rhythmGrid });
+    const cleanupAnchors = mountAnchorOverlays(scroller, anchorMarks, {
       selectedMarkId,
       bolCapture,
       onSelectMark,
@@ -77,13 +97,22 @@ export default function PreviewPane({
         event.currentTarget.setPointerCapture?.(event.pointerId);
       },
     });
-    const cleanupAudio = mountAudioLinkOverlays(mount.current, audioLinks, {
+    const cleanupAudio = mountAudioLinkOverlays(scroller, audioLinks, {
       selectedLinkId: selectedAudioLinkId,
       onActivate: onActivateAudioLink,
     });
-    applyPlaybackCursor(mount.current, activeCursorRef.current);
+    applyPlaybackCursor(scroller, activeCursorRef.current);
+    const afterAnchor = restorePreviewAnchor(scroller, anchorIdentity)
+      || previewAnchorElement(scroller, sourceLine, bolCapture);
+    scroller.scrollTop = lineAnchoredScrollTop({
+      scrollTop: beforeScrollTop,
+      beforeTop,
+      afterTop: afterAnchor?.getBoundingClientRect().top,
+      scrollHeight: scroller.scrollHeight,
+      clientHeight: scroller.clientHeight,
+    });
     return () => { cleanupAudio?.(); cleanupAnchors?.(); };
-  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink]);
+  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid]);
 
   useEffect(() => {
     applyPlaybackCursor(mount.current, activeCursor);
@@ -135,7 +164,7 @@ export default function PreviewPane({
 
   return (
     <div
-      className={`app-preview${anchorTool ? ' app-preview-anchoring' : ''}`}
+      className={`app-preview${anchorTool ? ' app-preview-anchoring' : ''}${rhythmGrid ? ' app-rhythm-grid' : ''}`}
       ref={mount}
       onClick={handleClick}
       onPointerDown={handlePointerDown}

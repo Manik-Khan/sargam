@@ -20,6 +20,7 @@ import { getTal, wrapMatra, vibhagOfMatra } from './tala.js';
 import { scanRepeatedSlideAt } from './repeated-slide.js';
 import { extractTerminalReturnCue, isReturnCueToken } from './return-cue.js';
 import { parseBolLane } from './bol-lane.js';
+import { performedMatraCount, performedOffsetAt } from './performed-time.js';
 
 const NOTE_CHARS = new Set(['S', 'r', 'R', 'g', 'G', 'm', 'M', 'P', 'd', 'D', 'n', 'N']);
 const CLUSTER_RE = /^[SrRgGmMPdDnN.'~-]+$/;
@@ -154,7 +155,15 @@ export function parseDocument(text) {
       if (!lastMusicLine) {
         problems.push({ line: lineNo, col: null, msg: 'bol line has no music line above it' });
       } else {
-        attachBols(lastMusicLine, trimmed.slice(1), lineNo, problems);
+        const passMatch = trimmed.match(/^>(\d+)\s*/);
+        const pass = passMatch ? Math.max(1, Number(passMatch[1]) || 1) : 1;
+        attachBols(
+          lastMusicLine,
+          passMatch ? trimmed.slice(passMatch[0].length) : trimmed.slice(1),
+          lineNo,
+          problems,
+          pass
+        );
       }
       continue;
     }
@@ -185,11 +194,10 @@ export function parseDocument(text) {
     const music = parseMusicLine(trimmed, lineNo, tal, problems, currentTal === 'free', nextStart);
     currentSection.lines.push(music);
     lastMusicLine = music;
-    // Continuation is based on the WRITTEN matras (a ||: :|| repeat's
-    // second pass doesn't shift where the next written line sits on the
-    // page — the notation continues from the ink, not the performance).
+    // Continuation follows performed time. A compact `(…)xN` phrase is inked
+    // once but advances tala position on every pass.
     if (tal && music.matras.length > 0) {
-      nextStart = wrapMatra(tal, music.startMatra + music.matras.length);
+      nextStart = wrapMatra(tal, music.startMatra + performedMatraCount(music));
     }
   }
 
@@ -267,6 +275,11 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
   Object.defineProperty(line, '_bars', { value: bars, enumerable: false });
   Object.defineProperty(line, '_bolLane', {
     value: null,
+    writable: true,
+    enumerable: false,
+  });
+  Object.defineProperty(line, '_bolPasses', {
+    value: [],
     writable: true,
     enumerable: false,
   });
@@ -388,6 +401,47 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
       continue;
     }
 
+    // Scoped within-matra slide: `DD~(DP)` keeps all four attacks in one
+    // cluster while drawing the meend only from the third D to P. This is the
+    // form produced when the writer selects part of a cluster and presses
+    // Slide. Whitespace inside the parentheses remains the existing ranged,
+    // cross-matra slide grammar.
+    const scopedSlide = body.slice(i).match(
+      /^([SrRgGmMPdDnN.'-]+)~\(([SrRgGmMPdDnN.'-]+)\)/
+    );
+    if (scopedSlide) {
+      const prefix = scopedSlide[1];
+      const inner = scopedSlide[2];
+      const combined = prefix + inner;
+      const events = buildClusterEvents(combined, i, clusterCtx, 1);
+      if (events?.length) {
+        const matraIndex = line.matras.length;
+        const noteIndices = events
+          .map((event, eventIndex) => event.type === 'note' && !event.grace ? eventIndex : -1)
+          .filter((eventIndex) => eventIndex >= 0);
+        const prefixNotes = [...prefix].filter((char) => NOTE_CHARS.has(char)).length;
+        const fromEvent = noteIndices[prefixNotes];
+        const toEvent = noteIndices.at(-1);
+        if (Number.isInteger(fromEvent) && Number.isInteger(toEvent) && fromEvent < toEvent) {
+          line.spans.push({
+            type: 'meend',
+            from: { matraIndex, eventIndex: fromEvent },
+            to: { matraIndex, eventIndex: toEvent },
+            scoped: true,
+          });
+        } else {
+          problems.push({
+            line: lineNo,
+            col: i + prefix.length + 2,
+            msg: 'a scoped slide needs at least two notes inside ~(...)',
+          });
+        }
+        line.matras.push({ events });
+      }
+      i += scopedSlide[0].length;
+      continue;
+    }
+
     // A ranged slide keeps its written rhythm while drawing one arc from the
     // first note after ~( to the last note before ). Parentheses without ~
     // remain phrase-repeat syntax and still require xN.
@@ -479,9 +533,18 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     }
     if (c === '{') {
       const close = body.indexOf('}', i + 1);
-      if (close === -1) {
+      const malformedInner = close === -1
+        ? ''
+        : body.slice(i + 1, close);
+      if (close === -1 || /[){\]]/.test(malformedInner)) {
         problems.push({ line: lineNo, col: i + 1, msg: '{ without closing }' });
-        i++;
+        // Quarantine the malformed ornament token. Re-reading its interior as
+        // ordinary notes/tilde syntax could otherwise create a phantom kan or
+        // connect a pending slide to a later, unrelated note.
+        let end = i + 1;
+        while (end < n && !/\s/.test(body[end])) end++;
+        line.passthrough.push({ col: i + 1, text: body.slice(i, end) });
+        i = end;
         continue;
       }
       const inner = body.slice(i + 1, close).replace(/[\s/]+/g, '');
@@ -703,7 +766,7 @@ function parseToken(tok, col, ctx) {
   if (tok === '_') {
     let count = 1;
     if (tal) {
-      const pos = wrapMatra(tal, line.startMatra + line.matras.length);
+      const pos = wrapMatra(tal, line.startMatra + performedOffsetAt(line, line.matras.length));
       const v = vibhagOfMatra(tal, pos);
       let vibhagStart = 1;
       for (let k = 0; k < v; k++) vibhagStart += tal.vibhags[k];
@@ -1133,12 +1196,13 @@ function attachLyrics(musicLine, text, lineNo, problems) {
 // Bol attachment (spec §3.8)
 // ---------------------------------------------------------------------------
 
-function attachBols(musicLine, text, lineNo, problems) {
-  const lane = parseBolLane(text, musicLine);
-  musicLine._bolLane = lane;
+function attachBols(musicLine, text, lineNo, problems, pass = 1) {
+  const lane = parseBolLane(text, musicLine, { diriAttacks: pass > 1 ? 1 : 2 });
+  lane.pass = pass;
   for (const message of lane.problems) {
     problems.push({ line: lineNo, col: null, msg: message });
   }
+  const bols = [];
   for (let ordinal = 0; ordinal < lane.assignments.length; ordinal++) {
     const mark = lane.assignments[ordinal];
     if (!mark) continue;
@@ -1147,10 +1211,21 @@ function attachBols(musicLine, text, lineNo, problems) {
       ref: { matraIndex: attack.matraIndex, eventIndex: attack.eventIndex },
       mark,
     };
-    if (mark === 'diri' && ordinal + 1 < lane.plan.attacks.length) {
+    if (mark === 'diri' && pass === 1 && ordinal + 1 < lane.plan.attacks.length) {
       const end = lane.plan.attacks[ordinal + 1];
       bol.endRef = { matraIndex: end.matraIndex, eventIndex: end.eventIndex };
+    } else if (mark === 'diri' && pass > 1) {
+      bol.rate = 2;
     }
-    musicLine.bols.push(bol);
+    bols.push(bol);
+  }
+  lane.bols = bols;
+  musicLine._bolPasses = [
+    ...(musicLine._bolPasses || []).filter((item) => item.pass !== pass),
+    lane,
+  ].sort((a, b) => a.pass - b.pass);
+  if (pass === 1) {
+    musicLine._bolLane = lane;
+    musicLine.bols = bols;
   }
 }

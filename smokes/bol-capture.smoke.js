@@ -5,6 +5,7 @@ import {
   bolCursorSelection,
   moveBolCursor,
   setBolAtCursor,
+  switchBolPass,
 } from '../src/engine/bol-capture.js';
 import { addAnchorMark, parseAnchorDocument } from '../src/engine/anchors.js';
 import { parseDocument } from '../src/engine/parse.js';
@@ -162,6 +163,24 @@ export const smokes = [
     },
   },
   {
+    name: 'bol capture: a numbered second pass writes one fast diri per attack',
+    fn() {
+      const music = 'tal: tintal\n\n(S--S SSSS)x2\n';
+      const started = beginBolCapture(music, music.indexOf('('));
+      let result = switchBolPass(started.text, started.cursor, 2);
+      assert.equal(result.ok, true);
+      assert.match(result.text, />1 \(\.--\. \. \. \. \.\)x2/);
+      assert.match(result.text, />2 \(\.--\. \. \. \. \.\)x2/);
+      for (let ordinal = 2; ordinal < 6; ordinal++) {
+        result = setBolAtCursor(result.text, { sourceLine: 3, ordinal, pass: 2 }, 'diri');
+        assert.equal(result.ok, true);
+      }
+      assert.match(result.text, />2 \(\.--\. diri diri diri diri\)x2/);
+      const line = parseDocument(result.text).doc.sections[0].lines[0];
+      assert.deepEqual(line._bolPasses[1].bols.map((bol) => bol.rate), [2, 2, 2, 2]);
+    },
+  },
+  {
     name: 'bol capture: EditorPane exposes mode, keyboard gestures, and preview cursor seams',
     async fn() {
       const fs = await import('node:fs/promises');
@@ -169,7 +188,8 @@ export const smokes = [
       const app = await fs.readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       const preview = await fs.readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
       assert.match(editor, /Bol Capture: ON/);
-      assert.match(editor, /WRITING > BOL LINE/);
+      assert.match(editor, /BOL PASS/);
+      assert.match(editor, /1–9 switch pass/);
       assert.match(editor, /bolCursorSelection/);
       assert.match(editor, /bolCaptureKeymap/);
       assert.match(editor, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/);

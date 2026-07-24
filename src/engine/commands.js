@@ -20,14 +20,14 @@ function trimmed(sel) {
 }
 
 /**
- * Slide (~). One cluster → leading tilde (within-matra meend, the canonical
- * form). Multiple beats → tilde after the first token, arcing across the
- * boundary (spec §3: `m~ g`).
+ * Slide (~). A selected cluster uses an explicit scope. That spelling remains
+ * one matra when inserted inside a larger cluster: selecting the final DP in
+ * DDDP produces `DD~(DP)`, not the kan-like `DD~DP`.
  */
 export function applySlide(sel) {
   const [lead, core, tail] = trimmed(sel);
   if (core === '') return lead + '~' + tail;
-  if (!/\s/.test(core)) return lead + '~' + core + tail;
+  if (!/\s/.test(core)) return lead + '~(' + core + ')' + tail;
   return lead + '~(' + core + ')' + tail;
 }
 

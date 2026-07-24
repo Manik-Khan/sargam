@@ -98,7 +98,7 @@ function compareRepeats(plan, actual, problems) {
  * Older flat lanes remain readable because omitted hold markers are skipped
  * automatically; structural capture always writes the complete form.
  */
-export function parseBolLane(text, line) {
+export function parseBolLane(text, line, { diriAttacks = 2 } = {}) {
   const source = String(text ?? '').trim();
   const plan = buildBolPlan(line);
   const assignments = Array(plan.attacks.length).fill(null);
@@ -123,7 +123,7 @@ export function parseBolLane(text, line) {
     lastAttack = ordinal;
     visualCursor = slotIndex + 1;
 
-    if (kind !== 'diri') return;
+    if (kind !== 'diri' || Number(diriAttacks) === 1) return;
     const secondSlot = nextAttackSlot(plan, visualCursor);
     if (secondSlot < 0) {
       problems.push('diri needs two successive note attacks');
@@ -208,15 +208,15 @@ export function parseBolLane(text, line) {
   return { plan, assignments, coveredBy, ranges, repeats, problems };
 }
 
-export function assignmentsFromBols(line) {
+export function assignmentsFromBols(line, bols = line?.bols || []) {
   const plan = buildBolPlan(line);
   const assignments = Array(plan.attacks.length).fill(null);
   const coveredBy = Array(plan.attacks.length).fill(null);
-  for (const bol of line?.bols || []) {
+  for (const bol of bols) {
     const attack = plan.attackByRef.get(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`);
     if (!attack || !BOL_KINDS.has(bol.mark)) continue;
     assignments[attack.ordinal] = bol.mark;
-    if (bol.mark === 'diri' && attack.ordinal + 1 < assignments.length) {
+    if (bol.mark === 'diri' && bol.rate !== 2 && attack.ordinal + 1 < assignments.length) {
       coveredBy[attack.ordinal + 1] = attack.ordinal;
     }
   }
@@ -239,7 +239,12 @@ function formatMatraSegments(line, matraIndex, plan, assignments, coveredBy) {
     }
     const mark = assignments[attack.ordinal] || '.';
     const ordinals = [attack.ordinal];
-    if (mark === 'diri' && attack.ordinal + 1 < plan.attacks.length) ordinals.push(attack.ordinal + 1);
+    if (
+      mark === 'diri' &&
+      coveredBy[attack.ordinal + 1] === attack.ordinal
+    ) {
+      ordinals.push(attack.ordinal + 1);
+    }
     segments.push({
       text: mark + '-'.repeat(Math.max(0, attack.writtenSlots - 1)),
       wordLength: mark.length,

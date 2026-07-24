@@ -91,6 +91,15 @@
   line-height: 1.15;
   white-space: nowrap;
 }
+.sr-repeat-landing {
+  align-self: flex-start;
+  margin-left: 0.12em;
+  color: var(--sr-accent);
+  font-size: 0.48em;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(0.1em);
+}
 /* Timed subdivisions are equal visual slots. Explicit internal dashes
    (`DnS-`, `g---`) occupy real slots but remain playback sustains, not
    attacks. Grace notes stay outside this metric grid. */
@@ -206,11 +215,28 @@
 }
 .sr-bol {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   box-sizing: border-box;
   padding-left: 6px;
   padding-right: 6px;
   padding-top: 2px;
+}
+.sr-bol-pass {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 1em;
+}
+.sr-bol-pass-label {
+  position: absolute;
+  right: calc(100% + 0.18rem);
+  top: 0;
+  color: var(--sr-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
 }
 .sr-bol-layout {
   display: inline-flex;
@@ -237,6 +263,9 @@
   color: var(--sr-ink);
 }
 .sr-bol-diri { justify-self: stretch; text-align: center; }
+.sr-bol-diri-fast {
+  border-bottom: 1px double color-mix(in srgb, var(--sr-accent) 65%, transparent);
+}
 .sr-bol-hold {
   font-size: 12px;
   line-height: 1;
@@ -785,7 +814,13 @@
    One source line may fold into several whole-matra systems; no global zoom
    is applied, and an indivisible ornament may scroll rather than become
    illegible. */
-.app-preview { overflow-x: hidden; }
+.app-preview {
+  overflow-x: hidden;
+  /* PreviewPane deliberately preserves the active source line across its
+     render-tree replacement. Native scroll anchoring would apply a second,
+     competing correction and make the working line drift. */
+  overflow-anchor: none;
+}
 .sr-line-group { max-width: 100%; }
 
 /* ---- M4: command bar + legend (M, 2026-07-16) ---- */
@@ -1095,6 +1130,7 @@
 .cmd-anchor-tools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; padding-left: 0.45rem; margin-left: 0.15rem; border-left: 1px solid var(--sr-line); }
 .cmd-anchor-label { font-size: 0.72rem; opacity: 0.75; }
 .cmd-anchor-tool.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
+.cmd-rhythm-grid.active { background: var(--sr-accent); color: var(--sr-paper-raised); }
 .cmd-anchor-tool span { font-size: 0.68rem; opacity: 0.78; }
 .app-preview-anchoring .sr-anchor-target, .app-preview-anchoring .sr-boundary-target { cursor: crosshair; }
 .app-preview-anchoring .sr-anchor-target:hover, .sr-anchor-gesture-start { border-radius: 0.22em; background: color-mix(in srgb, currentColor 16%, transparent); }
@@ -1105,6 +1141,26 @@
 .sr-marker { transform: translateX(var(--sr-marker-shift, 0px)); transition: transform 80ms linear; }
 .sr-marker-on-boundary::after { content: ''; position: absolute; left: 50%; top: 1.05em; height: 0.58em; border-left: 1px solid currentColor; opacity: 0.55; }
 .sr-line-block { position: relative; }
+.app-rhythm-grid .sr-cell {
+  border-inline: 1px solid color-mix(in srgb, var(--sr-accent) 24%, transparent);
+  border-radius: 0.2em;
+  background: color-mix(in srgb, var(--sr-accent) 3%, transparent);
+}
+.app-rhythm-grid .sr-slot {
+  box-shadow: inset 1px 0 color-mix(in srgb, var(--sr-accent) 17%, transparent);
+}
+.sr-rhythm-grid-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.sr-rhythm-grid-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--sr-accent) 34%, transparent);
+}
 /* Core render owns one fixed lower-lane stack. Children measure themselves
    against their own lane origin, which matches the padded notation origin;
    no overlay may use the outer block's border-box coordinates. */

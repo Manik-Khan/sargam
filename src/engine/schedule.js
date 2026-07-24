@@ -12,6 +12,11 @@
 // AudioContext clock). Correctness lives here, in node, under smokes.
 
 import { getTal, wrapMatra, vibhagOfMatra, markerAtMatra } from './tala.js';
+import {
+  performedMatraCount,
+  performedWrittenOrder,
+} from './performed-time.js';
+import { meterTicksForMatra, rationalNumber } from './meter.js';
 
 // ---------------------------------------------------------------------------
 // Pitch
@@ -83,6 +88,7 @@ export function scheduleDocument(doc, opts = {}) {
   const events = [];
   const lineStarts = [];
   const sections = doc?.sections || [];
+  const meterSpans = opts.meterSpans || [];
   let t = 0;
 
   const normalizedLabel = (value) => String(value ?? '')
@@ -97,32 +103,6 @@ export function scheduleDocument(doc, opts = {}) {
       if (normalizedLabel(sections[i]?.label) === target) return i;
     }
     return -1;
-  };
-
-  const writtenOrder = (line) => {
-    const order = [];
-    for (let i = 0; i < (line.matras?.length || 0); ) {
-      const pr = (line.phraseRepeats || []).find((r) => r.fromMatra === i);
-      if (pr) {
-        for (let rep = 0; rep < pr.times; rep++) {
-          for (let k = pr.fromMatra; k <= pr.toMatra; k++) order.push(k);
-        }
-        i = pr.toMatra + 1;
-      } else {
-        order.push(i);
-        i++;
-      }
-    }
-    return order;
-  };
-
-  const performedMatraCount = (line) => {
-    const order = writtenOrder(line);
-    if (!line.lineRepeat) return order.length;
-    const cut = Number.isInteger(line.firstEndingFrom)
-      ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
-      : -1;
-    return order.length + (cut >= 0 ? cut : order.length);
   };
 
   const findEntry = (section, desiredMatra) => {
@@ -175,7 +155,7 @@ export function scheduleDocument(doc, opts = {}) {
     }
 
     // Unroll phrase repeats into the played order of matra indices.
-    const order = writtenOrder(line);
+    const order = performedWrittenOrder(line);
     const passes = singlePass ? 1 : line.lineRepeat ? 2 : 1;
     const endingCut = Number.isInteger(line.firstEndingFrom)
       ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
@@ -227,6 +207,19 @@ export function scheduleDocument(doc, opts = {}) {
                   : 'vibhag';
           }
           events.push({ kind: 'tick', t: matraStart, accent, cycleMatra, tal: tal.name });
+        }
+
+        // A local meter is structural, but it never moves the surrounding
+        // tala. Its exact rational grid repeats with the written phrase and
+        // becomes audible as quieter subdivision clicks.
+        for (const tick of meterTicksForMatra(meterSpans, line.sourceLine, matraIndex)) {
+          events.push({
+            kind: 'tick',
+            t: matraStart + rationalNumber(tick.offset) * spm,
+            accent: 'subdivision',
+            localMeter: tick.label,
+            subdivision: true,
+          });
         }
 
         const evs = line.matras[matraIndex].events;

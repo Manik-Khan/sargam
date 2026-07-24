@@ -363,6 +363,16 @@ export const smokes = [
     },
   },
   {
+    name: 'phrase repeat: the following line continues from performed, not merely written, duration',
+    fn() {
+      const { doc, problems } = parseDocument('tal: tintal\n\n@15 (S R)x2 g m\nP D\n');
+      assert.deepEqual(problems, []);
+      const [first, second] = doc.sections[0].lines;
+      assert.equal(first.startMatra, 15);
+      assert.equal(second.startMatra, 5);
+    },
+  },
+  {
     name: 'line repeat: ||: :|| sets lineRepeat, strips glyphs from matras',
     fn: () => {
       const l = line('||: S R g m :||').line;

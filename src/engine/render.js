@@ -19,6 +19,7 @@ import { spellDegree } from './western.js';
 import { DEFAULT_SA } from './schedule.js';
 import { planLineSystems } from './layout.js';
 import { buildLineGeometry } from './notation-geometry.js';
+import { performedOffsetAt } from './performed-time.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -267,14 +268,33 @@ function renderLineBlock(line, tal, ctx) {
   // --- matra cells + barlines (grid row 2)
   const prefixOf = new Map(); // matraIndex → '(' etc.
   const suffixOf = new Map();
+  const repeatLandingOf = new Map();
   for (const pr of line.phraseRepeats) {
     prefixOf.set(pr.fromMatra, '(');
     suffixOf.set(pr.toMatra, `)x${pr.times}`);
+    if (tal) {
+      const next = wrapMatra(
+        tal,
+        line.startMatra + performedOffsetAt(line, pr.toMatra + 1)
+      );
+      repeatLandingOf.set(pr.toMatra, {
+        matra: next,
+        text: markerAtMatra(tal, next) ?? String(next),
+      });
+    }
   }
 
   const renderedCells = [];
   for (let k = 0; k < line.matras.length; k++) {
-    const cell = renderCell(line, k, tal, prefixOf.get(k), suffixOf.get(k), ctx);
+    const cell = renderCell(
+      line,
+      k,
+      tal,
+      prefixOf.get(k),
+      suffixOf.get(k),
+      repeatLandingOf.get(k),
+      ctx
+    );
     renderedCells.push(cell);
     cell.style.gridRow = '2';
     cell.style.gridColumn = String(colOf[k]);
@@ -329,14 +349,13 @@ function renderLineBlock(line, tal, ctx) {
   // '-', point strokes sit beneath their exact attack, and Diri spans the two
   // successive attacks it consumes.
   const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
-  const bolsByMatra = new Map();
-  for (const b of line.bols) {
-    if (!bolsByMatra.has(b.ref.matraIndex)) bolsByMatra.set(b.ref.matraIndex, []);
-    bolsByMatra.get(b.ref.matraIndex).push(b);
-  }
+  const bolPasses = line._bolPasses?.length
+    ? line._bolPasses
+    : (line._bolLane || line.bols?.length)
+      ? [{ pass: 1, bols: line.bols || [] }]
+      : [];
   for (let mi = 0; mi < line.matras.length; mi++) {
-    const group = bolsByMatra.get(mi) || [];
-    if (!line._bolLane && !group.length) continue;
+    if (!bolPasses.length) continue;
     if (colOf[mi] === undefined) continue;
     const el = h('div', 'sr-bol');
     el.setAttribute('data-matra', String(mi));
@@ -353,53 +372,72 @@ function renderLineBlock(line, tal, ctx) {
         slots.push({ event, eventIndex, partIndex });
       }
     }
-    const grid = h('span', 'sr-bol-slots');
-    grid.style.gridTemplateColumns = slots.length
-      ? slots
-          .map((slot) => slot.event?.approachSlide && slot.partIndex === 0
-            ? 'minmax(1.55em, max-content)'
-            : 'minmax(0.84em, max-content)')
-          .join(' ')
-      : 'minmax(0.84em, max-content)';
-    const bolAtEvent = new Map(group.map((bol) => [bol.ref.eventIndex, bol]));
-    const coveredEvents = new Set(
-      group
-        .filter((bol) => bol.mark === 'diri' && bol.endRef?.matraIndex === mi)
-        .map((bol) => bol.endRef.eventIndex)
-    );
-    for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
-      const slot = slots[slotIndex];
-      if (slot.partIndex > 0) {
-        const hold = h('span', 'sr-bol-slot sr-bol-hold', '-');
-        hold.style.gridColumn = String(slotIndex + 1);
-        grid.appendChild(hold);
-        continue;
+    for (const passLane of bolPasses) {
+      const pass = Number(passLane.pass) || 1;
+      const group = (passLane.bols || []).filter((bol) => bol.ref.matraIndex === mi);
+      const passRow = h('span', 'sr-bol-pass');
+      passRow.setAttribute('data-bol-pass', String(pass));
+      if (bolPasses.length > 1 && mi === 0) {
+        passRow.appendChild(h('span', 'sr-bol-pass-label', String(pass)));
       }
-      const bol = bolAtEvent.get(slot.eventIndex);
-      if (bol) {
-        const mark = h('span', 'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark, BOL_SYMBOL[bol.mark] ?? bol.mark);
-        const endSlot = bol.mark === 'diri' && bol.endRef?.matraIndex === mi
-          ? firstSlotOfEvent.get(bol.endRef.eventIndex)
-          : null;
-        mark.style.gridColumn = Number.isInteger(endSlot)
-          ? `${slotIndex + 1} / ${endSlot + 2}`
-          : String(slotIndex + 1);
-        grid.appendChild(mark);
-      } else if (!coveredEvents.has(slot.eventIndex)) {
-        const blank = h('span', 'sr-bol-slot sr-bol-blank', '');
-        blank.style.gridColumn = String(slotIndex + 1);
-        grid.appendChild(blank);
+      const grid = h('span', 'sr-bol-slots');
+      grid.style.gridTemplateColumns = slots.length
+        ? slots
+            .map((slot) => slot.event?.approachSlide && slot.partIndex === 0
+              ? 'minmax(1.55em, max-content)'
+              : 'minmax(0.84em, max-content)')
+            .join(' ')
+        : 'minmax(0.84em, max-content)';
+      const bolAtEvent = new Map(group.map((bol) => [bol.ref.eventIndex, bol]));
+      const coveredEvents = new Set(
+        group
+          .filter((bol) => bol.mark === 'diri' && bol.endRef?.matraIndex === mi)
+          .map((bol) => bol.endRef.eventIndex)
+      );
+      for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+        const slot = slots[slotIndex];
+        if (slot.partIndex > 0) {
+          const hold = h('span', 'sr-bol-slot sr-bol-hold', '-');
+          hold.style.gridColumn = String(slotIndex + 1);
+          grid.appendChild(hold);
+          continue;
+        }
+        const bol = bolAtEvent.get(slot.eventIndex);
+        if (bol) {
+          const rateClass = bol.mark === 'diri' && bol.rate === 2 ? ' sr-bol-diri-fast' : '';
+          const mark = h(
+            'span',
+            'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark + rateClass,
+            BOL_SYMBOL[bol.mark] ?? bol.mark
+          );
+          const endSlot = bol.mark === 'diri' && bol.endRef?.matraIndex === mi
+            ? firstSlotOfEvent.get(bol.endRef.eventIndex)
+            : null;
+          mark.style.gridColumn = Number.isInteger(endSlot)
+            ? `${slotIndex + 1} / ${endSlot + 2}`
+            : String(slotIndex + 1);
+          grid.appendChild(mark);
+        } else if (!coveredEvents.has(slot.eventIndex)) {
+          const blank = h('span', 'sr-bol-slot sr-bol-blank', '');
+          blank.style.gridColumn = String(slotIndex + 1);
+          grid.appendChild(blank);
+        }
       }
+      const layout = h('span', 'sr-bol-layout');
+      if (prefixOf.has(mi)) {
+        layout.appendChild(h('span', 'sr-phrase-glyph sr-bol-phrase-spacer', prefixOf.get(mi)));
+      }
+      layout.appendChild(grid);
+      if (suffixOf.has(mi)) {
+        layout.appendChild(h('span', 'sr-phrase-glyph sr-bol-phrase-spacer', suffixOf.get(mi)));
+        const landingMark = repeatLandingOf.get(mi);
+        if (landingMark) {
+          layout.appendChild(h('span', 'sr-repeat-landing sr-bol-phrase-spacer', `→${landingMark.text}`));
+        }
+      }
+      passRow.appendChild(layout);
+      el.appendChild(passRow);
     }
-    const layout = h('span', 'sr-bol-layout');
-    if (prefixOf.has(mi)) {
-      layout.appendChild(h('span', 'sr-phrase-glyph sr-bol-phrase-spacer', prefixOf.get(mi)));
-    }
-    layout.appendChild(grid);
-    if (suffixOf.has(mi)) {
-      layout.appendChild(h('span', 'sr-phrase-glyph sr-bol-phrase-spacer', suffixOf.get(mi)));
-    }
-    el.appendChild(layout);
     row.appendChild(el);
   }
 
@@ -420,7 +458,7 @@ function renderLineBlock(line, tal, ctx) {
   // the writer is thinking in).
   if (tal && ctx.activeLine !== undefined && ctx.activeLine === line.sourceLine) {
     for (const pr of line.phraseRepeats) {
-      const startAbs = wrapMatra(tal, line.startMatra + pr.fromMatra);
+      const startAbs = wrapMatra(tal, line.startMatra + performedOffsetAt(line, pr.fromMatra));
       const l = landing(tal, startAbs, pr.toMatra - pr.fromMatra + 1, pr.times);
       const where = l.isSam ? 'sam' : l.isKhali ? 'khali' : l.marker ? `marker ${l.marker}` : null;
       const note = lastStruckNote(line, pr);
@@ -452,7 +490,9 @@ function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
   const offsetRef = (ref) => ({ ...ref, matraIndex: ref.matraIndex - from });
   const sliced = {
     ...line,
-    startMatra: tal ? wrapMatra(tal, (line.startMatra || 1) + from) : (line.startMatra || 1) + from,
+    startMatra: tal
+      ? wrapMatra(tal, (line.startMatra || 1) + performedOffsetAt(line, from))
+      : (line.startMatra || 1) + performedOffsetAt(line, from),
     matras: line.matras.slice(from, to + 1),
     spans: (line.spans || [])
       .filter((span) => span.from.matraIndex >= from && span.to.matraIndex <= to)
@@ -494,13 +534,27 @@ function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
     writable: true,
     enumerable: false,
   });
+  Object.defineProperty(sliced, '_bolPasses', {
+    value: (line._bolPasses || []).map((lane) => ({
+      ...lane,
+      bols: (lane.bols || [])
+        .filter((bol) => bol.ref.matraIndex >= from && bol.ref.matraIndex <= to)
+        .map((bol) => ({
+          ...bol,
+          ref: offsetRef(bol.ref),
+          endRef: bol.endRef ? offsetRef(bol.endRef) : undefined,
+        })),
+    })),
+    writable: true,
+    enumerable: false,
+  });
   return sliced;
 }
 
 /** True if a structural or derived barline falls after 0-based matra k. */
 function boundaryAfter(line, k, tal) {
   if (line.firstEndingFrom === k + 1) return true;
-  return markerAtMatra(tal, line.startMatra + k + 1) !== null;
+  return markerAtMatra(tal, line.startMatra + performedOffsetAt(line, k + 1)) !== null;
 }
 
 /** 1 → '1st', 2 → '2nd', 3 → '3rd', 11 → '11th' … */
@@ -532,7 +586,7 @@ function lastStruckNote(line, pr) {
 // One matra → cell
 // ---------------------------------------------------------------------------
 
-function renderCell(line, k, tal, prefix, suffix, ctx) {
+function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   const matra = line.matras[k];
   const evs = matra.events;
   const allSustain = evs.every((e) => e.type === 'sustain');
@@ -584,7 +638,9 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
   }
 
   // Marker lane: derived from tal + start offset; empty node keeps rows aligned.
-  const markerText = tal ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + k)) : null;
+  const markerText = tal
+    ? markerAtMatra(tal, wrapMatra(tal, line.startMatra + performedOffsetAt(line, k)))
+    : null;
   cell.appendChild(h('div', 'sr-marker', markerText ?? ''));
 
   // Glyphs. Grace notes remain ornaments outside metric slots. Timed
@@ -627,7 +683,14 @@ function renderCell(line, k, tal, prefix, suffix, ctx) {
     }
     glyphs.appendChild(slots);
   }
-  if (suffix) glyphs.appendChild(h('span', 'sr-phrase-glyph', suffix));
+  if (suffix) {
+    glyphs.appendChild(h('span', 'sr-phrase-glyph', suffix));
+    if (repeatLanding) {
+      const landingMark = h('span', 'sr-repeat-landing', `→${repeatLanding.text}`);
+      landingMark.title = `The repeated phrase continues at tala matra ${repeatLanding.matra}`;
+      glyphs.appendChild(landingMark);
+    }
+  }
   cell.appendChild(glyphs);
 
   // Automatic under-arc on subdivided matras (spec principle 2).

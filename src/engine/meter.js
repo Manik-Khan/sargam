@@ -1,8 +1,9 @@
 import { scanRepeatedSlideAt } from './repeated-slide.js';
 // src/engine/meter.js — local meter/layakari spans authored from a text
-// selection. The written music remains the rhythmic authority in v1: meter
-// spans describe, validate, highlight, and print the local grid without
-// silently changing tala position or playback timing.
+// selection. The written music remains the tala authority, while meter spans
+// are structural local-grid data: they validate attacks, render guide lines,
+// and schedule audible subdivision ticks without changing the surrounding
+// matra count.
 
 const NOTE_CHARS = new Set(['S', 'r', 'R', 'g', 'G', 'm', 'M', 'P', 'd', 'D', 'n', 'N']);
 const CLUSTER_RE = /^[SrRgGmMPdDnN.'~-]+$/;
@@ -364,6 +365,61 @@ export function parseMeterDocument(text) {
   return { spans, problems };
 }
 
+/**
+ * Convert both legacy `>>` lanes and score-authored meter anchors into one
+ * structural model. Anchor endpoints are already repairable exact metric
+ * times, so the scheduler and Rhythm Grid do not need to know how the span
+ * was authored.
+ */
+export function structuralMeterSpans(laneSpans = [], anchorMarks = []) {
+  const spans = [...(laneSpans || [])];
+  for (const mark of anchorMarks || []) {
+    if (mark?.kind !== 'meter' || mark.status === 'missing' || mark.status === 'ambiguous') continue;
+    const meter = parseMeterValue(mark.value);
+    const startEndpoint = mark.resolvedStart || mark.start;
+    const endEndpoint = mark.resolvedEnd || mark.end;
+    const start = parseRational(startEndpoint?.time);
+    const end = parseRational(endEndpoint?.time);
+    if (!meter.ok || !start || !end || compareRational(start, end) >= 0) continue;
+    spans.push({
+      sourceLine: Number(startEndpoint.sourceLine),
+      label: meter.label,
+      numerator: meter.numerator,
+      denominator: meter.denominator,
+      unit: meter.unit,
+      start,
+      end,
+      valid: true,
+      anchorId: mark.id,
+    });
+  }
+  return spans;
+}
+
+/**
+ * Exact local subdivision positions inside one written matra. Matra heads are
+ * omitted because the tala scheduler already owns that tick.
+ */
+export function meterTicksForMatra(spans, sourceLine, matraIndex) {
+  const head = rational(matraIndex, 1);
+  const tail = rational(matraIndex + 1, 1);
+  const ticks = new Map();
+  for (const span of spans || []) {
+    if (Number(span?.sourceLine) !== Number(sourceLine) || span.valid === false || !span.unit) continue;
+    const total = divRational(subRational(span.end, span.start), span.unit);
+    if (!total) continue;
+    const limit = Math.min(512, Math.floor(rationalNumber(total) + 1e-9));
+    for (let step = 0; step <= limit; step++) {
+      const point = addRational(span.start, mulRational(span.unit, rational(step, 1)));
+      if (compareRational(point, head) <= 0 || compareRational(point, tail) >= 0) continue;
+      if (compareRational(point, span.end) > 0) continue;
+      const offset = subRational(point, head);
+      ticks.set(formatRational(offset), { offset, label: span.label });
+    }
+  }
+  return [...ticks.values()].sort((a, b) => compareRational(a.offset, b.offset));
+}
+
 function formatSpan(span) {
   return `${span.label} @${formatRational(span.start)}..${formatRational(span.end)}`;
 }
@@ -413,7 +469,7 @@ export function applyMeterToSelection(text, selectionStart, selectionEnd, meterT
     span,
     selectionStart: range.selectionStart,
     selectionEnd: range.selectionEnd,
-    message: `${meter.label} meter marked across ${validation.steps} local grid step${validation.steps === 1 ? '' : 's'}.`,
+    message: `${meter.label} meter applied across ${validation.steps} local grid step${validation.steps === 1 ? '' : 's'}; playback and Rhythm Grid now follow it.`,
   };
 }
 

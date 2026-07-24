@@ -8,10 +8,13 @@ import {
   formatRational,
   parseMeterDocument,
   parseMeterValue,
+  structuralMeterSpans,
   scanMusicLine,
   selectionToMeterRange,
   validateMeterRange,
 } from '../src/engine/meter.js';
+import { parseDocument } from '../src/engine/parse.js';
+import { scheduleDocument } from '../src/engine/schedule.js';
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), 'utf8');
 const line = '@8 .D--.n -S gm | D - ~(D m) [[g---RS R-]] S-';
@@ -132,15 +135,48 @@ export const smokes = [
     },
   },
   {
-    name: 'meter: shell keeps selection authoring separate from playback timing',
+    name: 'meter: local grid schedules exact subdivision clicks on every phrase-repeat pass',
+    fn() {
+      const text = 'tal: tintal\n\n(SRgm)x2\n>> 4 @0..3/4\n';
+      const parsed = parseDocument(text);
+      const meters = structuralMeterSpans(parseMeterDocument(text).spans, []);
+      const schedule = scheduleDocument(parsed.doc, { meterSpans: meters });
+      const ticks = schedule.events.filter((event) => event.subdivision);
+      assert.deepEqual(ticks.map((event) => event.t), [0.25, 0.5, 0.75, 1.25, 1.5, 1.75]);
+      assert.ok(ticks.every((event) => event.localMeter === '4'));
+    },
+  },
+  {
+    name: 'meter: score anchors and legacy lanes normalize into one structural model',
+    fn() {
+      const spans = structuralMeterSpans([], [{
+        id: 'a1',
+        kind: 'meter',
+        value: '6',
+        status: 'resolved',
+        resolvedStart: { sourceLine: 3, time: '0' },
+        resolvedEnd: { sourceLine: 3, time: '5/6' },
+      }]);
+      assert.equal(spans.length, 1);
+      assert.equal(spans[0].label, '6');
+      assert.equal(formatRational(spans[0].unit), '1/6');
+    },
+  },
+  {
+    name: 'meter: shell connects authoring, playback timing, and the Rhythm Grid view',
     async fn() {
       const app = await read('../src/shell/App.jsx');
       const command = await read('../src/shell/CommandBar.jsx');
       const preview = await read('../src/shell/PreviewPane.jsx');
       assert.match(app, /applyMeterToSelection/);
-      assert.match(app, /meterSpans=\{meterModel\.spans\}/);
+      assert.match(app, /scheduleDocument\(doc, \{ meterSpans: structuralMeters \}\)/);
+      assert.match(app, /meterSpans=\{structuralMeters\}/);
       assert.match(command, /placeholder="3, 6, 5\/7, 4\/3"/);
+      assert.match(command, />Apply Meter</);
+      assert.match(command, /onApplyMeter\?\.\(customMeter\)/);
+      assert.match(command, />Rhythm Grid</);
       assert.match(preview, /mountMeterOverlays/);
+      assert.match(preview, /app-rhythm-grid/);
       assert.doesNotMatch(await read('../src/engine/meter.js'), /scheduleDocument|createPlayer|AudioContext/);
     },
   },

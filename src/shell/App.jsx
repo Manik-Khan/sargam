@@ -23,6 +23,7 @@ import {
   applyMeterToSelection,
   clearMeterFromSelection,
   parseMeterDocument,
+  structuralMeterSpans,
   previewMeterSelection,
 } from '../engine/meter.js';
 import {
@@ -165,6 +166,7 @@ export default function App() {
   const [anchorMessage, setAnchorMessage] = useState(
     'Choose a mark, then click or drag directly on the rendered notation.'
   );
+  const [rhythmGrid, setRhythmGrid] = useState(false);
   const [selectedMarkId, setSelectedMarkId] = useState(null);
   const [bolCapture, setBolCapture] = useState(null);
   const [bolMessage, setBolMessage] = useState('');
@@ -217,6 +219,10 @@ export default function App() {
   const { doc, problems } = useMemo(() => parseDocument(text), [text]);
   const meterModel = useMemo(() => parseMeterDocument(text), [text]);
   const anchorModel = useMemo(() => parseAnchorDocument(text), [text]);
+  const structuralMeters = useMemo(
+    () => structuralMeterSpans(meterModel.spans, anchorModel.marks),
+    [meterModel.spans, anchorModel.marks]
+  );
   const audioLinkModel = useMemo(() => parseAudioLinkDocument(text), [text]);
   const selectedAudioLink = useMemo(
     () => audioLinkModel.links.find((link) => link.id === selectedAudioLinkId) || null,
@@ -335,7 +341,10 @@ export default function App() {
 
   // ---- playback (M3) ----
   const player = useMemo(() => createPlayer(makeAudioEnv()), []);
-  const schedule = useMemo(() => scheduleDocument(doc), [doc]);
+  const schedule = useMemo(
+    () => scheduleDocument(doc, { meterSpans: structuralMeters }),
+    [doc, structuralMeters]
+  );
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [playCursor, setPlayCursor] = useState(null);
@@ -1174,6 +1183,8 @@ export default function App() {
     setText(result.text);
     setMeterDraft(null);
     setMeterMessage(result.message);
+    setAnchorMessage(result.message);
+    setRhythmGrid(true);
     restoreMeterSelection(result);
   };
   const doMeterClear = () => {
@@ -1203,6 +1214,10 @@ export default function App() {
     if (!result.ok) return;
     setText(result.text);
     setSelectedMarkId(result.mark.id);
+    if (anchorTool === 'meter') {
+      setRhythmGrid(true);
+      setAnchorMessage(`${result.mark.value} meter applied. Playback and Rhythm Grid now use this local subdivision.`);
+    }
   };
   const doMoveAnchorMark = (markId, side, endpoint) => {
     const result = updateAnchorMark(text, markId, side, endpoint);
@@ -1797,7 +1812,7 @@ export default function App() {
             activeCursor={playCursor}
             noteNames={noteNames}
             onSeek={doSeek}
-            meterSpans={meterModel.spans}
+            meterSpans={structuralMeters}
             meterDraft={meterDraft}
             sourceText={text}
             anchorMarks={anchorModel.marks}
@@ -1810,6 +1825,7 @@ export default function App() {
             audioLinks={audioLinkModel.links}
             selectedAudioLinkId={selectedAudioLinkId}
             onActivateAudioLink={activateAudioLink}
+            rhythmGrid={rhythmGrid}
           
           /><div className="app-editor-col">
             <CommandBar
@@ -1818,8 +1834,11 @@ export default function App() {
             onAnchorTool={setAnchorTool}
             anchorMeter={anchorMeter}
             onAnchorMeter={setAnchorMeter}
+            onApplyMeter={doMeterApply}
             onRemoveSelectedMark={doRemoveSelectedMark}
             anchorMessage={anchorMessage}
+            rhythmGrid={rhythmGrid}
+            onRhythmGrid={setRhythmGrid}
           />
             <EditorPane
               text={text}

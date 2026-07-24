@@ -2,7 +2,13 @@
 // The engine data stays exact fractions; this file measures the already
 // rendered notation so a lower arch can follow folded systems and micro-slots.
 
-import { rationalNumber } from '../engine/meter.js';
+import {
+  addRational,
+  compareRational,
+  mulRational,
+  rational,
+  rationalNumber,
+} from '../engine/meter.js';
 import { xForMetricTime } from './score-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -54,7 +60,33 @@ function highlightDraft(block, span, from, to) {
   }
 }
 
-export function mountMeterOverlays(root, spans = [], draft = null) {
+function mountRhythmGrid(block, spans, systemStart, systemEnd) {
+  const layer = document.createElement('div');
+  layer.className = 'sr-rhythm-grid-layer';
+  block.appendChild(layer);
+  const seen = new Set();
+  for (const span of spans) {
+    if (!span.unit || span.valid === false) continue;
+    for (let step = 0; step <= 512; step++) {
+      const point = addRational(span.start, mulRational(span.unit, rational(step, 1)));
+      if (compareRational(point, span.end) > 0) break;
+      const numeric = rationalNumber(point);
+      if (numeric < systemStart - 1e-8 || numeric > systemEnd + 1e-8) continue;
+      const key = `${point.n}/${point.d}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const x = xForMetricTime(layer, block, point, 'start');
+      if (x === null) continue;
+      const guide = document.createElement('span');
+      guide.className = 'sr-rhythm-grid-guide';
+      guide.style.left = `${emFromPx(layer, x)}em`;
+      guide.title = `${span.label} grid`;
+      layer.appendChild(guide);
+    }
+  }
+}
+
+export function mountMeterOverlays(root, spans = [], draft = null, { rhythmGrid = false } = {}) {
   if (!root) return;
   root.querySelectorAll('.sr-meter-lane').forEach((node) => node.replaceChildren());
   root.querySelectorAll('.sr-meter-selected').forEach((node) => node.classList.remove('sr-meter-selected'));
@@ -77,6 +109,7 @@ export function mountMeterOverlays(root, spans = [], draft = null) {
           return { span, start: Math.max(start, systemStart), end: Math.min(end, systemEnd), originalStart: start };
         })
         .filter((segment) => segment.end > segment.start + 1e-8);
+      if (rhythmGrid) mountRhythmGrid(block, lineSpans, systemStart, systemEnd);
       if (!segments.length) continue;
       let lane = block.querySelector(':scope > .sr-annotation-stack > .sr-meter-lane')
         || block.querySelector(':scope > .sr-meter-lane');
