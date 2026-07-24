@@ -8,8 +8,13 @@ import {
   parseAnchorMetadata,
   writeAnchorMetadata,
 } from './anchors.js';
+import { parseDocument } from './parse.js';
+import {
+  BOL_KINDS,
+  formatBolLane,
+  parseBolLane,
+} from './bol-lane.js';
 
-const BOL_KINDS = new Set(['da', 'ra', 'diri', 'chikari']);
 const INSERT_KEYS = new Map([
   ['ArrowDown', 'da'],
   ['ArrowUp', 'ra'],
@@ -51,7 +56,7 @@ function findBolLane(text, sourceLine) {
   const parts = sourceParts(text);
   const musicIndex = Number(sourceLine) - 1;
   if (!Number.isInteger(musicIndex) || musicIndex < 0 || musicIndex >= parts.lines.length) {
-    return { ...parts, musicIndex, laneIndex: -1, insertIndex: -1, tokens: [] };
+    return { ...parts, musicIndex, laneIndex: -1, insertIndex: -1, body: '' };
   }
 
   let insertIndex = musicIndex + 1;
@@ -72,29 +77,38 @@ function findBolLane(text, sourceLine) {
   }
 
   const raw = laneIndex >= 0 ? parts.lines[laneIndex].trim().slice(1).trim() : '';
-  const tokens = raw ? raw.split(/\s+/) : [];
-  return { ...parts, musicIndex, laneIndex, insertIndex, tokens };
+  return { ...parts, musicIndex, laneIndex, insertIndex, body: raw };
 }
 
-function trimBolTokens(tokens) {
-  const next = [...tokens];
-  // Preserve the explicit gap following a final diri: it documents the
-  // two-attack span in the editable lane.
-  while (next.at(-1) === '.' && next.at(-2) !== 'diri') next.pop();
-  return next;
+function musicLineForSource(text, sourceLine) {
+  const parsed = parseDocument(text);
+  for (const section of parsed.doc.sections || []) {
+    for (const line of section.lines || []) {
+      if (line.sourceLine === Number(sourceLine)) return line;
+    }
+  }
+  return null;
 }
 
-function writeBolLane(text, sourceLine, tokens, { keepEmpty = true } = {}) {
+function structuralLane(text, sourceLine) {
+  const musicLine = musicLineForSource(text, sourceLine);
+  if (!musicLine) return null;
+  const found = findBolLane(text, sourceLine);
+  const parsed = parseBolLane(found.body, musicLine);
+  return { musicLine, found, parsed };
+}
+
+function writeBolLane(text, sourceLine, body, { keepEmpty = true } = {}) {
   const lane = findBolLane(text, sourceLine);
   if (lane.insertIndex < 0) {
     return { ok: false, text, message: 'The active music line no longer exists.' };
   }
-  const normalized = trimBolTokens(tokens);
-  const bolText = normalized.length ? `> ${normalized.join(' ')}` : '> ';
+  const normalized = String(body ?? '').trim();
+  const bolText = normalized ? `> ${normalized}` : '> ';
   const lines = [...lane.lines];
   let laneIndex = lane.laneIndex;
 
-  if (!normalized.length && !keepEmpty && laneIndex >= 0) {
+  if (!normalized && !keepEmpty && laneIndex >= 0) {
     lines.splice(laneIndex, 1);
     laneIndex = -1;
   } else if (laneIndex >= 0) {
@@ -108,7 +122,7 @@ function writeBolLane(text, sourceLine, tokens, { keepEmpty = true } = {}) {
   return {
     ok: true,
     text: lines.join(lane.eol),
-    tokens: normalized,
+    body: normalized,
     bolSourceLine: laneIndex >= 0 ? laneIndex + 1 : null,
   };
 }
@@ -143,16 +157,18 @@ function migrateBolAnchors(text, sourceLine) {
   if (!migrated.length) return { ok: true, text, count: 0 };
 
   const withoutAnchors = writeAnchorMetadata(text, retained);
-  const lane = findBolLane(withoutAnchors, sourceLine);
-  const tokens = [...lane.tokens];
+  const lane = structuralLane(withoutAnchors, sourceLine);
+  if (!lane) return { ok: false, text, count: 0, message: 'The active music line no longer exists.' };
+  const assignments = [...lane.parsed.assignments];
+  const coveredBy = [...lane.parsed.coveredBy];
   for (const mark of migrated) {
-    while (tokens.length <= mark.to) tokens.push('.');
-    tokens[mark.from] = mark.kind;
+    assignments[mark.from] = mark.kind;
     if (mark.kind === 'diri') {
-      for (let i = mark.from + 1; i <= mark.to; i++) tokens[i] = '.';
+      for (let i = mark.from + 1; i <= mark.to; i++) coveredBy[i] = mark.from;
     }
   }
-  const written = writeBolLane(withoutAnchors, sourceLine, tokens);
+  const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
+  const written = writeBolLane(withoutAnchors, sourceLine, formatted.text);
   return { ...written, count: migrated.length };
 }
 
@@ -166,11 +182,14 @@ export function bolCursorSelection(text, cursor) {
   const lineStart = lineStartOffset(lane.lines, lane.laneIndex, lane.eol);
   const bodyOffset = line.indexOf('>') + 1;
   const body = line.slice(bodyOffset);
-  const matches = [...body.matchAll(/\S+/g)];
-  const match = matches[ordinal];
-  if (match) {
-    const from = lineStart + bodyOffset + match.index;
-    return { from, to: from + match[0].length };
+  const musicLine = musicLineForSource(text, sourceLine);
+  if (!musicLine) return null;
+  const parsed = parseBolLane(body, musicLine);
+  const range = parsed.ranges[ordinal];
+  if (range) {
+    const leading = body.length - body.trimStart().length;
+    const from = lineStart + bodyOffset + leading + range.from;
+    return { from, to: lineStart + bodyOffset + leading + range.to };
   }
   const at = lineStart + line.length;
   return { from: at, to: at };
@@ -205,7 +224,10 @@ export function beginBolCapture(text, position) {
 
   const migrated = migrateBolAnchors(text, sourceLine);
   if (!migrated.ok) return { ...migrated, cursor: null };
-  const ready = writeBolLane(migrated.text, sourceLine, findBolLane(migrated.text, sourceLine).tokens);
+  const lane = structuralLane(migrated.text, sourceLine);
+  if (!lane) return { ok: false, text: migrated.text, cursor: null, message: 'The active music line no longer exists.' };
+  const formatted = formatBolLane(lane.musicLine, lane.parsed.assignments, lane.parsed.coveredBy);
+  const ready = writeBolLane(migrated.text, sourceLine, formatted.text);
   if (!ready.ok) return { ...ready, cursor: null };
   const cursor = { sourceLine, ordinal: 0 };
   return {
@@ -223,26 +245,36 @@ function rangesOverlap(aFrom, aTo, bFrom, bTo) {
   return aFrom <= bTo && bFrom <= aTo;
 }
 
-function tokenRange(tokens, index) {
-  if (!tokens[index] || tokens[index] === '.') return null;
+function assignmentRange(assignments, coveredBy, index) {
+  const covering = coveredBy[index];
+  if (covering !== null && covering !== undefined) {
+    return { from: covering, to: index };
+  }
+  if (!assignments[index]) return null;
   return {
     from: index,
-    to: tokens[index] === 'diri' ? Math.min(tokens.length - 1, index + 1) : index,
+    to: assignments[index] === 'diri' ? Math.min(assignments.length - 1, index + 1) : index,
   };
 }
 
-function clearBolRange(tokens, from, to) {
-  const next = [...tokens];
+function clearBolRange(assignments, coveredBy, from, to) {
+  const next = [...assignments];
+  const nextCovered = [...coveredBy];
   let removed = 0;
-  for (let i = 0; i < tokens.length; i++) {
-    const range = tokenRange(tokens, i);
+  for (let i = 0; i < assignments.length; i++) {
+    const range = assignmentRange(assignments, coveredBy, i);
     if (range && rangesOverlap(range.from, range.to, from, to)) {
       next[i] = '.';
-      if (tokens[i] === 'diri' && i + 1 < next.length) next[i + 1] = '.';
+      next[i] = null;
+      if (assignments[i] === 'diri' && i + 1 < next.length) nextCovered[i + 1] = null;
+      if (coveredBy[i] !== null && coveredBy[i] !== undefined) {
+        next[coveredBy[i]] = null;
+        nextCovered[i] = null;
+      }
       removed++;
     }
   }
-  return { tokens: next, removed };
+  return { assignments: next, coveredBy: nextCovered, removed };
 }
 
 export function removeBolAtCursor(text, cursor) {
@@ -251,9 +283,16 @@ export function removeBolAtCursor(text, cursor) {
   if (!Number.isInteger(sourceLine) || !Number.isInteger(ordinal)) {
     return { ok: false, text, message: 'Bol Capture has no active attack.' };
   }
-  const lane = findBolLane(text, sourceLine);
-  const cleared = clearBolRange(lane.tokens, ordinal, ordinal);
-  const written = writeBolLane(text, sourceLine, cleared.tokens);
+  const lane = structuralLane(text, sourceLine);
+  if (!lane) return { ok: false, text, message: 'The active music line no longer exists.' };
+  const cleared = clearBolRange(
+    lane.parsed.assignments,
+    lane.parsed.coveredBy,
+    ordinal,
+    ordinal
+  );
+  const formatted = formatBolLane(lane.musicLine, cleared.assignments, cleared.coveredBy);
+  const written = writeBolLane(text, sourceLine, formatted.text);
   if (!written.ok) return written;
   return {
     ...written,
@@ -276,14 +315,21 @@ export function setBolAtCursor(text, cursor, kind) {
     return { ok: false, text, message: 'Diri needs two consecutive attacks; only one remains.' };
   }
 
-  const lane = findBolLane(text, sourceLine);
-  const cleared = clearBolRange(lane.tokens, ordinal, ordinal + span - 1);
-  const tokens = cleared.tokens;
-  while (tokens.length < ordinal + span) tokens.push('.');
-  tokens[ordinal] = kind;
-  if (kind === 'diri') tokens[ordinal + 1] = '.';
+  const lane = structuralLane(text, sourceLine);
+  if (!lane) return { ok: false, text, message: 'The active music line no longer exists.' };
+  const cleared = clearBolRange(
+    lane.parsed.assignments,
+    lane.parsed.coveredBy,
+    ordinal,
+    ordinal + span - 1
+  );
+  const assignments = cleared.assignments;
+  const coveredBy = cleared.coveredBy;
+  assignments[ordinal] = kind;
+  if (kind === 'diri') coveredBy[ordinal + 1] = ordinal;
 
-  const written = writeBolLane(text, sourceLine, tokens);
+  const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
+  const written = writeBolLane(text, sourceLine, formatted.text);
   if (!written.ok) return written;
   const nextOrdinal = Math.min(info.attacks.length, ordinal + span);
   const nextCursor = { sourceLine, ordinal: nextOrdinal };
@@ -338,7 +384,7 @@ export function applyBolCaptureKey(text, cursor, key) {
       text,
       cursor,
       selection: bolCursorSelection(text, cursor),
-      message: 'The music line already owns “-”. Use ←/→ to move between attacks.',
+      message: 'Written hold markers are already mirrored in the > line. Use ←/→ to move between attacks.',
     };
   }
   const kind = INSERT_KEYS.get(key);

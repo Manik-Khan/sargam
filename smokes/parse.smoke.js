@@ -410,16 +410,20 @@ export const smokes = [
   {
     name: 'bols: words da ra diri attach per note event, including inside clusters',
     fn: () => {
-      const { doc, problems } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra da diri da ra\n');
+      const { doc, problems } = parseDocument('tal: tintal\n\nSR g m P d n\n> da ra da diri da ra\n');
       assert.deepEqual(problems, []);
       const l = doc.sections[0].lines[0];
       assert.deepEqual(l.bols, [
         { ref: { matraIndex: 0, eventIndex: 0 }, mark: 'da' },
         { ref: { matraIndex: 0, eventIndex: 1 }, mark: 'ra' },
         { ref: { matraIndex: 1, eventIndex: 0 }, mark: 'da' },
-        { ref: { matraIndex: 2, eventIndex: 0 }, mark: 'diri' },
-        { ref: { matraIndex: 3, eventIndex: 0 }, mark: 'da' },
-        { ref: { matraIndex: 4, eventIndex: 0 }, mark: 'ra' },
+        {
+          ref: { matraIndex: 2, eventIndex: 0 },
+          mark: 'diri',
+          endRef: { matraIndex: 3, eventIndex: 0 },
+        },
+        { ref: { matraIndex: 4, eventIndex: 0 }, mark: 'da' },
+        { ref: { matraIndex: 5, eventIndex: 0 }, mark: 'ra' },
       ]);
     },
   },
@@ -442,8 +446,35 @@ export const smokes = [
       const l = doc.sections[0].lines[0];
       assert.deepEqual(l.bols, [
         { ref: { matraIndex: 0, eventIndex: 0 }, mark: 'da' },
-        { ref: { matraIndex: 2, eventIndex: 0 }, mark: 'diri' },
+        {
+          ref: { matraIndex: 2, eventIndex: 0 },
+          mark: 'diri',
+          endRef: { matraIndex: 3, eventIndex: 0 },
+        },
       ]);
+    },
+  },
+  {
+    name: 'bols: structural holds and repeat range match the notation line',
+    fn: () => {
+      const source = 'tal: tintal\n\n@10 gR (S--S SSSS)x2 S-SS\n> da da (da--da ra da diri)x2 .-. .\n';
+      const { doc, problems } = parseDocument(source);
+      assert.deepEqual(problems, []);
+      const line = doc.sections[0].lines[0];
+      assert.deepEqual(line.phraseRepeats, [{ times: 2, fromMatra: 1, toMatra: 2 }]);
+      assert.deepEqual(line.bols.at(-1), {
+        ref: { matraIndex: 2, eventIndex: 2 },
+        mark: 'diri',
+        endRef: { matraIndex: 2, eventIndex: 3 },
+      });
+    },
+  },
+  {
+    name: 'bols: a mismatched repeat range is a diagnostic instead of silent drift',
+    fn: () => {
+      const source = 'tal: tintal\n\n@10 gR (S--S SSSS)x2 S-SS\n> da da da--da (ra da diri .-. .)x2\n';
+      const { problems } = parseDocument(source);
+      assert.ok(problems.some((problem) => /repeat structure must mirror/.test(problem.msg)));
     },
   },
   {
@@ -1060,4 +1091,3 @@ Gat
     },
   },
 ];
-

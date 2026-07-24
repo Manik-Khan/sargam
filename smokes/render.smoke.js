@@ -314,7 +314,7 @@ export const smokes = [
   {
     name: "render: bols render as the handwriting's symbols — | for da, — for ra, V diri, ^ chikari",
     fn: () => {
-      const { doc } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra diri chikari da ra\n');
+      const { doc } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra diri chikari da\n');
       const root = renderDocument(doc);
       const row = root.querySelector('.sr-row');
       const bol0 = row.querySelector('.sr-bol[data-matra="0"]');
@@ -322,9 +322,29 @@ export const smokes = [
       const marks0 = [...bol0.querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
       assert.deepEqual(marks0, ['|', '—']); // da, ra on S and R
       const marks1 = [...row.querySelector('.sr-bol[data-matra="1"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
-      assert.deepEqual(marks1, ['V']); // diri on g
-      const marks2 = [...row.querySelector('.sr-bol[data-matra="2"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
-      assert.deepEqual(marks2, ['^']); // chikari on m
+      assert.deepEqual(marks1, ['V']); // diri spans g into m
+      const marks3 = [...row.querySelector('.sr-bol[data-matra="3"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
+      assert.deepEqual(marks3, ['^']); // chikari on P
+    },
+  },
+  {
+    name: 'render: structural bol slots align da--da and a two-attack Diri under S--S SSSS',
+    fn: () => {
+      const source = 'tal: tintal\n\n@10 gR (S--S SSSS)x2 S-SS\n> da da (da--da ra da diri)x2 .-. .\n';
+      const { doc, problems } = parseDocument(source);
+      assert.deepEqual(problems, []);
+      const row = renderDocument(doc).querySelector('.sr-row');
+      const held = row.querySelector('.sr-bol[data-matra="1"]');
+      assert.deepEqual(
+        [...held.querySelectorAll('.sr-bol-slot')].map((node) => node.textContent),
+        ['|', '-', '-', '|']
+      );
+      const fast = row.querySelector('.sr-bol[data-matra="2"]');
+      assert.deepEqual(
+        [...fast.querySelectorAll('.sr-bol-mark')].map((node) => node.textContent),
+        ['—', '|', 'V']
+      );
+      assert.match(fast.querySelector('.sr-bol-diri').style.gridColumn, /\//);
     },
   },
   {

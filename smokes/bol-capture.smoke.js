@@ -20,7 +20,7 @@ export const smokes = [
       const result = beginBolCapture(source, source.indexOf('\n', lineStart));
       assert.equal(result.ok, true);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 0 });
-      assert.match(result.text, /S- SS SS SS\n> \n/);
+      assert.match(result.text, /S- SS SS SS\n> \.- \. \. \. \. \. \.\n/);
       const done = moveBolCursor(result.text, result.cursor, 7);
       assert.deepEqual(done.cursor, { sourceLine: 3, ordinal: 7 });
       assert.match(done.message, /7\/7/);
@@ -33,7 +33,7 @@ export const smokes = [
       const result = beginBolCapture(withBlank, withBlank.length);
       assert.equal(result.ok, true);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 0 });
-      assert.match(result.text, /S- SS SS SS\n> \n/);
+      assert.match(result.text, /S- SS SS SS\n> \.- \. \. \. \. \. \.\n/);
     },
   },
   {
@@ -65,7 +65,7 @@ export const smokes = [
       result = applyBolCaptureKey(text, cursor, 'ArrowLeft');
       assert.equal(result.text, text);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 1 });
-      assert.match(text, /S- SS SS SS\n> da ra\n/);
+      assert.match(text, /S- SS SS SS\n> da- ra \. \. \. \. \.\n/);
       const parsed = parseDocument(text);
       assert.deepEqual(parsed.problems, []);
       assert.deepEqual(parsed.doc.sections[0].lines[0].bols.map((bol) => bol.mark), ['da', 'ra']);
@@ -78,7 +78,7 @@ export const smokes = [
       const result = setBolAtCursor(source, { sourceLine: 3, ordinal: 4 }, 'diri');
       assert.equal(result.ok, true);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 6 });
-      assert.match(result.text, /> \. \. \. \. diri \./);
+      assert.match(result.text, /> \.- \. \. \. diri \./);
       const parsed = parseDocument(result.text);
       assert.deepEqual(parsed.doc.sections[0].lines[0].bols.map((bol) => bol.mark), ['diri']);
       assert.deepEqual(parseAnchorDocument(result.text).marks, []);
@@ -90,7 +90,7 @@ export const smokes = [
       const diri = setBolAtCursor(source, { sourceLine: 3, ordinal: 2 }, 'diri');
       const corrected = setBolAtCursor(diri.text, { sourceLine: 3, ordinal: 3 }, 'da');
       assert.equal(corrected.ok, true);
-      assert.match(corrected.text, /> \. \. \. da/);
+      assert.match(corrected.text, /> \.- \. \. da \. \. \./);
       assert.doesNotMatch(corrected.text, /diri/);
     },
   },
@@ -108,7 +108,7 @@ export const smokes = [
       assert.equal(anchored.ok, true);
       const result = beginBolCapture(anchored.text, lineStart);
       assert.equal(result.ok, true);
-      assert.match(result.text, /S- SS SS SS\n> da\n/);
+      assert.match(result.text, /S- SS SS SS\n> da- \. \. \. \. \. \.\n/);
       assert.deepEqual(parseAnchorDocument(result.text).marks, []);
       assert.match(result.message, /Moved 1 existing bol mark/);
     },
@@ -120,8 +120,7 @@ export const smokes = [
       const range = bolCursorSelection(result.text, { sourceLine: 3, ordinal: 0 });
       assert.equal(result.text.slice(range.from, range.to), 'da');
       const next = bolCursorSelection(result.text, result.cursor);
-      assert.equal(next.from, result.text.indexOf('> da') + 4);
-      assert.equal(next.to, next.from);
+      assert.equal(result.text.slice(next.from, next.to), '.');
     },
   },
   {
@@ -132,7 +131,34 @@ export const smokes = [
       assert.equal(result.handled, true);
       assert.equal(result.text, source);
       assert.deepEqual(result.cursor, cursor);
-      assert.match(result.message, /music line already owns/);
+      assert.match(result.message, /hold markers are already mirrored/);
+    },
+  },
+  {
+    name: 'bol capture: holds and phrase repeats mirror the exact notation structure',
+    fn() {
+      const music = 'tal: tintal\n\n@10 gR (S--S SSSS)x2 S-SS\n';
+      let result = beginBolCapture(music, music.indexOf('@10'));
+      assert.equal(result.ok, true);
+      assert.match(result.text, /> \. \. \(\.--\. \. \. \. \.\)x2 \.-\. \.\n/);
+      for (const kind of ['da', 'da', 'da', 'da', 'ra', 'da', 'diri']) {
+        result = setBolAtCursor(result.text, result.cursor, kind);
+        assert.equal(result.ok, true);
+      }
+      assert.match(
+        result.text,
+        /> da da \(da--da ra da diri\)x2 \.-\. \.\n/
+      );
+      const parsed = parseDocument(result.text);
+      assert.deepEqual(parsed.problems, []);
+      assert.deepEqual(
+        parsed.doc.sections[0].lines[0].bols.map((bol) => bol.mark),
+        ['da', 'da', 'da', 'da', 'ra', 'da', 'diri']
+      );
+      assert.deepEqual(parsed.doc.sections[0].lines[0].bols.at(-1).endRef, {
+        matraIndex: 2,
+        eventIndex: 3,
+      });
     },
   },
   {

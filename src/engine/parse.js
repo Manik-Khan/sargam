@@ -19,11 +19,11 @@ import { frac, fracReduce, fracAdd } from './model.js';
 import { getTal, wrapMatra, vibhagOfMatra } from './tala.js';
 import { scanRepeatedSlideAt } from './repeated-slide.js';
 import { extractTerminalReturnCue, isReturnCueToken } from './return-cue.js';
+import { parseBolLane } from './bol-lane.js';
 
 const NOTE_CHARS = new Set(['S', 'r', 'R', 'g', 'G', 'm', 'M', 'P', 'd', 'D', 'n', 'N']);
 const CLUSTER_RE = /^[SrRgGmMPdDnN.'~-]+$/;
 const DIRECTIVE_RE = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/;
-const BOL_MARKS = { da: 'da', ra: 'ra', diri: 'diri', chikari: 'chikari' };
 
 // ---------------------------------------------------------------------------
 // Public entry
@@ -265,6 +265,11 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
   // Internal (non-model) bar bookkeeping, consumed by lyric attachment.
   const bars = []; // matra counts at each | position
   Object.defineProperty(line, '_bars', { value: bars, enumerable: false });
+  Object.defineProperty(line, '_bolLane', {
+    value: null,
+    writable: true,
+    enumerable: false,
+  });
 
   let body = text;
 
@@ -1129,33 +1134,23 @@ function attachLyrics(musicLine, text, lineNo, problems) {
 // ---------------------------------------------------------------------------
 
 function attachBols(musicLine, text, lineNo, problems) {
-  const noteRefs = [];
-  musicLine.matras.forEach((m, mi) => {
-    m.events.forEach((e, ei) => {
-      if (e.type === 'note') noteRefs.push({ matraIndex: mi, eventIndex: ei });
-    });
-  });
-  const tokens = text.trim().split(/\s+/).filter(Boolean);
-  let t = 0;
-  for (const tok of tokens) {
-    if (t >= noteRefs.length) {
-      problems.push({ line: lineNo, col: null, msg: 'more bol marks than note events' });
-      break;
+  const lane = parseBolLane(text, musicLine);
+  musicLine._bolLane = lane;
+  for (const message of lane.problems) {
+    problems.push({ line: lineNo, col: null, msg: message });
+  }
+  for (let ordinal = 0; ordinal < lane.assignments.length; ordinal++) {
+    const mark = lane.assignments[ordinal];
+    if (!mark) continue;
+    const attack = lane.plan.attacks[ordinal];
+    const bol = {
+      ref: { matraIndex: attack.matraIndex, eventIndex: attack.eventIndex },
+      mark,
+    };
+    if (mark === 'diri' && ordinal + 1 < lane.plan.attacks.length) {
+      const end = lane.plan.attacks[ordinal + 1];
+      bol.endRef = { matraIndex: end.matraIndex, eventIndex: end.eventIndex };
     }
-    if (tok === '.') {
-      t++; // explicit gap: this note event carries no mark (spec §3.8)
-      continue;
-    }
-    const mark = BOL_MARKS[tok];
-    if (!mark) {
-      problems.push({
-        line: lineNo,
-        col: null,
-        msg: `unrecognized bol mark '${tok}' — use da, ra, diri, chikari, or . for a gap`,
-      });
-      continue;
-    }
-    musicLine.bols.push({ ref: noteRefs[t], mark });
-    t++;
+    musicLine.bols.push(bol);
   }
 }

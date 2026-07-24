@@ -324,25 +324,82 @@ function renderLineBlock(line, tal, ctx) {
     row.appendChild(el);
   }
 
-  // --- bol ticks (grid row 4), grouped per matra in event order.
-  // Typed as words, rendered as the handwriting's symbols (spec §3.8).
-  // SARGAM_CORRECT_BOL_GLYPHS_2026_07_20 — legacy bol lanes use the
-      // traditional symbols; score-side Diri uses a two-attack V connector.
-      const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
+  // --- structural bol lane (grid row 4).
+  // It mirrors each matra's written microbeat slots. A hold remains a short
+  // '-', point strokes sit beneath their exact attack, and Diri spans the two
+  // successive attacks it consumes.
+  const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
   const bolsByMatra = new Map();
   for (const b of line.bols) {
     if (!bolsByMatra.has(b.ref.matraIndex)) bolsByMatra.set(b.ref.matraIndex, []);
     bolsByMatra.get(b.ref.matraIndex).push(b);
   }
-  for (const [mi, group] of bolsByMatra) {
+  for (let mi = 0; mi < line.matras.length; mi++) {
+    const group = bolsByMatra.get(mi) || [];
+    if (!line._bolLane && !group.length) continue;
     if (colOf[mi] === undefined) continue;
     const el = h('div', 'sr-bol');
     el.setAttribute('data-matra', String(mi));
     el.style.gridRow = '4';
     el.style.gridColumn = String(colOf[mi]);
-    for (const b of group) {
-      el.appendChild(h('span', 'sr-bol-mark sr-bol-' + b.mark, BOL_SYMBOL[b.mark] ?? b.mark));
+    const slots = [];
+    const firstSlotOfEvent = new Map();
+    for (let eventIndex = 0; eventIndex < line.matras[mi].events.length; eventIndex++) {
+      const event = line.matras[mi].events[eventIndex];
+      if (event.grace) continue;
+      firstSlotOfEvent.set(eventIndex, slots.length);
+      const count = Math.max(1, Number(event.writtenSlots) || 1);
+      for (let partIndex = 0; partIndex < count; partIndex++) {
+        slots.push({ event, eventIndex, partIndex });
+      }
     }
+    const grid = h('span', 'sr-bol-slots');
+    grid.style.gridTemplateColumns = slots.length
+      ? slots
+          .map((slot) => slot.event?.approachSlide && slot.partIndex === 0
+            ? 'minmax(1.55em, max-content)'
+            : 'minmax(0.84em, max-content)')
+          .join(' ')
+      : 'minmax(0.84em, max-content)';
+    const bolAtEvent = new Map(group.map((bol) => [bol.ref.eventIndex, bol]));
+    const coveredEvents = new Set(
+      group
+        .filter((bol) => bol.mark === 'diri' && bol.endRef?.matraIndex === mi)
+        .map((bol) => bol.endRef.eventIndex)
+    );
+    for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+      const slot = slots[slotIndex];
+      if (slot.partIndex > 0) {
+        const hold = h('span', 'sr-bol-slot sr-bol-hold', '-');
+        hold.style.gridColumn = String(slotIndex + 1);
+        grid.appendChild(hold);
+        continue;
+      }
+      const bol = bolAtEvent.get(slot.eventIndex);
+      if (bol) {
+        const mark = h('span', 'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark, BOL_SYMBOL[bol.mark] ?? bol.mark);
+        const endSlot = bol.mark === 'diri' && bol.endRef?.matraIndex === mi
+          ? firstSlotOfEvent.get(bol.endRef.eventIndex)
+          : null;
+        mark.style.gridColumn = Number.isInteger(endSlot)
+          ? `${slotIndex + 1} / ${endSlot + 2}`
+          : String(slotIndex + 1);
+        grid.appendChild(mark);
+      } else if (!coveredEvents.has(slot.eventIndex)) {
+        const blank = h('span', 'sr-bol-slot sr-bol-blank', '');
+        blank.style.gridColumn = String(slotIndex + 1);
+        grid.appendChild(blank);
+      }
+    }
+    const layout = h('span', 'sr-bol-layout');
+    if (prefixOf.has(mi)) {
+      layout.appendChild(h('span', 'sr-phrase-glyph sr-bol-phrase-spacer', prefixOf.get(mi)));
+    }
+    layout.appendChild(grid);
+    if (suffixOf.has(mi)) {
+      layout.appendChild(h('span', 'sr-phrase-glyph sr-bol-phrase-spacer', suffixOf.get(mi)));
+    }
+    el.appendChild(layout);
     row.appendChild(el);
   }
 
@@ -412,7 +469,11 @@ function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
       .map((lyric) => ({ ...lyric, matraIndex: lyric.matraIndex - from })),
     bols: (line.bols || [])
       .filter((bol) => bol.ref.matraIndex >= from && bol.ref.matraIndex <= to)
-      .map((bol) => ({ ...bol, ref: offsetRef(bol.ref) })),
+      .map((bol) => ({
+        ...bol,
+        ref: offsetRef(bol.ref),
+        endRef: bol.endRef ? offsetRef(bol.endRef) : undefined,
+      })),
     firstEndingFrom:
       Number.isInteger(line.firstEndingFrom) && line.firstEndingFrom >= from && line.firstEndingFrom <= to
         ? line.firstEndingFrom - from
@@ -426,6 +487,11 @@ function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
   };
   Object.defineProperty(sliced, '_bars', {
     value: (line._bars || []).filter((bar) => bar > from && bar <= to + 1).map((bar) => bar - from),
+    enumerable: false,
+  });
+  Object.defineProperty(sliced, '_bolLane', {
+    value: line._bolLane,
+    writable: true,
     enumerable: false,
   });
   return sliced;

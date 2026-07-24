@@ -4,6 +4,31 @@
 
 ## Authoritative recent-state update (2026-07-23 — supersedes older recent-state blocks)
 
+### Bol Capture structural alignment
+
+Bol Capture now uses the music line as its complete structural authority rather
+than maintaining a flat attack list.
+
+- Activating capture immediately writes a visible, editable `>` lane with one
+  position for every written note attack.
+- Internal note holds are mirrored as `-`, and phrase repeats mirror the exact
+  notation range as `(…)xN`.
+- `diri` consumes and visually spans two successive note attacks.
+- Left/right navigation remains attack-by-attack; selecting either attack
+  covered by a Diri selects the same editable `diri` word.
+- A manually typed bol repeat that does not match the notation repeat produces
+  a diagnostic instead of silently drifting across the line.
+
+Canonical example:
+
+```text
+@10 gR (S--S SSSS)x2 S-SS
+> da da (da--da ra da diri)x2 .-. .
+```
+
+The repeated bol phrase is authored once and inherited by the notation's `x2`;
+capture does not write across a second flattened copy.
+
 ### Accepted notation geometry and Phase 3A links
 
 Preserve the browser-accepted Anchor Geometry and linked-notation behavior:

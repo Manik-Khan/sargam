@@ -206,15 +206,41 @@
 }
 .sr-bol {
   display: flex;
-  gap: 4px;
   justify-content: center;
+  box-sizing: border-box;
+  padding-left: 6px;
+  padding-right: 6px;
   padding-top: 2px;
+}
+.sr-bol-layout {
+  display: inline-flex;
+  align-items: center;
+}
+.sr-bol-phrase-spacer { visibility: hidden; }
+.sr-bol-slots {
+  display: inline-grid;
+  align-items: center;
+  justify-items: center;
+  column-gap: 0.22em;
+  min-width: 1em;
+}
+.sr-bol-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.84em;
 }
 .sr-bol-mark {
   font-size: 13px;
   font-weight: 500;
   line-height: 1;
   color: var(--sr-ink);
+}
+.sr-bol-diri { justify-self: stretch; text-align: center; }
+.sr-bol-hold {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--sr-dim);
 }
 
 /* landing report */
