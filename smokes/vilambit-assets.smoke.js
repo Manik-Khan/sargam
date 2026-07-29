@@ -13,9 +13,10 @@ export const smokes = [
       assert.match(html, /<link rel="stylesheet" href="\.\.\/vilambit\/vilambit\.css">/);
       const signal = html.indexOf('../vilambit/vendor/signalsmith-stretch.js');
       const flac = html.indexOf('../vilambit/vendor/libflac.js');
+      const remoteWaveform = html.indexOf('../vilambit/vilambit-remote-waveform.js');
       const core = html.indexOf('../vilambit/vilambit-core.js');
       const app = html.indexOf('../vilambit/vilambit-app.js');
-      assert.ok(signal >= 0 && flac > signal && core > flac && app > core);
+      assert.ok(signal >= 0 && flac > signal && remoteWaveform > flac && core > remoteWaveform && app > core);
       assert.doesNotMatch(html, /Vilambit v2 — the musician's practice player/);
       assert.doesNotMatch(html, /var SignalsmithStretch =/);
     },
@@ -39,8 +40,41 @@ export const smokes = [
       assert.match(app, /params\.get\('src'\)/);
       assert.match(app, /url\.origin !== window\.location\.origin/);
       assert.match(app, /engine: archive streaming/);
-      assert.match(app, /without loading the complete WAV into memory/);
+      assert.match(app, /The recording stays on the host/);
       assert.doesNotMatch(app, /function loadArchiveURL[\s\S]{0,1200}arrayBuffer\(/);
+    },
+  },
+  {
+    name: 'sargam player: archive profile keeps practice tools and removes unfinished analysis and export UI',
+    async fn() {
+      const html = await read('../public/sargam-player/index.html');
+      const css = await read('../public/vilambit/vilambit.css');
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(html, /tuningCard archiveUnsupported/);
+      assert.match(html, /<!-- BEATS -->\s*<div class="card archiveUnsupported">/);
+      assert.match(html, /<!-- SPEED REGIONS -->\s*<div class="card">/);
+      assert.match(html, /<!-- EXPORT -->\s*<div class="card archiveUnsupported">/);
+      assert.match(css, /body\.archiveMode[\s\S]*?\.archiveUnsupported\{display:none!important\}/);
+      assert.match(app, /setArchiveMode\(true\)/);
+      assert.match(app, /captureLiveWaveform\(p\)/);
+      assert.match(app, /fetchApproximateWavPeaks/);
+    },
+  },
+  {
+    name: 'sargam player: video uses a custom fullscreen practice shell without native download controls',
+    async fn() {
+      const html = await read('../public/sargam-player/index.html');
+      const css = await read('../public/vilambit/vilambit.css');
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(html, /controlslist="nodownload noremoteplayback noplaybackrate"/);
+      assert.match(html, /id="videoFullscreen"/);
+      assert.match(html, /id="videoPanel"/);
+      assert.match(html, /id="videoTempo"/);
+      assert.match(html, /id="videoSetA"/);
+      assert.match(html, /id="videoMarkerJump"/);
+      assert.match(css, /#videoWrap:fullscreen/);
+      assert.match(app, /requestFullscreen \|\| wrap\.webkitRequestFullscreen/);
+      assert.match(app, /if \(state\.archive\) event\.preventDefault\(\)/);
     },
   },
   {

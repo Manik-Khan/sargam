@@ -30,11 +30,25 @@ Archive mode retains the controls that the browser can provide reliably:
 - play, pause, seek, and volume;
 - speed control;
 - pitch control when the browser's compatibility engine supports it;
-- A–B looping and time markers.
+- speed regions;
+- A–B looping and time markers;
+- a low-memory waveform overview for PCM WAV recordings;
+- a progressively refined waveform while streamed audio or video plays;
+- custom video controls and a fullscreen practice drawer.
 
-Features that require a complete decoded audio buffer, such as full-file
-waveform analysis or lossless processed export, remain available when a local
-file is opened on a capable computer.
+The archive profile hides Advanced tuning, automatic Beats & BPM, and processed
+Export. These tools still belong to the shared player source, but they are not
+shown when their decoded-audio input is unavailable.
+
+For a remote WAV, the player uses a bounded number of byte-range requests to
+sample an overview instead of downloading the recording. If a precomputed
+waveform exists at `/sargam-waveforms/<media-path>.json`, the player uses that
+more exact sidecar first. Other audio and video formats build a visible
+waveform progressively during playback.
+
+Video uses Sargam's own play, seek, volume, and fullscreen controls. The
+fullscreen practice drawer keeps speed, pitch, looping, and markers available
+without leaving the picture.
 
 ## Server requirements
 
@@ -50,7 +64,16 @@ The `/classaudio/` server should return:
 - `206 Partial Content` for byte-range requests.
 
 Byte ranges let the browser seek without downloading the entire recording
-first.
+first. They also let Sargam Player sample a WAV overview without decoding the
+complete file.
+
+## Download deterrence
+
+Archive video omits the browser's ordinary download, remote-playback,
+picture-in-picture, and native speed controls, and suppresses the media context
+menu. This removes casual download affordances; it is not DRM. A browser that
+can play an unprotected URL can still be made to retrieve it. Real access
+control requires the authenticated media gateway described for a later phase.
 
 ## Browser target
 

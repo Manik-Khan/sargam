@@ -18,14 +18,17 @@
 const $ = id => document.getElementById(id);
 const media = $('media');
 const Core = window.VilambitCore;
+const RemoteWaveform = window.SargamRemoteWaveform;
 if (!Core) throw new Error('VilambitCore must load before vilambit-app.js');
 
 const state = {
   fileURL: null, fileURLRevocable: false, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
+  archive: false,
   engine: 'none',            // 'buffer' | 'video' | 'fallback'
   tempo: 100, semitones: 0, cents: 0,
   loopA: null, loopB: null, loopOn: false,
   markers: [], duration: 0, peaks: null,
+  waveformMode: 'none',      // 'decoded' | 'sidecar' | 'range' | 'live'
   decoded: null,             // AudioBuffer (for waveform / detection / export)
   playing: false, posPaused: 0,
   detected: null,            // {hz, note, octave, cents, midi}
@@ -40,6 +43,8 @@ let actx = null, master = null;
 let stretch = null;          // Signalsmith node (buffer or live mode)
 let srcNode = null;          // MediaElementSource (video / fallback)
 let granular = null, dryGain = null, wetGain = null;   // fallback shifter
+let waveAnalyser = null, waveAnalyserData = null, waveAnalyserBytes = null, waveAnalyserSilent = null;
+let lastLiveWaveCapture = 0;
 let realtimeCaptureActive = false;
 const GRAIN = 4096, RB_SIZE = 1 << 16, RB_MASK = RB_SIZE - 1;
 
@@ -65,6 +70,16 @@ async function buildGraph(){
 
   // Engine B / C: media element drives playback
   srcNode = actx.createMediaElementSource(media);
+  waveAnalyser = actx.createAnalyser();
+  waveAnalyser.fftSize = 2048;
+  waveAnalyser.smoothingTimeConstant = 0.15;
+  waveAnalyserData = new Float32Array(waveAnalyser.fftSize);
+  waveAnalyserBytes = new Uint8Array(waveAnalyser.fftSize);
+  waveAnalyserSilent = actx.createGain();
+  waveAnalyserSilent.gain.value = 0;
+  srcNode.connect(waveAnalyser);
+  waveAnalyser.connect(waveAnalyserSilent);
+  waveAnalyserSilent.connect(master);
   let liveOk = false;
   if (window.SignalsmithStretch){
     try {
@@ -76,13 +91,15 @@ async function buildGraph(){
       stretch.start();
       liveOk = true;
       state.engine = 'video';
-      setBadge('engine: video + live pitch');
+      setBadge(state.archive
+        ? 'engine: archive streaming + live pitch'
+        : (state.isVideo ? 'engine: video + live pitch' : 'engine: streamed audio + live pitch'));
     } catch (e) { console.warn('live stretch unavailable', e); }
   }
   if (!liveOk){
     buildGranular();
     state.engine = 'fallback';
-    setBadge('engine: compatibility');
+    setBadge(state.archive ? 'engine: archive compatibility' : 'engine: compatibility');
   }
   applyPitch();
 }
@@ -327,6 +344,8 @@ function applyTempo(v){
   state.tempo = Core.clampTempo(v);
   $('tempo').value = state.tempo;
   $('tempoVal').textContent = state.tempo;
+  if ($('videoTempo')) $('videoTempo').value = state.tempo;
+  if ($('videoTempoVal')) $('videoTempoVal').textContent = state.tempo;
   setEngineRate(effRateAt(pos()));
   renderBpm();
 }
@@ -338,6 +357,9 @@ function applyPitch(){
     (state.cents >= 0 ? '+' : '') + state.cents + ' ¢';
   $('stVal').textContent = state.semitones;
   $('centsVal').textContent = state.cents + ' ¢';
+  if ($('videoPitchVal')) $('videoPitchVal').textContent = $('pitchVal').textContent;
+  if ($('videoCents')) $('videoCents').value = state.cents;
+  if ($('videoCentsVal')) $('videoCentsVal').textContent = state.cents + ' ¢';
   if (typeof renderTuneLive === 'function') renderTuneLive();
   if (!actx) return;
   if (state.engine === 'buffer' && stretch){
@@ -440,9 +462,67 @@ function paintPlayBtn(){
   const on = state.engine === 'buffer' ? state.playing : !media.paused;
   $('playBtn').textContent = on ? '❚❚' : '▶';
   $('playBtn').classList.toggle('playing', on);
+  if ($('videoPlayBtn')) {
+    $('videoPlayBtn').textContent = on ? '❚❚' : '▶';
+    $('videoPlayBtn').setAttribute('aria-label', on ? 'Pause' : 'Play');
+  }
 }
 media.addEventListener('play', paintPlayBtn);
 media.addEventListener('pause', paintPlayBtn);
+
+let videoControlsTimer = null;
+
+function syncVideoTimeline(current = pos()){
+  if (!$('videoSeek')) return;
+  const duration = state.duration || 0;
+  $('videoSeek').max = duration || 1;
+  if (document.activeElement !== $('videoSeek')) $('videoSeek').value = Math.min(duration, Math.max(0, current || 0));
+  $('videoClock').textContent = `${fmt(current || 0)} / ${fmt(duration)}`;
+}
+
+function setVideoPanel(open){
+  const panel = $('videoPanel');
+  if (!panel) return;
+  panel.classList.toggle('on', Boolean(open));
+  panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+  $('videoPanelToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  revealVideoControls();
+}
+
+function revealVideoControls(){
+  const wrap = $('videoWrap');
+  if (!wrap) return;
+  wrap.classList.remove('controlsHidden');
+  clearTimeout(videoControlsTimer);
+  if (!media.paused && !$('videoPanel').classList.contains('on')) {
+    videoControlsTimer = setTimeout(() => wrap.classList.add('controlsHidden'), 2600);
+  }
+}
+
+function currentFullscreenElement(){
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+async function toggleVideoFullscreen(){
+  const wrap = $('videoWrap');
+  if (!wrap) return;
+  if (currentFullscreenElement()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) await exit.call(document);
+  } else {
+    const enter = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
+    if (enter) await enter.call(wrap);
+  }
+}
+
+function syncFullscreenButton(){
+  const fullscreen = currentFullscreenElement() === $('videoWrap');
+  if ($('videoFullscreen')) {
+    $('videoFullscreen').textContent = fullscreen ? '↙' : '⛶';
+    $('videoFullscreen').setAttribute('aria-label', fullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
+  }
+  revealVideoControls();
+}
 
 /* ---------------- source loading ---------------- */
 function showSourceNotice(message, kind){
@@ -450,6 +530,72 @@ function showSourceNotice(message, kind){
   if (!el) return;
   el.textContent = message || '';
   el.className = message ? 'on' + (kind ? ' ' + kind : '') : '';
+}
+
+function setWaveStatus(message){
+  const el = $('waveStatus');
+  if (el) el.textContent = message || '';
+}
+
+function setArchiveMode(active){
+  document.body.classList.toggle('archiveMode', Boolean(active));
+}
+
+function installWaveform(peaks, mode, message){
+  state.peaks = peaks;
+  state.waveformMode = mode;
+  invalidateWaveCache();
+  setWaveStatus(message);
+  if (state.duration) drawWave();
+}
+
+function ensureLiveWaveform(message){
+  if (!state.peaks) state.peaks = new Array(1600).fill(null);
+  if (state.waveformMode === 'none') state.waveformMode = 'live';
+  setWaveStatus(message || 'Waveform builds during playback');
+  invalidateWaveCache();
+}
+
+async function prepareArchiveWaveform(sourceURL){
+  if (!RemoteWaveform || !state.archive || state.fileURL !== sourceURL) {
+    ensureLiveWaveform('Waveform builds during playback');
+    return;
+  }
+
+  setWaveStatus('Loading archive waveform…');
+  try {
+    const sidecarURL = RemoteWaveform.sidecarURLForSource(sourceURL);
+    const response = await fetch(sidecarURL, { cache: 'no-store', credentials: 'same-origin' });
+    if (response.ok) {
+      const waveform = RemoteWaveform.normalizeSidecar(await response.json());
+      if (state.fileURL !== sourceURL) return;
+      installWaveform(waveform.peaks, 'sidecar', 'Archive waveform ready');
+      return;
+    }
+  } catch (_) {
+    // A sidecar is optional; WAV range sampling or live analysis follows.
+  }
+
+  if (/\.wav(?:$|[?#])/i.test(sourceURL)) {
+    try {
+      const waveform = await RemoteWaveform.fetchApproximateWavPeaks(sourceURL, {
+        columns: 1600,
+        sampleCount: 64,
+        chunkBytes: 65536,
+        concurrency: 4,
+      });
+      if (state.fileURL !== sourceURL) return;
+      installWaveform(waveform.peaks, 'range', 'Streamed waveform overview ready');
+      return;
+    } catch (error) {
+      console.warn('Remote WAV overview unavailable; using live waveform capture.', error);
+    }
+  }
+
+  if (state.fileURL !== sourceURL) return;
+  ensureLiveWaveform(state.isVideo
+    ? 'Video waveform builds during playback'
+    : 'Waveform builds during playback');
 }
 
 function fileNameFromURL(url){
@@ -469,15 +615,18 @@ function resetSourceState(source){
     fileURL: source.url,
     fileURLRevocable: Boolean(source.revocable),
     fileName: source.name,
+    archive: Boolean(source.archive),
     fileSize: Number.isFinite(Number(source.size)) ? Number(source.size) : null,
     duration: 0, isVideo: false,
     fileLastModified: Number.isFinite(Number(source.lastModified)) ? Number(source.lastModified) : null,
-    peaks: null, decoded: null, detected: null,
+    peaks: null, waveformMode: 'none', decoded: null, detected: null,
     loopA: null, loopB: null, loopOn: false, markers: [],
     regions: [], bpm: null,
     viewStart: 0, viewEnd: 0, followPlayhead: false,
   });
   lastEff = null;
+  lastLiveWaveCapture = 0;
+  setWaveStatus('');
   renderMarkers(); renderLoop(); renderTune(); renderRegions(); renderBpm();
   $('expWav').disabled = $('expFlac').disabled = true;
   $('exportStatus').textContent = ''; $('exportStatus').className = '';
@@ -497,6 +646,8 @@ function resetSourceState(source){
       $('dur').textContent = fmt(state.duration);
       resetWaveView();
     }
+    syncVideoTimeline();
+    if (state.archive) prepareArchiveWaveform(state.fileURL);
     // engine choice happens on first play; rebuild if a file type flips engines
     if (actx && ((state.isVideo && state.engine === 'buffer') || (!state.isVideo && state.engine !== 'buffer'))){
       // simplest correct path: reload the page state on engine flip
@@ -529,6 +680,8 @@ function decodeSource(arrayBuffer){
         if (!state.viewEnd) resetWaveView();
       }
       computePeaks(ab);
+      state.waveformMode = 'decoded';
+      setWaveStatus('Waveform ready');
       $('expWav').disabled = $('expFlac').disabled = false;
       if (stretch && state.engine === 'buffer'){
         stretch.dropBuffers();
@@ -544,6 +697,7 @@ function decodeSource(arrayBuffer){
 
 function loadFile(file){
   if (!file) return;
+  setArchiveMode(false);
   showSourceNotice('');
   resetSourceState({
     url: URL.createObjectURL(file),
@@ -551,6 +705,7 @@ function loadFile(file){
     name: file.name,
     size: file.size,
     lastModified: file.lastModified,
+    archive: false,
   });
   decodeSource(file.arrayBuffer());
 }
@@ -575,10 +730,11 @@ function loadArchiveURL(raw, displayName){
       name: String(displayName || '').trim() || fileNameFromURL(url.href),
       size: null,
       lastModified: null,
+      archive: true,
     });
     setBadge('engine: archive streaming');
     showSourceNotice(
-      'Streaming from the archive server. Loops, markers, seeking, speed, and volume are available without loading the complete WAV into memory.',
+      'Streaming from the archive server. The recording stays on the host while loops, markers, seeking, speed, pitch, and volume remain available.',
       'ok',
     );
     return true;
@@ -592,6 +748,7 @@ function loadArchiveURLFromQuery(){
   const params = new URLSearchParams(window.location.search);
   const source = params.get('src');
   if (!source) return false;
+  setArchiveMode(true);
   return loadArchiveURL(source, params.get('name'));
 }
 
@@ -735,6 +892,43 @@ function computePeaks(ab){
   invalidateWaveCache();
 }
 
+function captureLiveWaveform(time){
+  if (!state.archive || !state.duration || !waveAnalyser || !Number.isFinite(time)) return;
+  const now = performance.now();
+  if (now - lastLiveWaveCapture < 120) return;
+  lastLiveWaveCapture = now;
+  if (!state.peaks) ensureLiveWaveform();
+
+  let min = 1;
+  let max = -1;
+  if (typeof waveAnalyser.getFloatTimeDomainData === 'function') {
+    waveAnalyser.getFloatTimeDomainData(waveAnalyserData);
+    for (let i = 0; i < waveAnalyserData.length; i++) {
+      const value = waveAnalyserData[i];
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+  } else {
+    waveAnalyser.getByteTimeDomainData(waveAnalyserBytes);
+    for (let i = 0; i < waveAnalyserBytes.length; i++) {
+      const value = (waveAnalyserBytes[i] - 128) / 128;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+  }
+  if (min > max) return;
+
+  const index = Math.min(
+    state.peaks.length - 1,
+    Math.max(0, Math.floor(time / state.duration * state.peaks.length)),
+  );
+  const previous = state.peaks[index];
+  state.peaks[index] = previous
+    ? [Math.min(previous[0], min), Math.max(previous[1], max)]
+    : [min, max];
+  invalidateWaveCache();
+}
+
 function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
 function drawDecodedWave(context, view, color){
@@ -772,13 +966,20 @@ function drawDecodedWave(context, view, color){
 function drawSummaryPeaks(context, view, color){
   if (!state.peaks || !view.span || !state.duration) return false;
   const W = wave.width, H = wave.height, mid = H / 2, n = state.peaks.length;
+  context.strokeStyle = getCss('--line');
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(0, mid);
+  context.lineTo(W, mid);
+  context.stroke();
   context.strokeStyle = color;
   context.lineWidth = 1;
   context.beginPath();
   for (let x = 0; x < W; x++){
     const time = view.start + (x + 0.5) / W * view.span;
     const index = Math.min(n - 1, Math.max(0, Math.floor(time / state.duration * n)));
-    const peak = state.peaks[index] || [0, 0];
+    const peak = state.peaks[index];
+    if (!peak) continue;
     const y1 = mid + peak[0] * mid * 0.92;
     const y2 = mid + peak[1] * mid * 0.92;
     context.moveTo(x + 0.5, y1);
@@ -1047,7 +1248,14 @@ window.addEventListener('resize', () => { sizeWave(); drawWave(); });
 $('playBtn').addEventListener('click', togglePlay);
 document.querySelectorAll('[data-seek]').forEach(b =>
   b.addEventListener('click', () => seekTo(pos() + parseFloat(b.dataset.seek))));
-$('vol').addEventListener('input', e => { if (master) master.gain.value = parseFloat(e.target.value); });
+function applyVolume(value){
+  const next = Math.min(1.3, Math.max(0, Number(value) || 0));
+  $('vol').value = next;
+  if ($('videoVol')) $('videoVol').value = next;
+  if (master) master.gain.value = next;
+}
+$('vol').addEventListener('input', e => applyVolume(e.target.value));
+if ($('videoVol')) $('videoVol').addEventListener('input', e => applyVolume(e.target.value));
 
 $('tempo').addEventListener('input', e => applyTempo(parseFloat(e.target.value)));
 document.querySelectorAll('[data-tempo]').forEach(b =>
@@ -1064,6 +1272,73 @@ $('cents').addEventListener('input', e => { state.cents = parseInt(e.target.valu
 $('pitchReset').addEventListener('click', () => {
   state.semitones = 0; state.cents = 0; $('cents').value = 0; applyPitch();
 });
+
+if ($('videoPlayBtn')) $('videoPlayBtn').addEventListener('click', togglePlay);
+if ($('videoSeek')) $('videoSeek').addEventListener('input', event => seekTo(Number(event.target.value)));
+if ($('videoPanelToggle')) $('videoPanelToggle').addEventListener('click', () =>
+  setVideoPanel(!$('videoPanel').classList.contains('on')));
+if ($('videoPanelClose')) $('videoPanelClose').addEventListener('click', () => setVideoPanel(false));
+if ($('videoFullscreen')) $('videoFullscreen').addEventListener('click', toggleVideoFullscreen);
+if ($('videoTempo')) $('videoTempo').addEventListener('input', event => applyTempo(Number(event.target.value)));
+document.querySelectorAll('[data-video-tempo]').forEach(button =>
+  button.addEventListener('click', () => applyTempo(state.tempo + Number(button.dataset.videoTempo))));
+document.querySelectorAll('[data-video-temposet]').forEach(button =>
+  button.addEventListener('click', () => applyTempo(Number(button.dataset.videoTemposet))));
+if ($('videoPitchDown')) $('videoPitchDown').addEventListener('click', () => {
+  state.semitones = Math.max(-12, state.semitones - 1);
+  applyPitch();
+});
+if ($('videoPitchUp')) $('videoPitchUp').addEventListener('click', () => {
+  state.semitones = Math.min(12, state.semitones + 1);
+  applyPitch();
+});
+if ($('videoPitchReset')) $('videoPitchReset').addEventListener('click', () => {
+  state.semitones = 0;
+  state.cents = 0;
+  $('cents').value = 0;
+  applyPitch();
+});
+if ($('videoCents')) $('videoCents').addEventListener('input', event => {
+  state.cents = Number(event.target.value);
+  $('cents').value = state.cents;
+  applyPitch();
+});
+if ($('videoSetA')) $('videoSetA').addEventListener('click', setA);
+if ($('videoSetB')) $('videoSetB').addEventListener('click', setB);
+if ($('videoLoopToggle')) $('videoLoopToggle').addEventListener('click', toggleLoop);
+if ($('videoLoopClear')) $('videoLoopClear').addEventListener('click', () => {
+  state.loopA = state.loopB = null;
+  state.loopOn = false;
+  renderLoop();
+  applyLoopToEngine();
+});
+if ($('videoAddMarker')) $('videoAddMarker').addEventListener('click', addMarker);
+if ($('videoMarkerJump')) $('videoMarkerJump').addEventListener('change', event => {
+  const index = Number(event.target.value);
+  if (Number.isInteger(index) && state.markers[index]) seekTo(state.markers[index].t);
+  event.target.value = '';
+});
+
+media.addEventListener('click', () => {
+  if (state.isVideo) togglePlay();
+});
+media.addEventListener('dblclick', event => {
+  if (!state.isVideo) return;
+  event.preventDefault();
+  toggleVideoFullscreen();
+});
+media.addEventListener('contextmenu', event => {
+  if (state.archive) event.preventDefault();
+});
+$('videoWrap').addEventListener('mousemove', revealVideoControls);
+$('videoWrap').addEventListener('mouseenter', revealVideoControls);
+$('videoWrap').addEventListener('mouseleave', () => {
+  if (!media.paused && !$('videoPanel').classList.contains('on')) $('videoWrap').classList.add('controlsHidden');
+});
+media.addEventListener('play', revealVideoControls);
+media.addEventListener('pause', revealVideoControls);
+document.addEventListener('fullscreenchange', syncFullscreenButton);
+document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
 
 /* ---------------- loop ---------------- */
 function fmtPrecise(time){
@@ -1124,6 +1399,15 @@ function renderLoop(){
     duration.textContent = ready
       ? `Loop duration: ${formatSpan(Math.max(0, state.loopB - state.loopA))}`
       : 'Set both boundaries to see the loop duration.';
+  }
+  if ($('videoLoopState')) {
+    $('videoLoopState').textContent = ready
+      ? `A ${fmtPrecise(state.loopA)} → B ${fmtPrecise(state.loopB)}${state.loopOn ? ' · looping' : ''}`
+      : 'No loop set';
+    $('videoLoopToggle').disabled = !ready;
+    $('videoLoopToggle').textContent = state.loopOn ? 'Loop on' : 'Loop off';
+    $('videoLoopToggle').classList.toggle('active', state.loopOn);
+    $('videoLoopClear').disabled = !ready && state.loopA == null && state.loopB == null;
   }
   renderWaveViewControls();
   if (state.duration) drawWave();
@@ -1307,10 +1591,34 @@ function saveLoopBoundaryAsMarker(point){
   drawWave();
 }
 
+function syncVideoMarkers(){
+  const select = $('videoMarkerJump');
+  if (!select) return;
+  select.innerHTML = '';
+  if (!state.markers.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No markers yet';
+    select.appendChild(option);
+    return;
+  }
+  const prompt = document.createElement('option');
+  prompt.value = '';
+  prompt.textContent = 'Jump to marker…';
+  select.appendChild(prompt);
+  state.markers.forEach((marker, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `${fmtPrecise(marker.t)}${marker.label ? ` · ${marker.label}` : ''}`;
+    select.appendChild(option);
+  });
+}
+
 function renderMarkers(){
   const list = $('markerList');
   list.innerHTML = '';
   state.markers = Core.sortMarkers(state.markers, state.duration);
+  syncVideoMarkers();
   if (!state.markers.length){
     list.innerHTML = '<div class="empty">No markers yet — press M while listening.</div>';
     return;
@@ -1334,7 +1642,7 @@ function renderMarkers(){
     inp.placeholder = 'label…';
     inp.value = m.label;
     inp.setAttribute('aria-label', `Marker label at ${fmtPrecise(m.t)}`);
-    inp.addEventListener('input', () => { m.label = inp.value; });
+    inp.addEventListener('input', () => { m.label = inp.value; syncVideoMarkers(); });
 
     const actions = document.createElement('div');
     actions.className = 'markerActions';
@@ -2001,6 +2309,8 @@ function tick(){
       paintPlayBtn();
     }
     $('cur').textContent = fmt(p);
+    if (state.isVideo) syncVideoTimeline(p);
+    if (active && state.engine !== 'buffer') captureLiveWaveform(p);
     if (active && state.followPlayhead) followWaveAt(p);
     if (state.duration) drawWave();
   }
