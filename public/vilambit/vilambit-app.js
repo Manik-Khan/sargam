@@ -647,7 +647,11 @@ function resetSourceState(source){
       resetWaveView();
     }
     syncVideoTimeline();
-    if (state.archive) prepareArchiveWaveform(state.fileURL);
+    if (state.archive) {
+      prepareArchiveWaveform(state.fileURL);
+    } else if (state.isVideo) {
+      ensureLiveWaveform('Video waveform builds during playback');
+    }
     // engine choice happens on first play; rebuild if a file type flips engines
     if (actx && ((state.isVideo && state.engine === 'buffer') || (!state.isVideo && state.engine !== 'buffer'))){
       // simplest correct path: reload the page state on engine flip
@@ -691,6 +695,9 @@ function decodeSource(arrayBuffer){
       return dctx.close();
     });
   }).catch(() => {
+    ensureLiveWaveform(state.isVideo
+      ? 'Video waveform builds during playback'
+      : 'Waveform builds during playback');
     $('exportStatus').textContent = 'Could not decode audio track — waveform, tuning and export unavailable for this file.';
   });
 }
@@ -893,7 +900,7 @@ function computePeaks(ab){
 }
 
 function captureLiveWaveform(time){
-  if (!state.archive || !state.duration || !waveAnalyser || !Number.isFinite(time)) return;
+  if (state.waveformMode !== 'live' || !state.duration || !waveAnalyser || !Number.isFinite(time)) return;
   const now = performance.now();
   if (now - lastLiveWaveCapture < 120) return;
   lastLiveWaveCapture = now;

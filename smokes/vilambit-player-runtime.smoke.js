@@ -7,6 +7,24 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), 'utf8');
 
 export const smokes = [
   {
+    name: 'sargam player: integrated video enables live waveform capture outside archive mode',
+    async fn() {
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(
+        app,
+        /else if \(state\.isVideo\) \{\s*ensureLiveWaveform\('Video waveform builds during playback'\);/,
+      );
+      assert.match(
+        app,
+        /function captureLiveWaveform\(time\)\{\s*if \(state\.waveformMode !== 'live'/,
+      );
+      assert.doesNotMatch(
+        app,
+        /function captureLiveWaveform\(time\)\{\s*if \(!state\.archive/,
+      );
+    },
+  },
+  {
     name: 'sargam player: archive shell boots with every custom video and waveform control wired',
     async fn() {
       const [html, remoteWaveform, core, app] = await Promise.all([
