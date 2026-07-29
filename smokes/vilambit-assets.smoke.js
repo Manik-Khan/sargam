@@ -6,17 +6,41 @@ const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 export const smokes = [
   {
-    name: 'vilambit: entry page loads split assets in original order',
+    name: 'sargam player: canonical entry page loads legacy-compatible split assets in order',
     async fn() {
-      const html = await read('../public/vilambit.html');
-      assert.match(html, /<link rel="stylesheet" href="vilambit\/vilambit\.css">/);
-      const signal = html.indexOf('vilambit/vendor/signalsmith-stretch.js');
-      const flac = html.indexOf('vilambit/vendor/libflac.js');
-      const core = html.indexOf('vilambit/vilambit-core.js');
-      const app = html.indexOf('vilambit/vilambit-app.js');
+      const html = await read('../public/sargam-player/index.html');
+      assert.match(html, /<title>Sargam Player/);
+      assert.match(html, /<link rel="stylesheet" href="\.\.\/vilambit\/vilambit\.css">/);
+      const signal = html.indexOf('../vilambit/vendor/signalsmith-stretch.js');
+      const flac = html.indexOf('../vilambit/vendor/libflac.js');
+      const core = html.indexOf('../vilambit/vilambit-core.js');
+      const app = html.indexOf('../vilambit/vilambit-app.js');
       assert.ok(signal >= 0 && flac > signal && core > flac && app > core);
       assert.doesNotMatch(html, /Vilambit v2 — the musician's practice player/);
       assert.doesNotMatch(html, /var SignalsmithStretch =/);
+    },
+  },
+  {
+    name: 'sargam player: old Vilambit URL redirects while preserving query parameters',
+    async fn() {
+      const legacy = await read('../public/vilambit.html');
+      assert.match(legacy, /url=sargam-player\//);
+      assert.match(legacy, /window\.location\.search \+ window\.location\.hash/);
+      assert.match(legacy, /window\.location\.replace\(target\)/);
+    },
+  },
+  {
+    name: 'sargam player: archive URLs load in same-origin streaming mode',
+    async fn() {
+      const html = await read('../public/sargam-player/index.html');
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(html, /id="sourceNotice"/);
+      assert.match(app, /new URLSearchParams\(window\.location\.search\)/);
+      assert.match(app, /params\.get\('src'\)/);
+      assert.match(app, /url\.origin !== window\.location\.origin/);
+      assert.match(app, /engine: archive streaming/);
+      assert.match(app, /without loading the complete WAV into memory/);
+      assert.doesNotMatch(app, /function loadArchiveURL[\s\S]{0,1200}arrayBuffer\(/);
     },
   },
   {

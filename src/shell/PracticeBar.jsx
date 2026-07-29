@@ -68,9 +68,9 @@ export default function PracticeBar({
     : 'Loop not set';
 
   return (
-    <div className="app-practice-bar" aria-label="Vilambit recording controls">
+    <div className="app-practice-bar" aria-label="Sargam Player recording controls">
       <div className="app-practice-source" title={sourceName}>
-        <span className="app-practice-kicker">Vilambit recording</span>
+        <span className="app-practice-kicker">Sargam Player recording</span>
         <strong>{sourceName}</strong>
       </div>
       <span className="app-practice-time" aria-label="Recording position">
@@ -135,8 +135,8 @@ export default function PracticeBar({
             : ''}
         </span>
       )}
-      {player.error && <span className="app-practice-error" title={player.error}>Vilambit error</span>}
-      <button type="button" className="app-practice-open" onClick={onOpen}>Open Vilambit</button>
+      {player.error && <span className="app-practice-error" title={player.error}>Sargam Player error</span>}
+      <button type="button" className="app-practice-open" onClick={onOpen}>Open Player</button>
     </div>
   );
 }

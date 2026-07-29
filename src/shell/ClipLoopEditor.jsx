@@ -317,7 +317,7 @@ export default function ClipLoopEditor({ project, clip, file, onSave, onOpenSour
           <button type="button" disabled={loading || Boolean(error)} aria-pressed={playing} onClick={togglePreview}>
             {playing ? 'Stop Preview' : 'Play Loop'}
           </button>
-          {onOpenSource && <button type="button" onClick={onOpenSource}>Open Source in Vilambit</button>}
+          {onOpenSource && <button type="button" onClick={onOpenSource}>Open Source in Player</button>}
           <span className="clip-loop-action-spacer" />
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="button" disabled={loading || Boolean(error) || saving} onClick={save}>{saving ? 'Saving…' : 'Save Loop Points'}</button>

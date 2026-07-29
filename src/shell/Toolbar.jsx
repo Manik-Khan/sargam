@@ -168,7 +168,7 @@ export default function Toolbar({
       <span className="tb-tabs" role="tablist" aria-label="Workspace">
         {[
           ['notation', 'Notation'],
-          ['vilambit', 'Vilambit'],
+          ['vilambit', 'Player'],
         ].map(([v, label]) => (
           <button
             key={v}

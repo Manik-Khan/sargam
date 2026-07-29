@@ -16,7 +16,7 @@ export const smokes = [
   {
     name: 'vilambit marker loop: source controls are separated into waveform and loop groups',
     async fn() {
-      const html = await read('../public/vilambit.html');
+      const html = await read('../public/sargam-player/index.html');
       assert.match(html, /id=["']waveToolbar["']/);
       assert.match(html, /class=["'][^"']*waveToolGroup[^"']*["']/);
       assert.match(html, /id=["']loopBoundaryGrid["']/);
@@ -39,7 +39,7 @@ export const smokes = [
   {
     name: 'vilambit marker loop: loop boundaries can be saved directly as markers',
     async fn() {
-      const html = await read('../public/vilambit.html');
+      const html = await read('../public/sargam-player/index.html');
       const app = await read('../public/vilambit/vilambit-app.js');
       assert.match(html, /id=["']saveAAsMarker["'][^>]*>A → Marker/);
       assert.match(html, /id=["']saveBAsMarker["'][^>]*>B → Marker/);

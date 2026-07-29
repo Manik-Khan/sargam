@@ -193,10 +193,10 @@ export const smokes = [
       assert.match(app, /import PracticeBar from ['"]\.\/PracticeBar\.jsx['"]/);
       assert.match(app, /const vilambitRef = useRef\(null\)/);
       assert.match(app, /<PracticeBar\s+frameRef=\{vilambitRef\}/);
-      assert.match(app, /<iframe[\s\S]*?ref=\{vilambitRef\}[\s\S]*?src=["']vilambit\.html["']/);
+      assert.match(app, /<iframe[\s\S]*?ref=\{vilambitRef\}[\s\S]*?src=["']sargam-player\/["']/);
       assert.match(bar, /−5s/);
       assert.match(bar, /\+5s/);
-      assert.match(bar, /Open Vilambit/);
+      assert.match(bar, /Open Player/);
       assert.match(bar, /onClipExtracted/);
       assert.match(bar, /Extract Clip/);
       assert.doesNotMatch(bar, /AudioContext|createMediaElementSource|decodeAudioData/);

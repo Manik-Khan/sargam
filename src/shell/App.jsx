@@ -1341,7 +1341,7 @@ export default function App() {
     }
 
     if (!recordingMatches(link.recording, vilambitStateRef.current)) {
-      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit to use this phrase.`);
+      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Sargam Player to use this phrase.`);
       return;
     }
     stopLinkedPlayback();
@@ -1355,7 +1355,7 @@ export default function App() {
     if (play) {
       const sent = sendVilambit('play');
       if (!sent) {
-        setNotice('Vilambit is not ready to play the linked source loop.');
+        setNotice('Sargam Player is not ready to play the linked source loop.');
         return;
       }
       setLinkedPlaybackState({
@@ -1388,7 +1388,7 @@ export default function App() {
       return;
     }
     if (!recordingMatches(link.recording, playerState)) {
-      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Vilambit before extracting its clip.`);
+      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Sargam Player before extracting its clip.`);
       return;
     }
     const extraction = extractionRangeForLink(link, playerState.duration || link.recording?.duration);
@@ -1408,7 +1408,7 @@ export default function App() {
     if (!sent) {
       pendingClipRef.current = null;
       setExtractingClip(false);
-      setNotice('Vilambit is not ready to extract the clip.');
+      setNotice('Sargam Player is not ready to extract the clip.');
     }
   };
 
@@ -1796,8 +1796,8 @@ export default function App() {
       <div className="app-stage">
         <iframe
           ref={vilambitRef}
-          title="Vilambit — practice player"
-          src="vilambit.html"
+          title="Sargam Player — practice and archive audio"
+          src="sargam-player/"
           allow="autoplay; fullscreen; encrypted-media; clipboard-read; clipboard-write"
           className={'app-vilambit' + (view === 'vilambit' ? '' : ' app-veiled')}
         />

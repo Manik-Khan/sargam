@@ -5,7 +5,7 @@
  * object-URL, or animation-frame access. The browser player owns those
  * imperative surfaces; this core only decides values and transitions.
  *
- * Loaded as a classic script by public/vilambit.html and exposed as
+ * Loaded as a classic script by public/sargam-player/index.html and exposed as
  * globalThis.VilambitCore so the existing non-module player can consume it.
  */
 (function installVilambitCore(root) {

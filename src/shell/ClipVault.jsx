@@ -37,7 +37,7 @@ export default function ClipVault({ project, manifest, links = [], presence = {}
           <span>{unused.length} unused</span>
         </div>
         {clips.length === 0 ? (
-          <p className="clip-vault-empty">Attach a Vilambit loop, open a project folder, then choose Extract Clip.</p>
+          <p className="clip-vault-empty">Attach a Sargam Player loop, open a project folder, then choose Extract Clip.</p>
         ) : (
           <div className="clip-vault-list">
             {clips.map((clip) => {

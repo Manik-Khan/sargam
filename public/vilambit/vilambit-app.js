@@ -21,7 +21,7 @@ const Core = window.VilambitCore;
 if (!Core) throw new Error('VilambitCore must load before vilambit-app.js');
 
 const state = {
-  fileURL: null, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
+  fileURL: null, fileURLRevocable: false, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
   engine: 'none',            // 'buffer' | 'video' | 'fallback'
   tempo: 100, semitones: 0, cents: 0,
   loopA: null, loopB: null, loopOn: false,
@@ -444,17 +444,34 @@ function paintPlayBtn(){
 media.addEventListener('play', paintPlayBtn);
 media.addEventListener('pause', paintPlayBtn);
 
-/* ---------------- file loading ---------------- */
-function loadFile(file){
-  if (!file) return;
+/* ---------------- source loading ---------------- */
+function showSourceNotice(message, kind){
+  const el = $('sourceNotice');
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = message ? 'on' + (kind ? ' ' + kind : '') : '';
+}
+
+function fileNameFromURL(url){
+  try {
+    const leaf = new URL(url, window.location.href).pathname.split('/').filter(Boolean).pop();
+    return decodeURIComponent(leaf || '') || 'Archive recording';
+  } catch (_) {
+    return 'Archive recording';
+  }
+}
+
+function resetSourceState(source){
   if (state.playing && stretch) { stretch.schedule({ active: false }); }
   state.playing = false; state.posPaused = 0;
-  if (state.fileURL) URL.revokeObjectURL(state.fileURL);
+  if (state.fileURL && state.fileURLRevocable) URL.revokeObjectURL(state.fileURL);
   Object.assign(state, {
-    fileURL: URL.createObjectURL(file), fileName: file.name,
-    fileSize: Number.isFinite(Number(file.size)) ? Number(file.size) : null,
+    fileURL: source.url,
+    fileURLRevocable: Boolean(source.revocable),
+    fileName: source.name,
+    fileSize: Number.isFinite(Number(source.size)) ? Number(source.size) : null,
     duration: 0, isVideo: false,
-    fileLastModified: Number.isFinite(Number(file.lastModified)) ? Number(file.lastModified) : null,
+    fileLastModified: Number.isFinite(Number(source.lastModified)) ? Number(source.lastModified) : null,
     peaks: null, decoded: null, detected: null,
     loopA: null, loopB: null, loopOn: false, markers: [],
     regions: [], bpm: null,
@@ -466,8 +483,9 @@ function loadFile(file){
   $('exportStatus').textContent = ''; $('exportStatus').className = '';
 
   media.src = state.fileURL;
+  media.preload = 'metadata';
   media.load();
-  $('fileName').textContent = file.name;
+  $('fileName').textContent = state.fileName;
   $('dropzone').style.display = 'none';
   ['transport','controls','waveWrap'].forEach(id => $(id).classList.add('on'));
 
@@ -493,7 +511,15 @@ function loadFile(file){
     sizeWave(); drawWave();
   }, { once: true });
 
-  file.arrayBuffer().then(buf => {
+  media.addEventListener('error', () => {
+    const message = 'The archive recording could not be loaded. Check that its URL is reachable from this computer.';
+    showSourceNotice(message, 'err');
+    $('exportStatus').textContent = message;
+  }, { once: true });
+}
+
+function decodeSource(arrayBuffer){
+  return Promise.resolve(arrayBuffer).then(buf => {
     const dctx = new (window.AudioContext || window.webkitAudioContext)();
     return dctx.decodeAudioData(buf.slice(0)).then(ab => {
       state.decoded = ab;
@@ -514,6 +540,59 @@ function loadFile(file){
   }).catch(() => {
     $('exportStatus').textContent = 'Could not decode audio track — waveform, tuning and export unavailable for this file.';
   });
+}
+
+function loadFile(file){
+  if (!file) return;
+  showSourceNotice('');
+  resetSourceState({
+    url: URL.createObjectURL(file),
+    revocable: true,
+    name: file.name,
+    size: file.size,
+    lastModified: file.lastModified,
+  });
+  decodeSource(file.arrayBuffer());
+}
+
+function archiveSourceURL(raw){
+  const url = new URL(String(raw || ''), window.location.href);
+  if (!/^https?:$/.test(url.protocol)) {
+    throw new Error('Archive recordings must use an HTTP or HTTPS URL.');
+  }
+  if (url.origin !== window.location.origin) {
+    throw new Error('For this compatibility player, the recording must be served from the same server as Sargam Player.');
+  }
+  return url;
+}
+
+function loadArchiveURL(raw, displayName){
+  try {
+    const url = archiveSourceURL(raw);
+    resetSourceState({
+      url: url.href,
+      revocable: false,
+      name: String(displayName || '').trim() || fileNameFromURL(url.href),
+      size: null,
+      lastModified: null,
+    });
+    setBadge('engine: archive streaming');
+    showSourceNotice(
+      'Streaming from the archive server. Loops, markers, seeking, speed, and volume are available without loading the complete WAV into memory.',
+      'ok',
+    );
+    return true;
+  } catch (error) {
+    showSourceNotice(error.message || String(error), 'err');
+    return false;
+  }
+}
+
+function loadArchiveURLFromQuery(){
+  const params = new URLSearchParams(window.location.search);
+  const source = params.get('src');
+  if (!source) return false;
+  return loadArchiveURL(source, params.get('name'));
 }
 
 /* ---------------- waveform ---------------- */
@@ -1937,11 +2016,13 @@ renderLoop();
 renderWaveViewControls();
 renderRegions();
 renderBpm();
+loadArchiveURLFromQuery();
 
 /* pure functions exposed for the test harness */
 window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, resampleLinear, granularShift, fmt,
   detectTempo, snapToGrid, segmentsFor, hitTest, effRateAt, fmtPrecise, formatSpan,
   currentWaveView, setWaveView, zoomWave, panWave, fitLoopInWave, commitLoopBoundary, nudgeLoopBoundary,
+  archiveSourceURL, fileNameFromURL,
   _setDetected: (hz) => { state.refA = parseFloat($('refA').value) || 440; state.detected = describePitch(hz, state.refA); renderTune(); },
   _getShift: () => ({ semitones: state.semitones, cents: state.cents, tempo: state.tempo }),
   _setDuration: (d) => { state.duration = d; },

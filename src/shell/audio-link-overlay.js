@@ -45,7 +45,7 @@ export function mountAudioLinkOverlays(root, links = [], options = {}) {
     const endEdge = numberOfFraction(endNode.getAttribute('data-geometry-end'));
     if (!Number.isFinite(start) || !Number.isFinite(endEdge)) continue;
     const selected = options.selectedLinkId === link.id;
-    const label = `${link.recording?.name || 'Vilambit recording'} · ${formatTime(link.startTime)}–${formatTime(link.endTime)}`;
+    const label = `${link.recording?.name || 'Sargam Player recording'} · ${formatTime(link.startTime)}–${formatTime(link.endTime)}`;
     const slots = [...group.querySelectorAll('.sr-slot[data-geometry-start]')].filter((slot) => {
       const slotStart = numberOfFraction(slot.getAttribute('data-geometry-start'));
       return Number.isFinite(slotStart) && slotStart >= start - 1e-8 && slotStart < endEdge - 1e-8;
@@ -67,7 +67,7 @@ export function mountAudioLinkOverlays(root, links = [], options = {}) {
     badge.type = 'button';
     badge.className = `sr-audio-link-badge${selected ? ' selected' : ''}`;
     badge.dataset.audioLinkId = link.id;
-    badge.setAttribute('aria-label', `Load linked Vilambit loop ${formatTime(link.startTime)} to ${formatTime(link.endTime)}`);
+    badge.setAttribute('aria-label', `Load linked Sargam Player loop ${formatTime(link.startTime)} to ${formatTime(link.endTime)}`);
     badge.title = label;
     badge.textContent = '♪';
     const activateBadge = (event) => {

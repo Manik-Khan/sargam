@@ -8,7 +8,7 @@ export const smokes = [
   {
     name: 'vilambit source workspace: entry page exposes zoom, pan, follow, and precise loop controls',
     async fn() {
-      const html = await read('../public/vilambit.html');
+      const html = await read('../public/sargam-player/index.html');
       for (const id of [
         'waveZoomIn', 'waveZoomOut', 'waveZoomLoop', 'waveZoomAll',
         'wavePanBack', 'wavePanForward', 'waveFollow', 'waveViewRange',
