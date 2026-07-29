@@ -102,7 +102,7 @@
 }
 /* Timed subdivisions are equal visual slots. Explicit internal dashes
    (`DnS-`, `g---`) occupy real slots but remain playback sustains, not
-   attacks. Grace notes stay outside this metric grid. */
+   attacks. Same-beat ornaments share their destination's slot. */
 .sr-timed-slots {
   position: relative;
   display: inline-grid;
@@ -117,6 +117,27 @@
   justify-content: center;
   align-items: flex-end;
   min-width: 0.84em;
+}
+.sr-slot-ornament {
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.04em;
+}
+.sr-slot-ornament.sr-scoped-krintan {
+  padding-top: 0.2em;
+}
+.sr-slot-ornament.sr-scoped-krintan::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0.08em;
+  right: 0.08em;
+  height: 0.2em;
+  border-top: 1.4px solid currentColor;
+  border-left: 1.4px solid currentColor;
+  border-right: 1.4px solid currentColor;
 }
 /* A written `-` is a countable hold position, never a scalable em-dash.
    This applies both to internal microbeat holds (`g---`) and to standalone

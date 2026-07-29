@@ -40,6 +40,18 @@ export const smokes = [
     },
   },
   {
+    name: 'meter: a scoped krintan remains inside its one-beat four-slot grid',
+    async fn() {
+      const scan = scanMusicLine('[-[[RS]]-.n]');
+      assert.equal(scan.error, null);
+      assert.equal(formatRational(scan.duration), '1');
+      assert.deepEqual(
+        scan.attacks.map((attack) => `${attack.ch}@${formatRational(attack.time)}`),
+        ['R@1/4', 'S@1/4', 'n@3/4'],
+      );
+    },
+  },
+  {
     name: 'meter: selection uses first and last attacks as arch boundaries',
     async fn() {
       const text = `${line}\n`;

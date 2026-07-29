@@ -496,7 +496,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     }
 
     if (c === '[') {
-      const close = body.indexOf(']', i + 1);
+      const close = findBeatGroupClose(body, i);
       if (close === -1) {
         problems.push({ line: lineNo, col: i + 1, msg: '[ without closing ]' });
         i++;
@@ -731,6 +731,25 @@ function parseTokenRun(text, colBase, ctx, bars) {
 // Tokens → matras
 // ---------------------------------------------------------------------------
 
+/**
+ * Find the close of a one-beat [ ] group without mistaking either character
+ * of an inline krintan's ]] for the beat close.
+ */
+function findBeatGroupClose(text, open) {
+  let i = open + 1;
+  while (i < text.length) {
+    if (text[i] === '[' && text[i + 1] === '[') {
+      const krintanClose = text.indexOf(']]', i + 2);
+      if (krintanClose === -1) return -1;
+      i = krintanClose + 2;
+      continue;
+    }
+    if (text[i] === ']') return i;
+    i++;
+  }
+  return -1;
+}
+
 function parseToken(tok, col, ctx) {
   const { line, lineNo, tal, problems } = ctx;
 
@@ -837,8 +856,8 @@ function addMeendOverMatras(line, fromM, toM, ranged = false) {
  */
 function buildSlottedMatra(inner, col, ctx) {
   const { line, lineNo, problems } = ctx;
-  const slotStrs = inner.split(/[\s/]+/).filter(Boolean);
-  if (slotStrs.length === 0) {
+  const slotParts = splitBeatSlots(inner);
+  if (slotParts.length === 0) {
     problems.push({ line: lineNo, col: col + 1, msg: 'empty [ ] beat' });
     return;
   }
@@ -849,14 +868,19 @@ function buildSlottedMatra(inner, col, ctx) {
   // finished matra, so `[~m g]`, `[m~ g]` and `[m ~g]` all read as
   // "this bracket is a slide" — the same as `~[m g]`.
   const tilde = { leadingTilde: false, sawTilde: false, trailingTilde: false };
-  for (let si = 0; si < slotStrs.length; si++) {
-    const s = slotStrs[si];
+  for (let si = 0; si < slotParts.length; si++) {
+    const { text: s, offset } = slotParts[si];
+    const slotCol = col + offset;
     if (s === '.') {
       perSlot.push([{ type: 'rest', w: 1 }]);
     } else if (/^-+$/.test(s)) {
       perSlot.push(s.split('').map(() => ({ type: 'dash', w: 1 })));
+    } else if (s.includes('[[')) {
+      const atoms = inlineKrintanAtoms(s, slotCol, ctx);
+      if (!atoms) return;
+      perSlot.push(atoms);
     } else if (CLUSTER_RE.test(s)) {
-      const atoms = clusterAtoms(s, col, ctx);
+      const atoms = clusterAtoms(s, slotCol, ctx);
       if (!atoms) return; // problem already recorded
       const t = atoms._tilde;
       if (t) {
@@ -864,7 +888,7 @@ function buildSlottedMatra(inner, col, ctx) {
         // A trailing tilde only reaches past the bracket from the LAST
         // slot; on any earlier slot it connects to the next slot inside.
         if (t.trailingTilde) {
-          if (si === slotStrs.length - 1) tilde.trailingTilde = true;
+          if (si === slotParts.length - 1) tilde.trailingTilde = true;
           else tilde.sawTilde = true;
         }
       }
@@ -880,12 +904,137 @@ function buildSlottedMatra(inner, col, ctx) {
   const slotCount = perSlot.length;
   const atoms = [];
   for (const slotAtoms of perSlot) {
-    const inSlot = slotAtoms.reduce((a, x) => a + x.w, 0);
-    for (const a of slotAtoms) atoms.push({ ...a, num: a.w, den: slotCount * inSlot });
+    const inSlot = slotAtoms.reduce((sum, atom) => sum + (atom.grace ? 0 : atom.w), 0);
+    if (inSlot <= 0) {
+      problems.push({ line: lineNo, col: col + 1, msg: 'an ornamental slot needs a timed destination note' });
+      return;
+    }
+    for (const atom of slotAtoms) {
+      atoms.push(atom.grace
+        ? { ...atom, num: 0, den: 1 }
+        : { ...atom, num: atom.w, den: slotCount * inSlot });
+    }
   }
   atoms._tilde = tilde;
   const events = atomsToEvents(atoms, ctx);
-  if (events) ctx.line.matras.push({ events });
+  if (!events) return;
+
+  const matraIndex = ctx.line.matras.length;
+  ctx.line.matras.push({ events });
+
+  // A scoped [[...]] is an articulation inside this beat, not a wrapper
+  // around another matra. Event order mirrors note-atom order even though
+  // dash atoms merge into the previous event.
+  const noteEventIndices = events
+    .map((event, eventIndex) => event.type === 'note' ? eventIndex : -1)
+    .filter((eventIndex) => eventIndex >= 0);
+  const scopedIds = [...new Set(
+    atoms.filter((atom) => atom.type === 'note' && atom.krintanId).map((atom) => atom.krintanId)
+  )];
+  for (const id of scopedIds) {
+    const noteOrdinals = [];
+    let noteOrdinal = 0;
+    for (const atom of atoms) {
+      if (atom.type !== 'note') continue;
+      if (atom.krintanId === id) noteOrdinals.push(noteOrdinal);
+      noteOrdinal++;
+    }
+    if (noteOrdinals.length < 2) continue;
+    ctx.line.spans.push({
+      type: 'krintan',
+      scoped: true,
+      from: { matraIndex, eventIndex: noteEventIndices[noteOrdinals[0]] },
+      to: { matraIndex, eventIndex: noteEventIndices[noteOrdinals.at(-1)] },
+    });
+  }
+}
+
+/** Split the outer beat only at top-level whitespace or slash separators. */
+function splitBeatSlots(inner) {
+  const slots = [];
+  let start = -1;
+  let i = 0;
+  while (i < inner.length) {
+    if (inner[i] === '[' && inner[i + 1] === '[') {
+      if (start === -1) start = i;
+      const close = inner.indexOf(']]', i + 2);
+      if (close === -1) {
+        i = inner.length;
+        break;
+      }
+      i = close + 2;
+      continue;
+    }
+    if (/[\s/]/.test(inner[i])) {
+      if (start !== -1) {
+        slots.push({ text: inner.slice(start, i), offset: start });
+        start = -1;
+      }
+      i++;
+      continue;
+    }
+    if (start === -1) start = i;
+    i++;
+  }
+  if (start !== -1) slots.push({ text: inner.slice(start), offset: start });
+  return slots;
+}
+
+/**
+ * Parse an inline krintan inside a [ ] beat. Its final note owns the timed
+ * slot; preceding notes are ornamental and therefore add no metric weight.
+ * Ordinary dashes around the wrapper stay attached to the flattened cluster,
+ * so `-[[RS]]-.n` has the same four-slot skeleton as `-S-.n`.
+ */
+function inlineKrintanAtoms(slot, col, ctx) {
+  let flat = '';
+  const ranges = [];
+  let i = 0;
+  let nextId = 1;
+
+  while (i < slot.length) {
+    if (slot[i] === '[' && slot[i + 1] === '[') {
+      const close = slot.indexOf(']]', i + 2);
+      if (close === -1) {
+        ctx.problems.push({ line: ctx.lineNo, col: col + i + 1, msg: '[[ without closing ]] inside [ ] beat' });
+        return null;
+      }
+      const inner = slot.slice(i + 2, close);
+      if (!CLUSTER_RE.test(inner) || [...inner].filter((char) => NOTE_CHARS.has(char)).length < 2) {
+        ctx.problems.push({
+          line: ctx.lineNo,
+          col: col + i + 1,
+          msg: 'an inline krintan needs at least two connected notes, as in [[RS]]',
+        });
+        return null;
+      }
+      const noteStart = [...flat].filter((char) => NOTE_CHARS.has(char)).length;
+      flat += inner;
+      const noteEnd = [...flat].filter((char) => NOTE_CHARS.has(char)).length - 1;
+      ranges.push({ id: `scoped-${nextId++}`, noteStart, noteEnd });
+      i = close + 2;
+      continue;
+    }
+    if (slot[i] === '[' || slot[i] === ']') {
+      ctx.problems.push({ line: ctx.lineNo, col: col + i + 1, msg: `unexpected '${slot[i]}' inside [ ] beat` });
+      return null;
+    }
+    flat += slot[i];
+    i++;
+  }
+
+  const atoms = clusterAtoms(flat, col, ctx);
+  if (!atoms) return null;
+  const noteAtoms = atoms.filter((atom) => atom.type === 'note');
+  for (const range of ranges) {
+    for (let ordinal = range.noteStart; ordinal <= range.noteEnd; ordinal++) {
+      const atom = noteAtoms[ordinal];
+      if (!atom) continue;
+      atom.krintanId = range.id;
+      if (ordinal < range.noteEnd) atom.grace = true;
+    }
+  }
+  return atoms;
 }
 
 /** Build the events of an unbracketed cluster token. */

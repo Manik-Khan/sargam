@@ -130,7 +130,7 @@ function serializeMusicLine(line, tal) {
 
   // 5. Krintan wrapping (interior joined with /).
   for (const span of line.spans) {
-    if (span.type !== 'krintan') continue;
+    if (span.type !== 'krintan' || span.scoped) continue;
     const ai = items.findIndex((it) => it.from <= span.from.matraIndex && span.from.matraIndex <= it.to);
     const bi = items.findIndex((it) => it.from <= span.to.matraIndex && span.to.matraIndex <= it.to);
     if (ai === -1 || bi === -1) continue;
@@ -230,6 +230,8 @@ function lcm(a, b) {
 function matraToken(line, k) {
   const matraIndex = k;
   const all = line.matras[k].events;
+  const scopedKrintan = scopedKrintanToken(line, matraIndex, all);
+  if (scopedKrintan) return scopedKrintan;
   const repeatedSlideToken = serializeRepeatedSlideMatra(all);
   if (repeatedSlideToken) return repeatedSlideToken;
   // Graces (kan) serialize as the canonical brace form: {graces}dest.
@@ -336,6 +338,57 @@ function matraToken(line, k) {
   });
   return gracePrefix + withinMatraTilde(line, matraIndex, atoms, evs.map((_, i) => i));
 
+}
+
+/**
+ * Preserve a krintan nested inside one explicit [ ] beat. The ornament notes
+ * replace the destination glyph in the timed skeleton; destination holds stay
+ * after the closing ]], so `[-[[RS]]-.n]` round-trips without becoming a
+ * whole-matra krintan or an extra beat.
+ */
+function scopedKrintanToken(line, matraIndex, events) {
+  const scoped = (line.spans || []).filter(
+    (span) => span.type === 'krintan' &&
+      span.scoped &&
+      span.from.matraIndex === matraIndex &&
+      span.to.matraIndex === matraIndex
+  );
+  if (scoped.length !== 1) return null;
+  const span = scoped[0];
+  if (
+    span.from.eventIndex < 0 ||
+    span.to.eventIndex <= span.from.eventIndex ||
+    span.to.eventIndex >= events.length
+  ) return null;
+
+  const ornamentEvents = events.slice(span.from.eventIndex, span.to.eventIndex + 1);
+  if (
+    ornamentEvents.some((event) => event.type !== 'note') ||
+    ornamentEvents.slice(0, -1).some((event) => !event.grace) ||
+    ornamentEvents.at(-1).grace
+  ) return null;
+  if (events.some((event, index) => event.grace && (index < span.from.eventIndex || index > span.to.eventIndex))) {
+    return null;
+  }
+
+  let token = '';
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    if (index === span.from.eventIndex) {
+      token += `[[${ornamentEvents.map(noteAtom).join('')}]]`;
+      index = span.to.eventIndex - 1;
+      continue;
+    }
+    if (index === span.to.eventIndex) {
+      token += '-'.repeat(Math.max(1, Number(event.writtenSlots) || 1) - 1);
+      continue;
+    }
+    if (event.grace) continue;
+    const slots = Math.max(1, Number(event.writtenSlots) || 1);
+    const base = event.type === 'note' ? noteAtom(event) : event.type === 'rest' ? '.' : '-';
+    token += base + '-'.repeat(slots - 1);
+  }
+  return `[${token}]`;
 }
 
 /** Recover equal outer bracket slots from exact event durations.

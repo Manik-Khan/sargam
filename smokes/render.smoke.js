@@ -139,6 +139,25 @@ export const smokes = [
     },
   },
   {
+    name: 'render: scoped krintan shares the S microbeat instead of preceding the beat',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\n[-[[RS]]-.n]\n');
+      assert.deepEqual(problems, []);
+      const root = renderDocument(doc);
+      const cells = [...root.querySelectorAll('.sr-cell')];
+      assert.equal(cells.length, 1);
+      const slots = [...cells[0].querySelectorAll('.sr-timed-slots > .sr-slot')];
+      assert.equal(slots.length, 4);
+      assert.equal(slots[0].textContent, '—');
+      assert.deepEqual([...slots[1].querySelectorAll('.sr-ch')].map((node) => node.textContent), ['R', 'S']);
+      assert.ok(slots[1].querySelector('.sr-slot-ornament .sr-grace'));
+      assert.equal(slots[2].textContent, '—');
+      assert.equal(slots[3].querySelector('.sr-ch').textContent, 'n');
+      assert.ok(slots[1].querySelector('.sr-scoped-krintan'));
+      assert.equal(root.querySelectorAll('.sr-arc-krintan').length, 0);
+    },
+  },
+  {
     name: 'render: sustain cells carry the dim class',
     fn: () => {
       const root = renderCorpus();

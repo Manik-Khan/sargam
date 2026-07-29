@@ -224,6 +224,10 @@ function renderLineBlock(line, tal, ctx) {
 
   // --- over-arc lane (grid row 1)
   for (const span of line.spans) {
+    // A krintan nested inside one [ ] beat is drawn directly over its
+    // ornament cluster in the destination slot. A row-wide arc would falsely
+    // imply that the complete beat is part of the pull-off.
+    if (span.type === 'krintan' && span.scoped) continue;
     const fromCol = colOf[span.from.matraIndex];
     const toCol = colOf[span.to.matraIndex];
     if (fromCol === undefined || toCol === undefined) continue;
@@ -604,10 +608,21 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   // grids in flow prevents print reflow from putting an arc through a marker.
   const visualSlots = [];
   let geometrySlotIndex = 0;
+  let pendingInBeatGraces = [];
   for (let eventIndex = 0; eventIndex < evs.length; eventIndex++) {
     const e = evs[eventIndex];
-    if (e.grace) continue;
-    visualSlots.push({ event: e, hold: false, geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null });
+    if (e.grace) {
+      if (!e.preBeat) pendingInBeatGraces.push({ event: e, eventIndex });
+      continue;
+    }
+    visualSlots.push({
+      event: e,
+      eventIndex,
+      graces: pendingInBeatGraces,
+      hold: false,
+      geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null,
+    });
+    pendingInBeatGraces = [];
     const writtenSlots = Math.max(1, Number(e.writtenSlots) || 1);
     for (let slot = 1; slot < writtenSlots; slot++) {
       visualSlots.push({ event: { type: 'sustain' }, hold: true, geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null });
@@ -643,12 +658,15 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
     : null;
   cell.appendChild(h('div', 'sr-marker', markerText ?? ''));
 
-  // Glyphs. Grace notes remain ornaments outside metric slots. Timed
-  // events live in an equal-column slot grid; every explicitly written
-  // internal dash becomes its own visible hold slot without a new attack.
+  // Glyphs. Cross-beat graces remain before the metric grid. Same-beat
+  // ornaments sit inside their destination's slot, which keeps a scoped
+  // krintan such as [-[[RS]]-.n] over the S position rather than before the
+  // beat's leading hold.
   const glyphs = h('div', 'sr-glyphs');
   if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph', prefix));
-  for (const e of evs.filter((event) => event.grace)) glyphs.appendChild(renderEvent(e, ctx));
+  for (const e of evs.filter((event) => event.grace && event.preBeat)) {
+    glyphs.appendChild(renderEvent(e, ctx));
+  }
 
   if (visualSlots.length > 0) {
     const slots = h('span', 'sr-timed-slots');
@@ -678,7 +696,25 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
         slot.setAttribute('data-anchor-note', item.geometry.note || '');
         slot.setAttribute('data-anchor-octave', String(item.geometry.octave || 0));
       }
-      slot.appendChild(renderEvent(item.event, ctx, item.hold));
+      if (!item.hold && item.graces?.length) {
+        const scopedKrintan = line.spans.some((span) =>
+          span.type === 'krintan' &&
+          span.scoped &&
+          span.from.matraIndex === k &&
+          span.to.matraIndex === k &&
+          span.to.eventIndex === item.eventIndex &&
+          item.graces.some((grace) => grace.eventIndex === span.from.eventIndex)
+        );
+        const ornament = h(
+          'span',
+          'sr-slot-ornament' + (scopedKrintan ? ' sr-scoped-krintan' : '')
+        );
+        for (const grace of item.graces) ornament.appendChild(renderEvent(grace.event, ctx));
+        ornament.appendChild(renderEvent(item.event, ctx));
+        slot.appendChild(ornament);
+      } else {
+        slot.appendChild(renderEvent(item.event, ctx, item.hold));
+      }
       slots.appendChild(slot);
     }
     glyphs.appendChild(slots);

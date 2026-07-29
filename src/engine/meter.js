@@ -139,9 +139,116 @@ function scanBracket(inner, innerBase, matraStart) {
     const token = matches[slot][0];
     if (token === '.' || /^-+$/.test(token)) continue;
     const start = addRational(matraStart, rational(slot, matches.length));
-    const scanned = atomAttacks(token, innerBase + matches[slot].index, start, slotScale);
+    const scanned = token.includes('[[')
+      ? inlineKrintanAttacks(token, innerBase + matches[slot].index, start, slotScale)
+      : atomAttacks(token, innerBase + matches[slot].index, start, slotScale);
     if (scanned.error) return scanned;
     attacks.push(...scanned.attacks);
+  }
+  return { attacks };
+}
+
+function findBeatGroupClose(text, open) {
+  let i = open + 1;
+  while (i < text.length) {
+    if (text[i] === '[' && text[i + 1] === '[') {
+      const krintanClose = text.indexOf(']]', i + 2);
+      if (krintanClose === -1) return -1;
+      i = krintanClose + 2;
+      continue;
+    }
+    if (text[i] === ']') return i;
+    i++;
+  }
+  return -1;
+}
+
+/**
+ * Meter-authoring mirror of the parser's inline krintan rule. Ornament notes
+ * share the destination onset and add no duration of their own.
+ */
+function inlineKrintanAttacks(token, baseIndex, matraStart, scale) {
+  let flat = '';
+  const sourceIndices = [];
+  const graceOrdinals = new Set();
+  let noteOrdinal = 0;
+  let i = 0;
+
+  while (i < token.length) {
+    if (token[i] === '[' && token[i + 1] === '[') {
+      const close = token.indexOf(']]', i + 2);
+      if (close === -1) return { attacks: [], error: '[[ without closing ]] inside [ ] beat.' };
+      const inner = token.slice(i + 2, close);
+      const notes = [...inner].filter((char) => NOTE_CHARS.has(char));
+      if (!CLUSTER_RE.test(inner) || notes.length < 2) {
+        return { attacks: [], error: 'An inline krintan needs at least two connected notes.' };
+      }
+      let localOrdinal = 0;
+      for (let k = 0; k < inner.length; k++) {
+        const char = inner[k];
+        flat += char;
+        sourceIndices.push(baseIndex + i + 2 + k);
+        if (NOTE_CHARS.has(char)) {
+          if (localOrdinal < notes.length - 1) graceOrdinals.add(noteOrdinal);
+          noteOrdinal++;
+          localOrdinal++;
+        }
+      }
+      i = close + 2;
+      continue;
+    }
+    if (token[i] === '[' || token[i] === ']') {
+      return { attacks: [], error: `Unexpected '${token[i]}' inside [ ] beat.` };
+    }
+    flat += token[i];
+    sourceIndices.push(baseIndex + i);
+    if (NOTE_CHARS.has(token[i])) noteOrdinal++;
+    i++;
+  }
+
+  const atoms = [];
+  let octave = 0;
+  noteOrdinal = 0;
+  for (let k = 0; k < flat.length; k++) {
+    const char = flat[k];
+    if (char === '~') continue;
+    if (char === "'") { octave += 1; continue; }
+    if (char === '.') { octave -= 1; continue; }
+    if (char === '-') {
+      const last = atoms[atoms.length - 1];
+      if (last) last.w += 1;
+      else atoms.push({ type: 'hold', w: 1, index: sourceIndices[k] });
+      continue;
+    }
+    if (NOTE_CHARS.has(char)) {
+      atoms.push({
+        type: 'note',
+        w: 1,
+        index: sourceIndices[k],
+        ch: char,
+        octave,
+        grace: graceOrdinals.has(noteOrdinal),
+      });
+      noteOrdinal++;
+      octave = 0;
+      continue;
+    }
+    return { attacks: [], error: `Unsupported character '${char}' in meter selection.` };
+  }
+
+  const total = atoms.reduce((sum, atom) => sum + (atom.grace ? 0 : atom.w), 0);
+  if (total <= 0) return { attacks: [], error: 'An ornamental slot needs a timed destination note.' };
+  let cursor = rational(0, 1);
+  const attacks = [];
+  for (const atom of atoms) {
+    if (atom.type === 'note') {
+      attacks.push({
+        index: atom.index,
+        ch: atom.ch,
+        time: addRational(matraStart, mulRational(scale, cursor)),
+      });
+    }
+    if (!atom.grace) cursor = addRational(cursor, rational(atom.w, total));
   }
   return { attacks };
 }
@@ -171,7 +278,7 @@ export function scanMusicLine(source) {
     if (c === '[' && text[i + 1] === '[') { i += 2; continue; }
     if (c === ']' && text[i + 1] === ']') { i += 2; continue; }
     if (c === '[') {
-      const close = text.indexOf(']', i + 1);
+      const close = findBeatGroupClose(text, i);
       if (close === -1) return { attacks, duration: time, error: '[ without closing ] in meter selection.' };
       const scanned = scanBracket(text.slice(i + 1, close), i + 1, time);
       if (scanned.error) return { attacks, duration: time, error: scanned.error };

@@ -352,6 +352,36 @@ export const smokes = [
       assert.deepEqual(kr[0].to, { matraIndex: 2, eventIndex: 1 });
     },
   },
+  {
+    name: 'krintan: [-[[RS]]-.n] stays one four-slot beat with an ornamental R',
+    fn: () => {
+      const parsed = line('[-[[RS]]-.n]');
+      assert.deepEqual(parsed.problems, []);
+      assert.equal(parsed.line.matras.length, 1);
+      assert.deepEqual(
+        parsed.line.matras[0].events.map((event) => [
+          event.type,
+          event.ch || '',
+          Boolean(event.grace),
+          `${event.dur.num}/${event.dur.den}`,
+          event.writtenSlots || 1,
+        ]),
+        [
+          ['sustain', '', false, '1/4', 1],
+          ['note', 'R', true, '0/1', 1],
+          ['note', 'S', false, '1/2', 2],
+          ['note', 'n', false, '1/4', 1],
+        ],
+      );
+      assert.deepEqual(parsed.line.spans, [{
+        type: 'krintan',
+        scoped: true,
+        from: { matraIndex: 0, eventIndex: 1 },
+        to: { matraIndex: 0, eventIndex: 2 },
+      }]);
+      assert.equal(serializeDocument(parsed.doc).trim(), 'tal: tintal\n\n[-[[RS]]-.n]');
+    },
+  },
 
   // ---- repeats ----
   {
