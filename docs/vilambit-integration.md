@@ -23,7 +23,12 @@ binding behavior.
 - notation-linked A–B ranges;
 - extracted clips with source fallback;
 - non-destructive clip-loop editor;
-- portable `.sargam` projects containing notation, metadata, and clips.
+- portable `.sargam` projects containing notation, metadata, workspace, and clips;
+- project-native per-source `workspace.json`;
+- recording replacement without reloading the workspace;
+- remote WAV byte-range overviews, waveform sidecars, and lazy host generation;
+- non-destructive per-recording EQ with curated archive/community profiles;
+- the approved Sargam Player Music surface.
 
 ## Source Workspace Wave 1 — precision source editing
 
@@ -42,43 +47,43 @@ Wave 1 adds a visible waveform window independent of the full recording:
 
 Decoded media is drawn directly from the source buffer at the current zoom, so
 zooming reveals real detail rather than enlarging the old whole-file summary.
-Undecodable media still has timeline zoom/pan; persistent waveform peaks for
-those large sources belong to Wave 3.
+Large remote WAV files can use bounded byte-range sampling or precomputed
+sidecars, while other streamed audio/video can refine a waveform during
+playback.
 
-## Next shared Vilambit waves
+## Completed Source Workspace Wave 2
 
-### Wave 2 — project-native per-source workspace
-
-Store and restore, per stable `sourceAssetId`:
+The project now stores and restores, per stable `sourceAssetId`:
 
 - position;
 - loop and loop-on state;
 - speed and pitch;
 - markers and labels;
 - BPM and speed regions;
-- waveform view and follow preference.
+- waveform view and follow preference;
+- non-destructive EQ restoration.
 
-This state should travel automatically inside project folders and portable
-`.sargam` packages. The standalone Save/Load session JSON remains a manual
-compatibility path, not the primary project workflow.
+This state travels automatically inside project folders and portable `.sargam`
+packages. The standalone Save/Load session JSON remains a manual compatibility
+path, not the primary project workflow.
 
-### Wave 3 — sources and large-file optimization
+## Current next phase — Library and Queue
 
-- Sources panel with locate, reconnect, switch, and resume;
-- strict source identity checks;
-- cached multi-resolution waveform peaks for long MP4 and other undecodable media;
-- release old object URLs, buffers, capture nodes, and media resources reliably;
-- interrupted extraction and unsupported-codec messaging;
-- remove obsolete duplicate source files.
+Begin with a product mock and explicit distinction:
 
-## Shared core and standalone library player
+- **Library:** durable archive/catalog surface;
+- **Queue:** temporary listening-session order;
+- **Playlist:** durable named collection added later.
 
-After the source workspace is stable, extract reusable player/controller
-surfaces so both shells use one implementation:
+The left Sargam rail must not become a growing source list. Current recording
+belongs to Music/File context; Queue may be a collapsible utility surface.
 
-- **Sargam shell:** notation bridge, extraction, projects, and practice sets;
-- **Standalone library shell:** URL/library-ID loading, queue, playlists, and FileMaker adapter.
+The first implementation should be a pure queue/session controller supporting
+add-without-interrupting, reorder, remove, clear, next/previous, repeat track,
+and repeat queue. Named playlists and Practice Sets should reuse this
+foundation only after the queue interaction is accepted.
 
-The future LAN browser player should load stable record IDs rather than raw
-network paths, preserve the active recording while tracks are queued, and
-remain testable against the actual older Windows browser target.
+The LAN player should load stable record IDs rather than raw network paths,
+preserve the active recording while tracks are queued, restore per-recording
+workspace only after identity validation, and remain testable against Chrome
+109 on the Windows 8.1 archive computer.
