@@ -89,12 +89,17 @@ export const smokes = [
       assert.match(html, /<h2>Practice<\/h2>/);
       assert.match(html, /class="cardIndex"[^>]*>I<\/span>/);
       assert.match(html, /class="cardIndex"[^>]*>II<\/span>/);
+      assert.match(html, /class="loopReadout"/);
+      assert.match(html, /class="loopEditorDetails"/);
       assert.match(html, /data-cent="-10"/);
       assert.match(html, /data-cent="10"/);
+      assert.match(css, /\.music-heading\{[\s\S]*?width:min\(820px,100%\)/);
+      assert.match(css, /body\{[\s\S]*?background:transparent/);
       assert.match(css, /#controls\.on\{\s*display:grid;\s*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
       assert.match(css, /#controls > \.playbackCard[\s\S]*?#controls > \.loopMarkersCard/);
       assert.match(app, /function syncWorkspaceContext\(\)/);
       assert.match(shell, /data-project-title=\{doc\.directives\.raga \|\| ''\}/);
+      assert.match(shell, /data-project-tal=\{doc\.directives\.tal \|\| ''\}/);
     },
   },
   {

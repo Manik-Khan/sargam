@@ -1853,6 +1853,8 @@ export default function App() {
           src="sargam-player/"
           allow="autoplay; fullscreen; encrypted-media; clipboard-read; clipboard-write"
           data-project-title={doc.directives.raga || ''}
+          data-project-composition={doc.directives.title || doc.directives.composition || ''}
+          data-project-tal={doc.directives.tal || ''}
           className={'app-vilambit' + (view === 'notation' ? ' app-veiled' : '')}
         />
         <button

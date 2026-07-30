@@ -197,10 +197,12 @@
   /* AACM Chronicle player composition — approved workspace form.
      These rules preserve the existing player IDs and engines while arranging
      the live controls in the same hierarchy as the design prototype. */
+  html{background:transparent}
   body{
     display:block;
     min-height:100%;
-    background:rgba(248,239,218,.96);
+    padding:34px 96px 42px;
+    background:transparent;
     font-family:var(--sans);
   }
 
@@ -209,10 +211,15 @@
     grid-template-columns:minmax(0,1fr) minmax(220px,auto);
     align-items:end;
     gap:32px;
-    max-width:1240px;
+    width:min(820px,100%);
+    max-width:none;
     margin:0 auto;
+    border:1px solid rgba(13,87,45,.42);
     border-bottom:1px solid var(--line);
     padding:30px 34px 23px;
+    background:rgba(248,239,218,.9);
+    box-shadow:0 28px 80px rgba(3,29,16,.3);
+    backdrop-filter:blur(18px) saturate(.82);
   }
   .music-heading-copy{min-width:0}
   .music-eyebrow{
@@ -281,14 +288,19 @@
     letter-spacing:.1em;
     text-transform:uppercase;
   }
+  body.hasSource .music-source-meta #openBtn{display:none}
 
   main{
     display:flex;
-    width:100%;
-    max-width:1240px;
+    width:min(820px,100%);
+    max-width:none;
     margin:0 auto;
     padding:0 34px 26px;
     gap:0;
+    border-right:1px solid rgba(13,87,45,.42);
+    border-left:1px solid rgba(13,87,45,.42);
+    background:rgba(248,239,218,.9);
+    backdrop-filter:blur(18px) saturate(.82);
   }
   #sourceNotice{margin:12px 0 0}
   #dropzone{
@@ -327,12 +339,16 @@
     letter-spacing:.2em;
   }
   .waveToolGroup{gap:5px}
+  #waveToolbar .waveToolGroup:nth-of-type(2),
+  #waveFollowLabel,
+  #waveStatus,
+  #waveHint{display:none}
   #waveToolbar .btn{
     border-radius:0;
     background:transparent;
   }
   #wave{
-    height:190px;
+    height:150px;
     background:
       linear-gradient(90deg,transparent 24.9%,var(--line) 25%,transparent 25.1%,transparent 49.9%,var(--line) 50%,transparent 50.1%,transparent 74.9%,var(--line) 75%,transparent 75.1%);
   }
@@ -344,7 +360,11 @@
 
   #transport{
     min-height:90px;
+    margin-right:-34px;
+    margin-left:-34px;
     padding:15px 0;
+    padding-right:34px;
+    padding-left:34px;
     border-bottom:1px solid var(--line);
     gap:9px;
   }
@@ -360,6 +380,8 @@
     background:var(--brass);
   }
   .seekBtns{gap:5px}
+  .seekBtns .btn:nth-child(2),
+  .seekBtns .btn:nth-child(3){display:none}
   .seekBtns .btn{
     min-width:42px;
     border-radius:50%;
@@ -385,13 +407,15 @@
     display:grid;
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     gap:0;
+    margin-right:-34px;
+    margin-left:-34px;
     border-bottom:1px solid var(--line);
   }
   #controls > .card{
     min-width:0;
     border:0;
     border-radius:0;
-    padding:25px 27px;
+    padding:22px 34px 23px;
     background:transparent;
   }
   #controls > .playbackCard,
@@ -465,6 +489,56 @@
   }
   .card .btn:hover{background:var(--panel-2)}
   .scaleMarks{font-size:9px}
+  .scaleMarks{display:none}
+
+  .loopReadout{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:end;
+    gap:8px;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    padding:10px 0;
+  }
+  .loopReadout > div{
+    display:grid;
+    gap:3px;
+  }
+  .loopReadout > div:last-child{text-align:right}
+  .loopReadout span{
+    color:var(--dim);
+    font-size:8px;
+    font-weight:700;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+  }
+  .loopReadout strong{
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:10px;
+    font-weight:500;
+  }
+  .loopReadout.looping strong{color:var(--madder)}
+  .loopReadoutDuration{
+    border-right:1px solid var(--line);
+    border-left:1px solid var(--line);
+    padding:0 12px;
+    text-align:center;
+  }
+  .loopEditorDetails{
+    border-bottom:1px solid var(--line);
+    padding-bottom:8px;
+  }
+  .loopEditorDetails > summary{
+    padding:7px 0 2px;
+    color:var(--brass);
+    font-size:8px;
+    font-weight:700;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .loopEditorDetails[open] > summary{margin-bottom:6px}
 
   .loopBoundaryRow{
     grid-template-columns:18px minmax(80px,1fr) auto;
@@ -505,18 +579,23 @@
   .detailsBody{padding:0 18px 18px}
 
   footer{
-    max-width:1240px;
+    width:min(820px,100%);
+    max-width:none;
     margin:0 auto;
+    border:1px solid rgba(13,87,45,.42);
     border-top:0;
     padding:11px 34px 17px;
+    background:rgba(248,239,218,.9);
     color:var(--dim);
     font-family:var(--serif);
     font-size:10px;
     font-style:italic;
     justify-content:flex-end;
   }
+  footer span:first-child{margin-right:auto}
 
   @media (max-width:900px){
+    body{padding:24px}
     .music-heading{
       grid-template-columns:1fr;
       gap:18px;
@@ -538,6 +617,15 @@
       margin:0;
     }
     main{padding:0 20px 22px}
+    #transport,
+    #controls.on{
+      margin-right:-20px;
+      margin-left:-20px;
+    }
+    #transport{
+      padding-right:20px;
+      padding-left:20px;
+    }
     #controls.on{grid-template-columns:1fr}
     #controls > .playbackCard,
     #controls > .loopMarkersCard{
@@ -555,14 +643,22 @@
   }
 
   @media (max-width:600px){
+    body{padding:14px}
     .music-heading{padding:19px 15px}
     .music-heading h1{font-size:36px}
     .music-heading .tag{font-size:14px}
     main{padding:0 14px 18px}
     #wave{height:150px}
     #transport{align-items:center}
-    .seekBtns .btn:nth-child(2),
-    .seekBtns .btn:nth-child(3){display:none}
+    #transport,
+    #controls.on{
+      margin-right:-14px;
+      margin-left:-14px;
+    }
+    #transport{
+      padding-right:14px;
+      padding-left:14px;
+    }
     #clock{width:100%;margin:4px 0 0}
     #volWrap{margin-left:0;padding-left:0}
     #controls > .card{padding:21px 18px}

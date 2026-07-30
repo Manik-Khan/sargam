@@ -90,10 +90,13 @@ export const smokes = [
   },
 
   {
-    name: 'print width: screen paper uses border-box so preview and printable content widths agree',
+    name: 'print width: screen paper matches printable width and uses compact export typography',
     fn() {
       const css = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
       assert.match(css, /\.app-export-paper\s*\{[^}]*width:\s*780px;[^}]*padding:\s*46px 52px 60px;[^}]*box-sizing:\s*border-box;/s);
+      assert.match(css, /\.app-export\s*\{[^}]*z-index:\s*120;/s);
+      assert.match(css, /\.sr-export\s*\{\s*font-size:\s*14px;/);
+      assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*18px;/);
     },
   },
 ];

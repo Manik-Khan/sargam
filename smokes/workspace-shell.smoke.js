@@ -45,11 +45,11 @@ export const smokes = [
       assert.match(app, /workspace-split-divider/);
       assert.match(
         css,
-        /\.app-stage > \.app-vilambit\s*\{[\s\S]*?width:\s*calc\(100% - 56px\)/,
+        /\.app-stage > \.app-vilambit\s*\{[\s\S]*?width:\s*100%;[\s\S]*?background:\s*transparent;/,
       );
       assert.match(
         css,
-        /\.app-workspace-split > \.app-vilambit\s*\{[\s\S]*?width:\s*calc\(100% - 28px\)/,
+        /\.app-workspace-split > \.app-vilambit\s*\{[\s\S]*?width:\s*100%/,
       );
     },
   },

@@ -12,7 +12,7 @@
   <div class="music-heading-copy">
     <span class="music-eyebrow">Current project · Music</span>
     <h1 id="workspaceProjectTitle">Sargam Music</h1>
-    <div class="tag">change the speed without the pitch · change the pitch without the speed</div>
+    <div class="tag" id="workspaceProjectTag">Practice recording</div>
   </div>
   <div class="music-source-meta">
     <span>Source</span>
@@ -106,8 +106,8 @@
     <div id="waveToolbar" aria-label="Waveform view controls">
       <span class="waveToolbarLabel">Waveform</span>
       <div class="waveToolGroup" role="group" aria-label="Waveform zoom">
-        <button class="btn small" id="waveZoomOut" title="Zoom out around the playhead">− Zoom</button>
-        <button class="btn small" id="waveZoomIn" title="Zoom in around the playhead">+ Zoom</button>
+        <button class="btn small" id="waveZoomOut" title="Zoom out around the playhead">−</button>
+        <button class="btn small" id="waveZoomIn" title="Zoom in around the playhead">+</button>
         <button class="btn small" id="waveZoomLoop" title="Fit the current A–B loop in the waveform" disabled>Fit loop</button>
         <button class="btn small" id="waveZoomAll" title="Show the complete recording">Show all</button>
       </div>
@@ -200,39 +200,55 @@
         </div>
       </div>
       <div class="loopMarkersGrid">
-        <section class="subPanel">
+        <section class="subPanel loopPanel">
           <div class="subPanelTitle">Loop</div>
-          <div id="loopState"><span class="off">no loop set</span></div>
-          <div id="loopBoundaryGrid">
-            <div class="loopBoundaryRow">
-              <label for="loopAInput">A</label>
-              <input class="timeIn" id="loopAInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop start time">
-              <button class="btn small loopPlayhead" id="setA">Playhead → A <kbd>A</kbd></button>
-              <button class="btn small loopSaveMarker" id="saveAAsMarker" title="Save the current A boundary as a marker">A → Marker</button>
-              <div class="loopNudgeGroup" role="group" aria-label="Adjust loop start">
-                <button class="btn small" data-loop-point="A" data-loop-nudge="-0.1" title="Move A earlier by 100 milliseconds">−100</button>
-                <button class="btn small" data-loop-point="A" data-loop-nudge="-0.01" title="Move A earlier by 10 milliseconds">−10</button>
-                <span>ms</span>
-                <button class="btn small" data-loop-point="A" data-loop-nudge="0.01" title="Move A later by 10 milliseconds">+10</button>
-                <button class="btn small" data-loop-point="A" data-loop-nudge="0.1" title="Move A later by 100 milliseconds">+100</button>
-              </div>
+          <div id="loopState" class="loopReadout">
+            <div>
+              <span>A</span>
+              <strong id="loopSummaryA">—</strong>
             </div>
-            <div class="loopBoundaryRow">
-              <label for="loopBInput">B</label>
-              <input class="timeIn" id="loopBInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop end time">
-              <button class="btn small loopPlayhead" id="setB">Playhead → B <kbd>B</kbd></button>
-              <button class="btn small loopSaveMarker" id="saveBAsMarker" title="Save the current B boundary as a marker">B → Marker</button>
-              <div class="loopNudgeGroup" role="group" aria-label="Adjust loop end">
-                <button class="btn small" data-loop-point="B" data-loop-nudge="-0.1" title="Move B earlier by 100 milliseconds">−100</button>
-                <button class="btn small" data-loop-point="B" data-loop-nudge="-0.01" title="Move B earlier by 10 milliseconds">−10</button>
-                <span>ms</span>
-                <button class="btn small" data-loop-point="B" data-loop-nudge="0.01" title="Move B later by 10 milliseconds">+10</button>
-                <button class="btn small" data-loop-point="B" data-loop-nudge="0.1" title="Move B later by 100 milliseconds">+100</button>
-              </div>
+            <div class="loopReadoutDuration">
+              <span>Loop</span>
+              <strong id="loopSummaryDuration">—</strong>
+            </div>
+            <div>
+              <span>B</span>
+              <strong id="loopSummaryB">—</strong>
             </div>
           </div>
-          <div id="loopDuration" class="hint">Set both boundaries to see the loop duration.</div>
-          <div class="hint">Drag across the waveform to make a loop, drag A/B to refine it, or save either boundary directly as a marker. Shift-click a marker sets A; Option/Alt-click sets B.</div>
+          <details class="loopEditorDetails">
+            <summary>Fine loop editing</summary>
+            <div id="loopBoundaryGrid">
+              <div class="loopBoundaryRow">
+                <label for="loopAInput">A</label>
+                <input class="timeIn" id="loopAInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop start time">
+                <button class="btn small loopPlayhead" id="setA">Playhead → A <kbd>A</kbd></button>
+                <button class="btn small loopSaveMarker" id="saveAAsMarker" title="Save the current A boundary as a marker">A → Marker</button>
+                <div class="loopNudgeGroup" role="group" aria-label="Adjust loop start">
+                  <button class="btn small" data-loop-point="A" data-loop-nudge="-0.1" title="Move A earlier by 100 milliseconds">−100</button>
+                  <button class="btn small" data-loop-point="A" data-loop-nudge="-0.01" title="Move A earlier by 10 milliseconds">−10</button>
+                  <span>ms</span>
+                  <button class="btn small" data-loop-point="A" data-loop-nudge="0.01" title="Move A later by 10 milliseconds">+10</button>
+                  <button class="btn small" data-loop-point="A" data-loop-nudge="0.1" title="Move A later by 100 milliseconds">+100</button>
+                </div>
+              </div>
+              <div class="loopBoundaryRow">
+                <label for="loopBInput">B</label>
+                <input class="timeIn" id="loopBInput" type="text" inputmode="decimal" placeholder="m:ss.sss" aria-label="Loop end time">
+                <button class="btn small loopPlayhead" id="setB">Playhead → B <kbd>B</kbd></button>
+                <button class="btn small loopSaveMarker" id="saveBAsMarker" title="Save the current B boundary as a marker">B → Marker</button>
+                <div class="loopNudgeGroup" role="group" aria-label="Adjust loop end">
+                  <button class="btn small" data-loop-point="B" data-loop-nudge="-0.1" title="Move B earlier by 100 milliseconds">−100</button>
+                  <button class="btn small" data-loop-point="B" data-loop-nudge="-0.01" title="Move B earlier by 10 milliseconds">−10</button>
+                  <span>ms</span>
+                  <button class="btn small" data-loop-point="B" data-loop-nudge="0.01" title="Move B later by 10 milliseconds">+10</button>
+                  <button class="btn small" data-loop-point="B" data-loop-nudge="0.1" title="Move B later by 100 milliseconds">+100</button>
+                </div>
+              </div>
+            </div>
+            <div id="loopDuration" class="hint">Set both boundaries to see the loop duration.</div>
+            <div class="hint">Drag across the waveform to make a loop, drag A/B to refine it, or save either boundary directly as a marker. Shift-click a marker sets A; Option/Alt-click sets B.</div>
+          </details>
         </section>
 
         <section class="subPanel markerPanel">
@@ -344,18 +360,14 @@
       </div>
     </details>
 
-  </div>  </div>
+  </div>
 </main>
 
 <footer>
-  <span><kbd>Space</kbd> play/pause</span>
-  <span><kbd>←</kbd><kbd>→</kbd> ±5s <span style="opacity:.7">(⇧ ±1s)</span></span>
-  <span><kbd>↑</kbd><kbd>↓</kbd> speed ±5% <span style="opacity:.7">(⇧ ±1%)</span></span>
-  <span><kbd>A</kbd><kbd>B</kbd> loop points</span>
-  <span><kbd>Ctrl</kbd>+wheel zoom · <kbd>Shift</kbd>+wheel pan</span>
-  <span><kbd>L</kbd> loop on/off</span>
+  <span>Everything stays on this machine.</span>
+  <span><kbd>Space</kbd> play</span>
+  <span><kbd>A</kbd><kbd>B</kbd> loop</span>
   <span><kbd>M</kbd> marker</span>
-  <span><kbd>0</kbd> reset speed</span>
 </footer>
 
 <script src="../vilambit/vendor/signalsmith-stretch.js"></script>

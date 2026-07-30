@@ -22,19 +22,30 @@ const RemoteWaveform = window.SargamRemoteWaveform;
 if (!Core) throw new Error('VilambitCore must load before vilambit-app.js');
 
 function syncWorkspaceContext(){
-  const rawTitle = window.frameElement?.dataset?.projectTitle?.trim() || '';
+  const frameData = window.frameElement?.dataset || {};
+  const rawTitle = frameData.projectTitle?.trim() || '';
+  const composition = frameData.projectComposition?.trim() || '';
+  const tal = frameData.projectTal?.trim() || '';
   const heading = $('workspaceProjectTitle');
+  const tag = $('workspaceProjectTag');
   if (!heading) return;
   heading.textContent = rawTitle
     ? (/^raga\s/i.test(rawTitle) ? rawTitle : `Raga ${rawTitle}`)
     : 'Sargam Music';
+  if (tag) {
+    const details = [
+      composition,
+      tal ? `${tal.charAt(0).toUpperCase()}${tal.slice(1)} taal` : '',
+    ].filter(Boolean);
+    tag.textContent = details.join(' · ') || 'Practice recording';
+  }
 }
 
 syncWorkspaceContext();
 if (window.frameElement && window.MutationObserver){
   new MutationObserver(syncWorkspaceContext).observe(window.frameElement, {
     attributes: true,
-    attributeFilter: ['data-project-title'],
+    attributeFilter: ['data-project-title', 'data-project-composition', 'data-project-tal'],
   });
 }
 
@@ -723,6 +734,7 @@ function resetSourceState(source){
   media.src = state.fileURL;
   media.preload = 'metadata';
   media.load();
+  document.body.classList.add('hasSource');
   $('fileName').textContent = state.fileName;
   $('dropzone').style.display = 'none';
   ['transport','controls','waveWrap'].forEach(id => $(id).classList.add('on'));
@@ -1464,15 +1476,18 @@ function syncLoopInput(id, value){
 
 function renderLoop(){
   const el = $('loopState');
-  if (state.loopA == null && state.loopB == null){
-    el.innerHTML = '<span class="off">no loop set</span>';
-  } else {
-    const a = state.loopA != null ? fmtPrecise(state.loopA) : '—';
-    const b = state.loopB != null ? fmtPrecise(state.loopB) : '—';
-    el.innerHTML = 'A <span class="pt">' + a + '</span> → B <span class="pt">' + b + '</span>' +
-      (state.loopOn ? ' · <span class="pt">looping</span>' : '');
-  }
   const ready = state.loopA != null && state.loopB != null;
+  const a = state.loopA != null ? fmtPrecise(state.loopA) : '—';
+  const b = state.loopB != null ? fmtPrecise(state.loopB) : '—';
+  const span = ready ? formatSpan(Math.max(0, state.loopB - state.loopA)) : '—';
+  if ($('loopSummaryA')) $('loopSummaryA').textContent = a;
+  if ($('loopSummaryB')) $('loopSummaryB').textContent = b;
+  if ($('loopSummaryDuration')) $('loopSummaryDuration').textContent = span;
+  el.classList.toggle('looping', ready && state.loopOn);
+  el.setAttribute(
+    'aria-label',
+    ready ? `Loop from ${a} to ${b}, duration ${span}${state.loopOn ? ', active' : ''}` : 'No loop set'
+  );
   $('loopToggle').disabled = !ready;
   $('loopClear').disabled = state.loopA == null && state.loopB == null;
   if ($('saveAAsMarker')) $('saveAAsMarker').disabled = state.loopA == null;

@@ -551,7 +551,7 @@
 
 /* ---- M2.5: export view (spec §4.1) ---- */
 .app-export {
-  position: fixed; inset: 0; z-index: 50;
+  position: fixed; inset: 0; z-index: 120;
   background: #ded9d0; display: flex; flex-direction: column;
 }
 .app-export-bar {
@@ -592,6 +592,26 @@
 .sr-exp-meta { text-align: right; font-size: 12.5px; line-height: 1.9; flex: none; }
 .sr-exp-meta-label { color: var(--sr-ink-soft); margin-right: 7px; }
 .sr-exp-meta-value { color: var(--sr-ink); }
+
+/* The printed score follows the compact AACM computer-notation precedent:
+   the same renderer and geometry, packed more densely only inside Export. */
+.sr-export { font-size: 14px; }
+.sr-export .sr-exp-head { gap: 30px; margin-bottom: 20px; padding-bottom: 11px; }
+.sr-export .sr-exp-raga { font-size: 29px; }
+.sr-export .sr-exp-title { font-size: 12px; margin-top: 4px; }
+.sr-export .sr-exp-prov { margin-top: 8px; font-size: 11px; }
+.sr-export .sr-exp-meta { font-size: 11px; line-height: 1.65; }
+.sr-export .sr-section { margin-bottom: 20px; }
+.sr-export .sr-section-label { margin-bottom: 7px; font-size: 11px; }
+.sr-export .sr-line-group { margin-bottom: 12px; }
+.sr-export .sr-line-block { margin-bottom: 4px; }
+.sr-export .sr-row { column-gap: 1px; padding-block: 1px; }
+.sr-export .sr-cell { min-width: 2.15em; padding-inline: 4px; }
+.sr-export .sr-glyphs { font-size: 18px; }
+.sr-export .sr-marker { font-size: 10.5px; }
+.sr-export .sr-lyric,
+.sr-export .sr-bol { font-size: 11px; }
+.sr-export .sr-return-cue { font-size: 11px; }
 
 /* ---- print: only the paper reaches the page ---- */
 @page { margin: 18mm; }
@@ -1393,8 +1413,7 @@
   grid-row: 1;
 }
 
-.app-stage > .app-panes,
-.app-stage > .app-vilambit {
+.app-stage > .app-panes {
   grid-column: 2;
   grid-row: 1;
   align-self: stretch;
@@ -1413,8 +1432,16 @@
 
 .app-stage > .app-vilambit {
   display: block;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
   justify-self: start;
-  width: calc(100% - 56px);
+  width: 100%;
+  height: auto;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .app-stage.app-workspace-split {
@@ -1450,8 +1477,8 @@
 
 .app-workspace-split > .app-vilambit {
   grid-column: 4;
-  margin-left: 0;
-  width: calc(100% - 28px);
+  margin: 0;
+  width: 100%;
 }
 
 .app-workspace-split .app-editor-col {
@@ -1608,9 +1635,7 @@
   }
 
   .app-stage > .app-panes,
-  .app-stage > .app-vilambit,
-  .app-workspace-split > .app-panes,
-  .app-workspace-split > .app-vilambit {
+  .app-workspace-split > .app-panes {
     grid-column: 1;
     grid-row: 2;
     margin: 14px;
@@ -1618,7 +1643,10 @@
 
   .app-stage > .app-vilambit,
   .app-workspace-split > .app-vilambit {
-    width: calc(100% - 28px);
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    margin: 0;
   }
 
   .app-workspace-split > .app-vilambit,
@@ -1675,9 +1703,7 @@
   }
 
   .app-stage > .app-panes,
-  .app-stage > .app-vilambit,
-  .app-workspace-split > .app-panes,
-  .app-workspace-split > .app-vilambit {
+  .app-workspace-split > .app-panes {
     margin: 10px;
   }
 }
