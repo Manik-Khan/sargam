@@ -79,6 +79,23 @@ export const smokes = [
     },
   },
   {
+    name: 'print width: metered systems prefer sam over a later arbitrary beat',
+    fn() {
+      const line = lineOf(20);
+      const tal = getTal('jhaptal');
+      setMeasuredLineLayout(line, {
+        widths: Array(20).fill(2),
+        prefixEm: 0,
+        suffixEm: 0,
+      });
+      const ranges = planLineSystems(line, tal, { maxEm: 25 });
+      assert.equal(ranges[0].to, 9);
+      assert.equal(ranges[1].from, 10);
+      assert.equal(ranges[0].reason, 'musical-boundary');
+      clearMeasuredLineLayout(line);
+    },
+  },
+  {
     name: 'print width: export remeasures without replacing browser printing',
     fn() {
       const source = readFileSync(new URL('../src/shell/ExportView.jsx', import.meta.url), 'utf8');
@@ -86,6 +103,7 @@ export const smokes = [
       assert.match(source, /beforeprint/);
       assert.match(source, /window\.print\(\)/);
       assert.match(source, /contentWidthInEm/);
+      assert.match(source, /SCORE_GUTTER_EM = 2/);
     },
   },
 
@@ -96,7 +114,9 @@ export const smokes = [
       assert.match(css, /\.app-export-paper\s*\{[^}]*width:\s*780px;[^}]*padding:\s*46px 52px 60px;[^}]*box-sizing:\s*border-box;/s);
       assert.match(css, /\.app-export\s*\{[^}]*z-index:\s*120;/s);
       assert.match(css, /\.sr-export\s*\{\s*font-size:\s*14px;/);
-      assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*18px;/);
+      assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*17px;/);
+      assert.match(css, /\.sr-export \.sr-cell\s*\{[^}]*min-width:\s*1\.7em;[^}]*padding-inline:\s*2px;/s);
+      assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*avoid-page;/s);
     },
   },
 ];

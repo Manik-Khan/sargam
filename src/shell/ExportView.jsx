@@ -10,8 +10,8 @@ import { renderExport } from '../engine/render.js';
 import { alignTalaMarkers, stampAnchorTargets, mountAnchorOverlays } from './anchor-overlay.js';
 import { clearMeasuredLineLayout, setMeasuredLineLayout } from '../engine/layout.js';
 
-const RIGHT_EDGE_BREATH_EM = 0.75;
-const SCORE_GUTTER_EM = 3.5;
+const RIGHT_EDGE_BREATH_EM = 0.3;
+const SCORE_GUTTER_EM = 2;
 const FALLBACK_SYSTEM_EM = 40;
 
 function allMusicLines(doc) {

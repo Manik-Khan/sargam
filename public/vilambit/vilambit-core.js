@@ -45,6 +45,25 @@
     return Math.round(clamp(value, -100, 100));
   }
 
+  function normalizeEqSettings(value = {}) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const text = (input, fallback, maxLength) => {
+      const result = typeof input === 'string' ? input.trim() : '';
+      return (result || fallback).slice(0, maxLength);
+    };
+    return {
+      enabled: Boolean(source.enabled),
+      highPassHz: Math.round(clamp(source.highPassHz ?? 30, 20, 180)),
+      lowShelfDb: Math.round(clamp(source.lowShelfDb ?? 0, -12, 12) * 10) / 10,
+      lowMidDb: Math.round(clamp(source.lowMidDb ?? 0, -12, 12) * 10) / 10,
+      presenceDb: Math.round(clamp(source.presenceDb ?? 0, -12, 12) * 10) / 10,
+      lowPassHz: Math.round(clamp(source.lowPassHz ?? 18000, 4000, 20000)),
+      outputDb: Math.round(clamp(source.outputDb ?? 0, -12, 6) * 10) / 10,
+      profileId: text(source.profileId, 'personal', 80),
+      profileName: text(source.profileName, 'My EQ', 120),
+    };
+  }
+
   function totalSemitones(semitones, cents) {
     return clampSemitones(semitones) + clampCents(cents) / 100;
   }
@@ -500,6 +519,7 @@
         end: view.end,
         followPlayhead: Boolean(viewSource.followPlayhead),
       },
+      eq: normalizeEqSettings(source.eq),
     };
   }
 
@@ -530,6 +550,7 @@
     viewStart = 0,
     viewEnd = 0,
     followPlayhead = false,
+    eq = {},
     error = null,
   } = {}) {
     const safeDuration = clampDuration(duration);
@@ -572,6 +593,7 @@
         end: view.end,
         followPlayhead: Boolean(followPlayhead),
       },
+      eq: normalizeEqSettings(eq),
       error: typeof error === 'string' && error ? error : null,
     };
   }
@@ -586,6 +608,7 @@
     clampTempo,
     clampSemitones,
     clampCents,
+    normalizeEqSettings,
     totalSemitones,
     currentPosition,
     planSeek,

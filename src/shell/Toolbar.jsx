@@ -29,6 +29,7 @@ export default function Toolbar({
   onOpenRecent,
   onRemoveRecent,
   sourceName,
+  onOpenRecording,
   queueItems = [],
   onQueueItem,
 }) {
@@ -254,10 +255,10 @@ export default function Toolbar({
         <button
           type="button"
           className="workspace-open-recording"
-          onClick={() => onView('vilambit')}
-          title="Open Music, then choose a recording"
+          onClick={onOpenRecording}
+          title={sourceName ? 'Choose another recording' : 'Choose a recording'}
         >
-          Open recording
+          {sourceName ? 'Change recording' : 'Open recording'}
         </button>
       </div>
     </header>

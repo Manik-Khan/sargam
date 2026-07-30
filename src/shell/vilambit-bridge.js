@@ -17,6 +17,7 @@ export const VILAMBIT_COMMANDS = Object.freeze([
   'jump-marker',
   'extract-loop',
   'apply-workspace',
+  'open-file',
 ]);
 
 const COMMAND_SET = new Set(VILAMBIT_COMMANDS);
@@ -37,6 +38,17 @@ export const EMPTY_VILAMBIT_STATE = Object.freeze({
   bpm: null,
   speedRegions: Object.freeze([]),
   waveformView: Object.freeze({ start: 0, end: 0, followPlayhead: false }),
+  eq: Object.freeze({
+    enabled: false,
+    highPassHz: 30,
+    lowShelfDb: 0,
+    lowMidDb: 0,
+    presenceDb: 0,
+    lowPassHz: 18000,
+    outputDb: 0,
+    profileId: 'personal',
+    profileName: 'My EQ',
+  }),
   error: null,
 });
 
@@ -53,6 +65,23 @@ function optionalSecond(value) {
 
 function text(value, fallback = '') {
   return typeof value === 'string' ? value : fallback;
+}
+
+function sanitizeEq(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const clamp = (input, min, max, fallback) =>
+    Math.min(max, Math.max(min, finite(input, fallback)));
+  return {
+    enabled: Boolean(source.enabled),
+    highPassHz: Math.round(clamp(source.highPassHz, 20, 180, 30)),
+    lowShelfDb: Math.round(clamp(source.lowShelfDb, -12, 12, 0) * 10) / 10,
+    lowMidDb: Math.round(clamp(source.lowMidDb, -12, 12, 0) * 10) / 10,
+    presenceDb: Math.round(clamp(source.presenceDb, -12, 12, 0) * 10) / 10,
+    lowPassHz: Math.round(clamp(source.lowPassHz, 4000, 20000, 18000)),
+    outputDb: Math.round(clamp(source.outputDb, -12, 6, 0) * 10) / 10,
+    profileId: text(source.profileId, 'personal').slice(0, 80) || 'personal',
+    profileName: text(source.profileName, 'My EQ').slice(0, 120) || 'My EQ',
+  };
 }
 
 export function sanitizeVilambitState(value) {
@@ -141,6 +170,7 @@ export function sanitizeVilambitState(value) {
       end: viewEnd,
       followPlayhead: Boolean(view.followPlayhead),
     },
+    eq: sanitizeEq(value.eq),
     error: typeof value.error === 'string' && value.error ? value.error : null,
   };
 }

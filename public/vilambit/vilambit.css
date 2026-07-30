@@ -288,7 +288,7 @@
     letter-spacing:.1em;
     text-transform:uppercase;
   }
-  body.hasSource .music-source-meta #openBtn{display:none}
+  body.hasSource .music-source-meta #openBtn{display:inline-flex}
 
   main{
     display:flex;
@@ -578,6 +578,87 @@
   }
   .detailsBody{padding:0 18px 18px}
 
+  .eqCard{grid-column:1 / -1!important}
+  .eqCard .detailsBody{padding:0 34px 22px}
+  .eqTopline,
+  .eqActions,
+  .eqProfileControl{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .eqTopline{
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    padding:14px 0 11px;
+  }
+  .eqEnable{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:13px;
+    cursor:pointer;
+  }
+  .eqProfileControl{padding:12px 0 5px}
+  .eqProfileControl .lbl{
+    color:var(--dim);
+    font-size:8px;
+    font-weight:700;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+  }
+  .eqProfileControl select{
+    min-width:210px;
+    border:1px solid var(--line);
+    border-radius:0;
+    padding:5px 8px;
+    background:rgba(248,239,218,.46);
+    color:var(--ink);
+    font:12px var(--serif);
+  }
+  .eqBands{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:0;
+    border-top:1px solid var(--line);
+    border-left:1px solid var(--line);
+    margin-top:6px;
+  }
+  .eqBand{
+    display:grid;
+    gap:6px;
+    border-right:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    padding:12px;
+  }
+  .eqBand > span{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .eqBand strong{
+    color:var(--brass);
+    font-family:var(--serif);
+    font-size:13px;
+    font-weight:600;
+  }
+  .eqBand output{
+    color:var(--ink);
+    font:10px var(--mono);
+    font-variant-numeric:tabular-nums;
+  }
+  .eqBand small{
+    color:var(--dim);
+    font-family:var(--serif);
+    font-size:10px;
+    font-style:italic;
+  }
+  .eqActions{padding-top:12px}
+  #eqStatus{margin-top:7px}
+
   footer{
     width:min(820px,100%);
     max-width:none;
@@ -640,6 +721,8 @@
       grid-column:1;
       border-left:0!important;
     }
+    .eqCard .detailsBody{padding-right:20px;padding-left:20px}
+    .eqBands{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
 
   @media (max-width:600px){
@@ -662,6 +745,10 @@
     #clock{width:100%;margin:4px 0 0}
     #volWrap{margin-left:0;padding-left:0}
     #controls > .card{padding:21px 18px}
+    .eqCard .detailsBody{padding-right:14px;padding-left:14px}
+    .eqBands{grid-template-columns:1fr}
+    .eqProfileControl{align-items:flex-start;flex-direction:column}
+    .eqProfileControl select{width:100%;min-width:0}
     .loopBoundaryRow{
       grid-template-columns:18px minmax(0,1fr);
       grid-template-areas:"point input" ". playhead" ". marker" ". nudges";

@@ -18,7 +18,7 @@
     <span>Source</span>
     <strong id="fileName">No recording loaded</strong>
     <span id="engineBadge">Local archive</span>
-    <button class="btn primary" id="openBtn">Open audio / video…</button>
+    <button class="btn primary" id="openBtn">Choose recording…</button>
     <input type="file" id="fileInput" accept="audio/*,video/*,.flac,.m4a,.mp4,.mov,.webm,.ogg,.wav,.mp3,.aac,.aiff" hidden>
   </div>
 </header>
@@ -265,6 +265,72 @@
         </section>
       </div>
     </div>
+
+    <!-- EQ & RESTORATION -->
+    <details class="card collapsibleCard eqCard">
+      <summary class="cardSummary">
+        <span class="summaryTitle">EQ &amp; Restoration</span>
+        <span class="summaryHint" id="eqSummary">Original signal</span>
+      </summary>
+      <div class="detailsBody">
+        <div class="eqTopline">
+          <label class="eqEnable">
+            <input type="checkbox" id="eqEnabled">
+            <span>Use EQ while listening</span>
+          </label>
+          <button class="btn small" id="eqReset" type="button">Reset flat</button>
+        </div>
+
+        <label class="eqProfileControl" for="eqProfile">
+          <span class="lbl">Setting</span>
+          <select id="eqProfile">
+            <option value="flat">Original recording</option>
+            <option value="personal">My EQ</option>
+          </select>
+        </label>
+
+        <div class="eqBands">
+          <label class="eqBand">
+            <span><strong>Rumble</strong><output id="eqHighPassVal">30 Hz</output></span>
+            <input id="eqHighPass" type="range" min="20" max="180" step="1" value="30">
+            <small>High-pass</small>
+          </label>
+          <label class="eqBand">
+            <span><strong>Bass</strong><output id="eqLowShelfVal">0 dB</output></span>
+            <input id="eqLowShelf" type="range" min="-12" max="12" step="0.5" value="0">
+            <small>Warmth</small>
+          </label>
+          <label class="eqBand">
+            <span><strong>Low-mid</strong><output id="eqLowMidVal">0 dB</output></span>
+            <input id="eqLowMid" type="range" min="-12" max="12" step="0.5" value="0">
+            <small>Boxiness</small>
+          </label>
+          <label class="eqBand">
+            <span><strong>Presence</strong><output id="eqPresenceVal">0 dB</output></span>
+            <input id="eqPresence" type="range" min="-12" max="12" step="0.5" value="0">
+            <small>Clarity</small>
+          </label>
+          <label class="eqBand">
+            <span><strong>Hiss</strong><output id="eqLowPassVal">18 kHz</output></span>
+            <input id="eqLowPass" type="range" min="4000" max="20000" step="250" value="18000">
+            <small>Low-pass</small>
+          </label>
+          <label class="eqBand">
+            <span><strong>Output</strong><output id="eqOutputVal">0 dB</output></span>
+            <input id="eqOutput" type="range" min="-12" max="6" step="0.5" value="0">
+            <small>Level trim</small>
+          </label>
+        </div>
+
+        <div class="eqActions">
+          <button class="btn small" id="eqSavePersonal" type="button">Keep as My EQ</button>
+          <button class="btn small" id="eqExportProfile" type="button">Share profile JSON</button>
+        </div>
+        <div class="hint" id="eqStatus">
+          My EQ is saved with this recording in workspace.json. Archive and community settings appear here when the host publishes them.
+        </div>
+      </div>
+    </details>
 
     <!-- ADVANCED TUNING -->
     <details class="card collapsibleCard tuningCard archiveUnsupported">

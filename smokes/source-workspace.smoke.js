@@ -36,11 +36,25 @@ export const smokes = [
         bpm: { bpm: 120, period: 0.5, phaseAbs: 3025, confidence: 0.8 },
         speedRegions: [{ start: 3030, end: 3040, pct: 65 }],
         waveformView: { start: 3025, end: 3060, followPlayhead: false },
+        eq: {
+          enabled: true,
+          highPassHz: 55,
+          lowShelfDb: 1.5,
+          lowMidDb: -2,
+          presenceDb: 2.5,
+          lowPassHz: 10500,
+          outputDb: -1,
+          profileId: 'personal',
+          profileName: 'My EQ',
+        },
       });
       assert.equal(entry.lastPosition, 3041.235);
       assert.deepEqual(entry.loop, { a: 3039, b: 3046.8, on: true });
       assert.deepEqual(entry.markers.map((marker) => marker.label), ['start', 'taan']);
       assert.deepEqual(entry.waveformView, { start: 3025, end: 3060, followPlayhead: false });
+      assert.equal(entry.eq.enabled, true);
+      assert.equal(entry.eq.lowMidDb, -2);
+      assert.equal(entry.eq.lowPassHz, 10500);
     },
   },
   {

@@ -205,6 +205,11 @@ export default function App() {
     return postVilambitCommand(frameWindow, type, payload, window.location.origin);
   }, []);
 
+  const openRecordingPicker = useCallback(() => {
+    setView('vilambit');
+    sendVilambit('open-file');
+  }, [sendVilambit]);
+
   const setLinkedPlaybackState = useCallback((next) => {
     linkedPlaybackRef.current = next;
     setLinkedPlayback(next);
@@ -339,6 +344,7 @@ export default function App() {
       ...nextEntry,
       loop: { ...(currentEntry?.loop || {}), ...nextEntry.loop },
       waveformView: { ...(currentEntry?.waveformView || {}), ...nextEntry.waveformView },
+      eq: { ...(currentEntry?.eq || {}), ...nextEntry.eq },
     }));
   }, [project, projectWorkspace, sendVilambit, vilambitState]);
 
@@ -1781,6 +1787,7 @@ export default function App() {
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
         sourceName={vilambitState.source?.name || null}
+        onOpenRecording={openRecordingPicker}
         queueItems={queueItems}
         onQueueItem={(id) => {
           const link = audioLinkModel.links.find((item) => item.id === id);

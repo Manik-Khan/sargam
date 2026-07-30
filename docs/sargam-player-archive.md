@@ -59,6 +59,53 @@ C:\website\sargam-waveforms\classaudio
 The worker is intentionally limited to `/classaudio/` until the other archive
 URL roots are identified and explicitly allowed.
 
+## Archive and community EQ
+
+EQ & Restoration is non-destructive and available in archive mode. Personal
+adjustments stay with a recording's ordinary Sargam workspace. The archive can
+also publish a curated list of recommended and community settings without
+modifying the source recording.
+
+Pass a same-origin profile manifest through `eqprofiles`:
+
+```text
+http://10.0.0.2/sargam-player/?src=%2Fclassaudio%2Fclass.wav&eqprofiles=%2Fsargam-eq%2Fclass.json
+```
+
+The JSON contract is:
+
+```json
+{
+  "kind": "sargam-eq-profiles",
+  "version": 1,
+  "profiles": [
+    {
+      "id": "archive-restoration-1",
+      "name": "Archive restoration",
+      "author": "AACM archive",
+      "status": "recommended",
+      "notes": "Reduced tape rumble and hiss; preserved the sarod's upper partials.",
+      "eq": {
+        "enabled": true,
+        "highPassHz": 45,
+        "lowShelfDb": 1.5,
+        "lowMidDb": -2,
+        "presenceDb": 1,
+        "lowPassHz": 11500,
+        "outputDb": -1
+      }
+    }
+  ]
+}
+```
+
+`status` may be `recommended` or `community`. The player lists every published
+profile but applies nothing until the listener chooses it. A listener can
+download a candidate profile JSON from the player; an archive curator reviews
+that file and adds accepted settings to the manifest. This keeps publication
+deliberate on the LAN-only static archive while leaving room for authenticated
+submissions and voting in a later server phase.
+
 Video uses Sargam's own play, seek, volume, and fullscreen controls. The
 fullscreen practice drawer keeps speed, pitch, looping, and markers available
 without leaving the picture.

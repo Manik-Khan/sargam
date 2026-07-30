@@ -24,6 +24,17 @@ notation Markdown, and it never contains browser file handles or audio bytes.
         "start": 3025,
         "end": 3060,
         "followPlayhead": false
+      },
+      "eq": {
+        "enabled": true,
+        "highPassHz": 45,
+        "lowShelfDb": 1.5,
+        "lowMidDb": -2,
+        "presenceDb": 1,
+        "lowPassHz": 11500,
+        "outputDb": -1,
+        "profileId": "personal",
+        "profileName": "My EQ"
       }
     }
   }
@@ -44,7 +55,7 @@ A filename match by itself is never enough to restore a workspace.
 - Reopening a project restores state only after the loaded source identity
   matches a saved entry.
 - One atomic iframe command restores position, loop, tempo, pitch, markers,
-  BPM, speed regions, waveform window, and follow preference together.
+  BPM, speed regions, waveform window, follow preference, and EQ together.
 - Portable `.sargam` export/import includes and validates `workspace.json`.
 - Missing source files do not remove their saved workspace entries.
 - Safe unknown fields survive parse, save, import, and re-export.
@@ -53,7 +64,7 @@ A filename match by itself is never enough to restore a workspace.
 
 1. Open a project and load a recording in Vilambit.
 2. Set a distinctive position, A/B loop, tempo, pitch, marker, waveform zoom,
-   and Follow Playhead setting.
+   Follow Playhead setting, and EQ restoration.
 3. Wait about two seconds, then inspect the project folder for
    `workspace.json`.
 4. Close and reopen the project while the same recording is loaded. Confirm

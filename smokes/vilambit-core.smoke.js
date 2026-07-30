@@ -239,6 +239,11 @@ export const smokes = [
         bpm: { bpm: 120, period: 0.5, phaseAbs: 15, confidence: 0.8 },
         speedRegions: [{ start: 30, end: 40, pct: 65 }],
         waveformView: { start: 25, end: 50, followPlayhead: true },
+        eq: {
+          enabled: true, highPassHz: 48, lowShelfDb: 1.5, lowMidDb: -2,
+          presenceDb: 2.5, lowPassHz: 11250, outputDb: -1,
+          profileId: 'archive:tape-2274', profileName: 'Tape 2274 restoration',
+        },
       }, 120);
       assert.deepEqual(JSON.parse(JSON.stringify(restored)), {
         lastPosition: 120,
@@ -250,6 +255,11 @@ export const smokes = [
         bpm: { bpm: 120, period: 0.5, phaseAbs: 15, confidence: 0.8 },
         speedRegions: [{ start: 30, end: 40, pct: 65 }],
         waveformView: { start: 25, end: 50, followPlayhead: true },
+        eq: {
+          enabled: true, highPassHz: 48, lowShelfDb: 1.5, lowMidDb: -2,
+          presenceDb: 2.5, lowPassHz: 11250, outputDb: -1,
+          profileId: 'archive:tape-2274', profileName: 'Tape 2274 restoration',
+        },
       });
     },
   },
@@ -288,7 +298,37 @@ export const smokes = [
         bpm: null,
         speedRegions: [],
         waveformView: { start: 0, end: 120, followPlayhead: false },
+        eq: {
+          enabled: false, highPassHz: 30, lowShelfDb: 0, lowMidDb: 0,
+          presenceDb: 0, lowPassHz: 18000, outputDb: 0,
+          profileId: 'personal', profileName: 'My EQ',
+        },
         error: null,
+      });
+    },
+  },
+  {
+    name: 'vilambit core: restoration settings clamp to safe listening ranges',
+    async fn() {
+      const core = await loadCore();
+      assert.deepEqual(JSON.parse(JSON.stringify(core.normalizeEqSettings({
+        enabled: true,
+        highPassHz: 2,
+        lowShelfDb: 30,
+        lowMidDb: -30,
+        presenceDb: 2.26,
+        lowPassHz: 50000,
+        outputDb: -20,
+      }))), {
+        enabled: true,
+        highPassHz: 20,
+        lowShelfDb: 12,
+        lowMidDb: -12,
+        presenceDb: 2.3,
+        lowPassHz: 20000,
+        outputDb: -12,
+        profileId: 'personal',
+        profileName: 'My EQ',
       });
     },
   },

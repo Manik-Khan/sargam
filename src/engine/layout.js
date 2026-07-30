@@ -70,8 +70,9 @@ export function isSafeBreak(line, k) {
 
 function boundaryPriority(line, tal, k) {
   const after = k + 1;
+  if (!tal) return (line?._bars || []).includes(after) ? 4 : 1;
+  if (isSamBoundary(line, tal, k)) return 5; // strongest readable system boundary
   if ((line?._bars || []).includes(after)) return 4; // author's phrase hint
-  if (!tal) return 1;
   const nextMatra = wrapMatra(tal, (line.startMatra || 1) + performedOffsetAt(line, after));
   const marker = markerAtMatra(tal, nextMatra);
   if (marker === null) return 1;

@@ -64,10 +64,14 @@ const state = {
   bpm: null,                 // {bpm, period, phaseAbs, confidence, tapped?}
   exportScope: 'sel',
   viewStart: 0, viewEnd: 0, followPlayhead: false,
+  eq: Core.normalizeEqSettings(),
+  personalEq: Core.normalizeEqSettings(),
+  archiveEqProfiles: [],
 };
 
 /* ---------------- shared audio context & nodes ---------------- */
 let actx = null, master = null;
+let eqInput = null, eqNodes = null;
 let stretch = null;          // Signalsmith node (buffer or live mode)
 let srcNode = null;          // MediaElementSource (video / fallback)
 let granular = null, dryGain = null, wetGain = null;   // fallback shifter
@@ -75,6 +79,7 @@ let waveAnalyser = null, waveAnalyserData = null, waveAnalyserBytes = null, wave
 let lastLiveWaveCapture = 0;
 let realtimeCaptureActive = false;
 let waveformPollGeneration = 0;
+let sourceGeneration = 0;
 const GRAIN = 4096, RB_SIZE = 1 << 16, RB_MASK = RB_SIZE - 1;
 
 async function buildGraph(){
@@ -83,6 +88,7 @@ async function buildGraph(){
   master = actx.createGain();
   master.gain.value = parseFloat($('vol').value);
   master.connect(actx.destination);
+  buildEqGraph();
 
   if (!state.isVideo && state.decoded){
     // Engine A: buffer playback through the stretch worklet
@@ -90,7 +96,7 @@ async function buildGraph(){
       stretch = await SignalsmithStretch(actx, { numberOfInputs: 0, outputChannelCount: [2] });
       stretch.addBuffers(bufferChannels(state.decoded));
       stretch.setUpdateInterval(0.05);
-      stretch.connect(master);
+      stretch.connect(eqInput);
       state.engine = 'buffer';
       setBadge('engine: full-quality');
       return;
@@ -108,15 +114,15 @@ async function buildGraph(){
   waveAnalyserSilent.gain.value = 0;
   srcNode.connect(waveAnalyser);
   waveAnalyser.connect(waveAnalyserSilent);
-  waveAnalyserSilent.connect(master);
+  waveAnalyserSilent.connect(eqInput);
   let liveOk = false;
   if (window.SignalsmithStretch){
     try {
       stretch = await SignalsmithStretch(actx, { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
       dryGain = actx.createGain(); wetGain = actx.createGain();
       dryGain.gain.value = 1; wetGain.gain.value = 0;
-      srcNode.connect(dryGain);  dryGain.connect(master);
-      srcNode.connect(stretch);  stretch.connect(wetGain); wetGain.connect(master);
+      srcNode.connect(dryGain);  dryGain.connect(eqInput);
+      srcNode.connect(stretch);  stretch.connect(wetGain); wetGain.connect(eqInput);
       stretch.start();
       liveOk = true;
       state.engine = 'video';
@@ -131,6 +137,132 @@ async function buildGraph(){
     setBadge(state.archive ? 'engine: archive compatibility' : 'engine: compatibility');
   }
   applyPitch();
+}
+
+function buildEqGraph(){
+  eqInput = actx.createGain();
+  const highPass = actx.createBiquadFilter();
+  highPass.type = 'highpass';
+  highPass.Q.value = 0.7;
+  const lowShelf = actx.createBiquadFilter();
+  lowShelf.type = 'lowshelf';
+  lowShelf.frequency.value = 120;
+  const lowMid = actx.createBiquadFilter();
+  lowMid.type = 'peaking';
+  lowMid.frequency.value = 450;
+  lowMid.Q.value = 0.85;
+  const presence = actx.createBiquadFilter();
+  presence.type = 'peaking';
+  presence.frequency.value = 3000;
+  presence.Q.value = 0.75;
+  const lowPass = actx.createBiquadFilter();
+  lowPass.type = 'lowpass';
+  lowPass.Q.value = 0.7;
+  const output = actx.createGain();
+  eqInput.connect(highPass);
+  highPass.connect(lowShelf);
+  lowShelf.connect(lowMid);
+  lowMid.connect(presence);
+  presence.connect(lowPass);
+  lowPass.connect(output);
+  output.connect(master);
+  eqNodes = { highPass, lowShelf, lowMid, presence, lowPass, output };
+  applyEqToGraph();
+}
+
+function dbGain(db){
+  return Math.pow(10, Number(db || 0) / 20);
+}
+
+function setAudioParam(param, value){
+  if (!param) return;
+  const now = actx?.currentTime || 0;
+  if (typeof param.setTargetAtTime === 'function') param.setTargetAtTime(value, now, 0.015);
+  else param.value = value;
+}
+
+function applyEqToGraph(){
+  if (!eqNodes) return;
+  const eq = state.eq;
+  const enabled = Boolean(eq.enabled);
+  setAudioParam(eqNodes.highPass.frequency, enabled ? eq.highPassHz : 20);
+  setAudioParam(eqNodes.lowShelf.gain, enabled ? eq.lowShelfDb : 0);
+  setAudioParam(eqNodes.lowMid.gain, enabled ? eq.lowMidDb : 0);
+  setAudioParam(eqNodes.presence.gain, enabled ? eq.presenceDb : 0);
+  setAudioParam(eqNodes.lowPass.frequency, enabled ? eq.lowPassHz : 20000);
+  setAudioParam(eqNodes.output.gain, dbGain(enabled ? eq.outputDb : 0));
+}
+
+function signedDb(value){
+  const number = Number(value || 0);
+  return `${number > 0 ? '+' : ''}${number.toFixed(Number.isInteger(number) ? 0 : 1)} dB`;
+}
+
+function paintEq(){
+  const eq = state.eq;
+  $('eqEnabled').checked = eq.enabled;
+  $('eqHighPass').value = eq.highPassHz;
+  $('eqLowShelf').value = eq.lowShelfDb;
+  $('eqLowMid').value = eq.lowMidDb;
+  $('eqPresence').value = eq.presenceDb;
+  $('eqLowPass').value = eq.lowPassHz;
+  $('eqOutput').value = eq.outputDb;
+  $('eqHighPassVal').textContent = `${eq.highPassHz} Hz`;
+  $('eqLowShelfVal').textContent = signedDb(eq.lowShelfDb);
+  $('eqLowMidVal').textContent = signedDb(eq.lowMidDb);
+  $('eqPresenceVal').textContent = signedDb(eq.presenceDb);
+  $('eqLowPassVal').textContent = eq.lowPassHz >= 1000
+    ? `${(eq.lowPassHz / 1000).toFixed(eq.lowPassHz % 1000 ? 1 : 0)} kHz`
+    : `${eq.lowPassHz} Hz`;
+  $('eqOutputVal').textContent = signedDb(eq.outputDb);
+  $('eqSummary').textContent = eq.enabled ? eq.profileName : 'Original signal';
+  const profile = $('eqProfile');
+  if ([...profile.options].some((option) => option.value === eq.profileId)) {
+    profile.value = eq.profileId;
+  } else {
+    profile.value = 'personal';
+  }
+}
+
+function setEq(value, { personal = false, status = '' } = {}){
+  const incoming = personal
+    ? { ...value, profileId: 'personal', profileName: 'My EQ' }
+    : value;
+  state.eq = Core.normalizeEqSettings(incoming);
+  if (personal) state.personalEq = { ...state.eq };
+  applyEqToGraph();
+  paintEq();
+  if (status) $('eqStatus').textContent = status;
+}
+
+function disconnectNode(node){
+  try { node?.disconnect?.(); } catch (_) {}
+}
+
+function disposeAudioGraph(){
+  try { media.pause(); } catch (_) {}
+  if (state.playing && stretch) {
+    try { stretch.schedule({ active: false }); } catch (_) {}
+  }
+  [stretch, srcNode, granular, dryGain, wetGain, waveAnalyser, waveAnalyserSilent, eqInput]
+    .forEach(disconnectNode);
+  if (eqNodes) Object.values(eqNodes).forEach(disconnectNode);
+  disconnectNode(master);
+  const closing = actx;
+  actx = null;
+  master = null;
+  eqInput = null;
+  eqNodes = null;
+  stretch = null;
+  srcNode = null;
+  granular = null;
+  dryGain = null;
+  wetGain = null;
+  waveAnalyser = null;
+  waveAnalyserData = null;
+  waveAnalyserBytes = null;
+  waveAnalyserSilent = null;
+  if (closing && closing.state !== 'closed') closing.close().catch(() => {});
 }
 
 function bufferChannels(ab){
@@ -347,8 +479,8 @@ function buildGranular(){
   };
   dryGain = actx.createGain(); wetGain = actx.createGain();
   dryGain.gain.value = 1; wetGain.gain.value = 0;
-  srcNode.connect(dryGain); dryGain.connect(master);
-  srcNode.connect(node); node.connect(wetGain); wetGain.connect(master);
+  srcNode.connect(dryGain); dryGain.connect(eqInput);
+  srcNode.connect(node); node.connect(wetGain); wetGain.connect(eqInput);
   granular = { node, params: sh };
 }
 
@@ -707,7 +839,8 @@ function fileNameFromURL(url){
 }
 
 function resetSourceState(source){
-  if (state.playing && stretch) { stretch.schedule({ active: false }); }
+  const generation = ++sourceGeneration;
+  disposeAudioGraph();
   state.playing = false; state.posPaused = 0;
   if (state.fileURL && state.fileURLRevocable) URL.revokeObjectURL(state.fileURL);
   Object.assign(state, {
@@ -715,6 +848,7 @@ function resetSourceState(source){
     fileURLRevocable: Boolean(source.revocable),
     fileName: source.name,
     archive: Boolean(source.archive),
+    engine: 'none',
     fileSize: Number.isFinite(Number(source.size)) ? Number(source.size) : null,
     duration: 0, isVideo: false,
     fileLastModified: Number.isFinite(Number(source.lastModified)) ? Number(source.lastModified) : null,
@@ -722,6 +856,9 @@ function resetSourceState(source){
     loopA: null, loopB: null, loopOn: false, markers: [],
     regions: [], bpm: null,
     viewStart: 0, viewEnd: 0, followPlayhead: false,
+    eq: Core.normalizeEqSettings(),
+    personalEq: Core.normalizeEqSettings(),
+    archiveEqProfiles: [],
   });
   lastEff = null;
   lastLiveWaveCapture = 0;
@@ -736,10 +873,14 @@ function resetSourceState(source){
   media.load();
   document.body.classList.add('hasSource');
   $('fileName').textContent = state.fileName;
+  $('openBtn').textContent = 'Change recording…';
   $('dropzone').style.display = 'none';
   ['transport','controls','waveWrap'].forEach(id => $(id).classList.add('on'));
+  renderEqProfiles();
+  paintEq();
 
   media.addEventListener('loadedmetadata', () => {
+    if (generation !== sourceGeneration) return;
     state.isVideo = media.videoWidth > 0;
     $('videoWrap').classList.toggle('on', state.isVideo);
     if (state.isVideo || !state.decoded){
@@ -753,12 +894,6 @@ function resetSourceState(source){
     } else if (state.isVideo) {
       ensureLiveWaveform('Video waveform builds during playback');
     }
-    // engine choice happens on first play; rebuild if a file type flips engines
-    if (actx && ((state.isVideo && state.engine === 'buffer') || (!state.isVideo && state.engine !== 'buffer'))){
-      // simplest correct path: reload the page state on engine flip
-      location.reload();
-      return;
-    }
     if (stretch && state.engine === 'buffer'){
       stretch.dropBuffers();
       if (state.decoded) stretch.addBuffers(bufferChannels(state.decoded));
@@ -768,16 +903,22 @@ function resetSourceState(source){
   }, { once: true });
 
   media.addEventListener('error', () => {
+    if (generation !== sourceGeneration) return;
     const message = 'The archive recording could not be loaded. Check that its URL is reachable from this computer.';
     showSourceNotice(message, 'err');
     $('exportStatus').textContent = message;
   }, { once: true });
+  return generation;
 }
 
-function decodeSource(arrayBuffer){
+function decodeSource(arrayBuffer, generation = sourceGeneration){
   return Promise.resolve(arrayBuffer).then(buf => {
     const dctx = new (window.AudioContext || window.webkitAudioContext)();
     return dctx.decodeAudioData(buf.slice(0)).then(ab => {
+      if (generation !== sourceGeneration) {
+        dctx.close().catch(() => {});
+        return;
+      }
       state.decoded = ab;
       if (!state.isVideo){
         state.duration = ab.duration;
@@ -796,6 +937,7 @@ function decodeSource(arrayBuffer){
       return dctx.close();
     });
   }).catch(() => {
+    if (generation !== sourceGeneration) return;
     ensureLiveWaveform(state.isVideo
       ? 'Video waveform builds during playback'
       : 'Waveform builds during playback');
@@ -807,7 +949,7 @@ function loadFile(file){
   if (!file) return;
   setArchiveMode(false);
   showSourceNotice('');
-  resetSourceState({
+  const generation = resetSourceState({
     url: URL.createObjectURL(file),
     revocable: true,
     name: file.name,
@@ -815,7 +957,7 @@ function loadFile(file){
     lastModified: file.lastModified,
     archive: false,
   });
-  decodeSource(file.arrayBuffer());
+  decodeSource(file.arrayBuffer(), generation);
 }
 
 function archiveSourceURL(raw){
@@ -827,6 +969,75 @@ function archiveSourceURL(raw){
     throw new Error('For this compatibility player, the recording must be served from the same server as Sargam Player.');
   }
   return url;
+}
+
+function renderEqProfiles(){
+  const select = $('eqProfile');
+  if (!select) return;
+  const current = state.eq?.profileId || 'personal';
+  select.replaceChildren();
+  const add = (value, label) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  };
+  add('flat', 'Original recording');
+  add('personal', 'My EQ');
+  for (const profile of state.archiveEqProfiles) {
+    const prefix = profile.status === 'recommended' ? 'Archive recommended' : 'Community';
+    add(profile.id, `${prefix} · ${profile.name}`);
+  }
+  select.value = [...select.options].some((option) => option.value === current) ? current : 'personal';
+}
+
+async function loadArchiveEqProfiles(raw){
+  if (!raw) {
+    $('eqStatus').textContent =
+      'No archive EQ has been published for this recording. You can still save and share My EQ.';
+    return;
+  }
+  try {
+    const url = new URL(String(raw), window.location.href);
+    if (url.origin !== window.location.origin || !/^https?:$/.test(url.protocol)) {
+      throw new Error('Archive EQ manifests must come from this archive host.');
+    }
+    const response = await fetch(url.href, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`Archive EQ manifest returned ${response.status}.`);
+    const payload = await response.json();
+    if (!payload || payload.kind !== 'sargam-eq-profiles' || payload.version !== 1) {
+      throw new Error('Archive EQ manifest is not a supported Sargam profile list.');
+    }
+    state.archiveEqProfiles = (Array.isArray(payload.profiles) ? payload.profiles : [])
+      .filter((profile) => profile && typeof profile === 'object' && profile.eq)
+      .map((profile, index) => {
+        const idBase = String(profile.id || `community-${index + 1}`)
+          .trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').slice(0, 64);
+        const status = profile.status === 'recommended' ? 'recommended' : 'community';
+        const name = String(profile.name || `Community EQ ${index + 1}`).trim().slice(0, 120);
+        return {
+          id: `archive:${idBase || index + 1}`,
+          name,
+          status,
+          author: String(profile.author || '').trim().slice(0, 120),
+          notes: String(profile.notes || '').trim().slice(0, 500),
+          eq: Core.normalizeEqSettings({
+            ...profile.eq,
+            enabled: profile.eq.enabled !== false,
+            profileId: `archive:${idBase || index + 1}`,
+            profileName: name,
+          }),
+        };
+      });
+    renderEqProfiles();
+    $('eqStatus').textContent = state.archiveEqProfiles.length
+      ? `${state.archiveEqProfiles.length} archive/community ${state.archiveEqProfiles.length === 1 ? 'setting is' : 'settings are'} available. Nothing changes until you choose one.`
+      : 'The archive EQ manifest is valid, but it does not contain any published settings.';
+  } catch (error) {
+    state.archiveEqProfiles = [];
+    renderEqProfiles();
+    $('eqStatus').textContent = `Archive EQ unavailable: ${error.message || error}`;
+  }
 }
 
 function loadArchiveURL(raw, displayName){
@@ -857,7 +1068,9 @@ function loadArchiveURLFromQuery(){
   const source = params.get('src');
   if (!source) return false;
   setArchiveMode(true);
-  return loadArchiveURL(source, params.get('name'));
+  const loaded = loadArchiveURL(source, params.get('name'));
+  if (loaded) loadArchiveEqProfiles(params.get('eqprofiles'));
+  return loaded;
 }
 
 /* ---------------- waveform ---------------- */
@@ -2378,6 +2591,95 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* ---------------- EQ & restoration ---------------- */
+$('eqEnabled').addEventListener('change', e => {
+  setEq({ ...state.eq, enabled: e.target.checked }, {
+    personal: true,
+    status: e.target.checked
+      ? 'My EQ is active and will be saved with this recording.'
+      : 'EQ bypassed. Your values remain available in My EQ.',
+  });
+});
+
+[
+  ['eqHighPass', 'highPassHz'],
+  ['eqLowShelf', 'lowShelfDb'],
+  ['eqLowMid', 'lowMidDb'],
+  ['eqPresence', 'presenceDb'],
+  ['eqLowPass', 'lowPassHz'],
+  ['eqOutput', 'outputDb'],
+].forEach(([id, key]) => {
+  $(id).addEventListener('input', event => {
+    setEq({ ...state.eq, enabled: true, [key]: Number(event.target.value) }, {
+      personal: true,
+      status: 'My EQ is active. Changes are saved with this recording in workspace.json.',
+    });
+  });
+});
+
+$('eqProfile').addEventListener('change', event => {
+  const id = event.target.value;
+  if (id === 'flat') {
+    setEq({ ...Core.normalizeEqSettings(), enabled: false, profileId: 'flat', profileName: 'Original recording' }, {
+      status: 'Original signal selected. No EQ is being applied.',
+    });
+    return;
+  }
+  if (id === 'personal') {
+    setEq(state.personalEq, {
+      status: 'My EQ selected. It is stored with this recording in workspace.json.',
+    });
+    return;
+  }
+  const profile = state.archiveEqProfiles.find((candidate) => candidate.id === id);
+  if (!profile) return;
+  setEq(profile.eq, {
+    status: [
+      profile.status === 'recommended' ? 'Archive recommended setting' : 'Community setting',
+      profile.author ? `by ${profile.author}` : '',
+      profile.notes,
+    ].filter(Boolean).join(' · '),
+  });
+});
+
+$('eqReset').addEventListener('click', () => {
+  setEq({ ...Core.normalizeEqSettings(), enabled: false, profileId: 'flat', profileName: 'Original recording' }, {
+    status: 'Reset to the untouched original signal.',
+  });
+});
+
+$('eqSavePersonal').addEventListener('click', () => {
+  setEq({ ...state.eq, enabled: true }, {
+    personal: true,
+    status: 'Kept as My EQ. It will return with this recording through workspace.json.',
+  });
+});
+
+$('eqExportProfile').addEventListener('click', () => {
+  const safeName = (state.fileName || 'recording').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-');
+  const payload = {
+    kind: 'sargam-eq-profile',
+    version: 1,
+    recording: { name: state.fileName || 'Unknown recording' },
+    profile: {
+      id: `candidate-${Date.now()}`,
+      name: state.eq.profileName === 'Original recording' ? 'Community restoration' : state.eq.profileName,
+      author: '',
+      status: 'candidate',
+      notes: '',
+      eq: Core.normalizeEqSettings({ ...state.eq, profileId: 'personal', profileName: 'My EQ' }),
+    },
+  };
+  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json' });
+  const anchor = document.createElement('a');
+  anchor.href = URL.createObjectURL(blob);
+  anchor.download = `${safeName || 'recording'}-eq-profile.json`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+  $('eqStatus').textContent =
+    'Profile JSON downloaded. An archive curator can review it and publish it as a recommended or community setting.';
+});
+
 /* ---------------- file pickers & drag/drop ---------------- */
 $('openBtn').addEventListener('click', () => $('fileInput').click());
 $('dropzone').addEventListener('click', () => $('fileInput').click());
@@ -2460,7 +2762,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   const BRIDGE_VERSION = 1;
   const BRIDGE_COMMANDS = new Set([
     'request-state', 'play', 'pause', 'toggle', 'seek', 'skip',
-    'set-loop', 'clear-loop', 'jump-marker', 'extract-loop', 'apply-workspace',
+    'set-loop', 'clear-loop', 'jump-marker', 'extract-loop', 'apply-workspace', 'open-file',
   ]);
   const bridgeTargetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
   let bridgeError = null;
@@ -2497,6 +2799,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       viewStart: state.viewStart,
       viewEnd: state.viewEnd,
       followPlayhead: state.followPlayhead,
+      eq: state.eq,
       error: bridgeError,
     });
   }
@@ -2547,6 +2850,10 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
 
   async function bridgeRunCommand(type, payload){
     if (type === 'request-state') return;
+    if (type === 'open-file') {
+      $('fileInput').click();
+      return;
+    }
     if (!state.fileURL) throw new Error('Load a recording in Vilambit first.');
 
     if (type === 'apply-workspace') {
@@ -2560,9 +2867,13 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       state.followPlayhead = restored.waveformView.followPlayhead;
       state.semitones = restored.pitchSemitones;
       state.cents = restored.pitchCents;
+      state.eq = restored.eq;
+      state.personalEq = { ...restored.eq, profileId: 'personal', profileName: 'My EQ' };
       $('cents').value = state.cents;
       applyTempo(restored.tempoPercent);
       applyPitch();
+      applyEqToGraph();
+      paintEq();
       setWaveView(restored.waveformView.start, restored.waveformView.end, { draw: false });
       lastEff = null;
       renderMarkers();

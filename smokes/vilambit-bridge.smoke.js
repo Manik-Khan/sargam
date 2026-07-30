@@ -29,6 +29,11 @@ function statePayload(overrides = {}) {
     bpm: { bpm: 120, period: 0.5, phaseAbs: 2538, confidence: 0.8 },
     speedRegions: [{ start: 2540, end: 2545, pct: 65 }],
     waveformView: { start: 2530, end: 2560, followPlayhead: true },
+    eq: {
+      enabled: true, highPassHz: 48, lowShelfDb: 1.5, lowMidDb: -2,
+      presenceDb: 2.5, lowPassHz: 11000, outputDb: -1,
+      profileId: 'personal', profileName: 'My EQ',
+    },
     error: null,
     ...overrides,
   };
@@ -64,6 +69,7 @@ export const smokes = [
       assert.equal(message.state.source.size, 123456);
       assert.equal(message.state.waveformView.start, 2530);
       assert.equal(message.state.speedRegions[0].pct, 65);
+      assert.equal(message.state.eq.lowPassHz, 11000);
       assert.equal(readVilambitMessage({ ...message, channel: 'other' }), null);
       assert.equal(readVilambitMessage({
         channel: VILAMBIT_CHANNEL, version: 2, direction: 'event', type: 'state', payload: statePayload(),
@@ -93,6 +99,7 @@ export const smokes = [
       }), null);
       assert.equal(makeVilambitCommand('extract-loop', { requestId: 'r', a: 1, b: 2 }).type, 'extract-loop');
       assert.equal(makeVilambitCommand('apply-workspace', { lastPosition: 42 }).type, 'apply-workspace');
+      assert.equal(makeVilambitCommand('open-file').type, 'open-file');
     },
   },
   {

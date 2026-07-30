@@ -7,6 +7,40 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), 'utf8');
 
 export const smokes = [
   {
+    name: 'sargam player: recordings can be replaced without reloading the workspace',
+    async fn() {
+      const [html, css, app] = await Promise.all([
+        read('../public/sargam-player/index.html'),
+        read('../public/vilambit/vilambit.css'),
+        read('../public/vilambit/vilambit-app.js'),
+      ]);
+      assert.match(html, /id="openBtn">Choose recording/);
+      assert.match(css, /body\.hasSource \.music-source-meta #openBtn\{display:inline-flex\}/);
+      assert.match(app, /function disposeAudioGraph\(\)/);
+      assert.match(app, /\$\('openBtn'\)\.textContent = 'Change recording…'/);
+      assert.doesNotMatch(app, /location\.reload\(\)/);
+    },
+  },
+  {
+    name: 'sargam player: EQ is audible, project-persistent, and archive-profile aware',
+    async fn() {
+      const [html, app, core] = await Promise.all([
+        read('../public/sargam-player/index.html'),
+        read('../public/vilambit/vilambit-app.js'),
+        read('../public/vilambit/vilambit-core.js'),
+      ]);
+      assert.match(html, /EQ &amp; Restoration/);
+      assert.match(html, /id="eqHighPass"/);
+      assert.match(html, /id="eqLowPass"/);
+      assert.match(app, /function buildEqGraph\(\)/);
+      assert.match(app, /type = 'highpass'/);
+      assert.match(app, /type = 'lowpass'/);
+      assert.match(app, /kind: 'sargam-eq-profile'/);
+      assert.match(app, /payload\.kind !== 'sargam-eq-profiles'/);
+      assert.match(core, /function normalizeEqSettings/);
+    },
+  },
+  {
     name: 'sargam player: integrated video enables live waveform capture outside archive mode',
     async fn() {
       const app = await read('../public/vilambit/vilambit-app.js');

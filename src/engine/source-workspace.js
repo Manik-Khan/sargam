@@ -25,6 +25,10 @@ function percent(value, fallback = 100) {
   return Math.min(200, Math.max(25, Math.round(finite(value, fallback))));
 }
 
+function clamped(value, min, max, fallback) {
+  return Math.min(max, Math.max(min, rounded(value, fallback)));
+}
+
 function safeSourceId(value) {
   const id = typeof value === 'string' ? value.trim() : '';
   return /^source-[a-z0-9._-]+$/i.test(id) ? id.toLowerCase() : null;
@@ -104,6 +108,26 @@ function normalizeWaveformView(value = {}) {
   };
 }
 
+export function normalizeEqSettings(value = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    ...source,
+    enabled: Boolean(source.enabled),
+    highPassHz: clamped(source.highPassHz, 20, 180, 30),
+    lowShelfDb: clamped(source.lowShelfDb, -12, 12, 0),
+    lowMidDb: clamped(source.lowMidDb, -12, 12, 0),
+    presenceDb: clamped(source.presenceDb, -12, 12, 0),
+    lowPassHz: clamped(source.lowPassHz, 4000, 20000, 18000),
+    outputDb: clamped(source.outputDb, -12, 6, 0),
+    profileId: typeof source.profileId === 'string' && source.profileId.trim()
+      ? source.profileId.trim().slice(0, 80)
+      : 'personal',
+    profileName: typeof source.profileName === 'string' && source.profileName.trim()
+      ? source.profileName.trim().slice(0, 120)
+      : 'My EQ',
+  };
+}
+
 export function createEmptySourceWorkspace() {
   return {
     kind: SOURCE_WORKSPACE_KIND,
@@ -125,6 +149,7 @@ export function normalizeSourceWorkspaceEntry(value = {}) {
     bpm: normalizeBpm(source.bpm),
     speedRegions: normalizeSpeedRegions(source.speedRegions),
     waveformView: normalizeWaveformView(source.waveformView),
+    eq: normalizeEqSettings(source.eq),
   };
 }
 
@@ -216,6 +241,6 @@ export function sourceWorkspaceEntryFromPlayer(state = {}) {
     bpm: state.bpm,
     speedRegions: state.speedRegions,
     waveformView: state.waveformView,
+    eq: state.eq,
   });
 }
-
