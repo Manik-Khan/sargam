@@ -36,7 +36,7 @@ export const smokes = [
       assert.match(editor, /−100 ms/);
       assert.match(editor, /\+10 ms/);
       assert.match(editor, /Save Loop Points/);
-      assert.match(editor, /Open Source in Player/);
+      assert.match(editor, /Open Source in Music/);
       assert.match(editor, /snapLoopRegionToZeroCrossings/);
       assert.match(editor, /audio file is unchanged/i);
     },

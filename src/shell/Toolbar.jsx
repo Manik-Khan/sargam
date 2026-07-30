@@ -1,8 +1,3 @@
-// src/shell/Toolbar.jsx — the M2 file strip. Purely presentational:
-// every action is injected from App.jsx; this file owns no file logic.
-// Design locked 2026-07-16: wordmark · New Open Save Recent▾ · name + dot
-// (filled = unsaved, hollow = saved).
-
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function Toolbar({
@@ -33,162 +28,238 @@ export default function Toolbar({
   onToggleLayout,
   onOpenRecent,
   onRemoveRecent,
+  sourceName,
+  queueItems = [],
+  onQueueItem,
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  const projectMenuRef = useRef(null);
+  const [openMenu, setOpenMenu] = useState(null);
+  const sourcesRef = useRef(null);
+  const queueRef = useRef(null);
 
   useEffect(() => {
-    if (!menuOpen && !projectMenuOpen) return;
-    const close = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target)) setProjectMenuOpen(false);
+    if (!openMenu) return undefined;
+    const close = (event) => {
+      const activeRef = openMenu === 'sources' ? sourcesRef : queueRef;
+      if (!activeRef.current?.contains(event.target)) setOpenMenu(null);
     };
-    const esc = (e) => {
-      if (e.key === 'Escape') { setMenuOpen(false); setProjectMenuOpen(false); }
+    const escape = (event) => {
+      if (event.key === 'Escape') setOpenMenu(null);
     };
     document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', esc);
+    document.addEventListener('keydown', escape);
     return () => {
       document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', esc);
+      document.removeEventListener('keydown', escape);
     };
-  }, [menuOpen, projectMenuOpen]);
+  }, [openMenu]);
+
+  const toggleMenu = (name) => {
+    setOpenMenu((current) => current === name ? null : name);
+  };
+
+  const run = (action) => {
+    setOpenMenu(null);
+    action?.();
+  };
 
   return (
-    <div className="app-header app-toolbar">
-      <span className="app-wordmark">Sargam</span>
-      <button className="tb-btn" onClick={onNew}>New</button>
-      <button className="tb-btn" onClick={onOpen}>Open</button>
-      <button className="tb-btn" onClick={onSave} title="Cmd+S">Save</button>
-      <span className="tb-recent-wrap" ref={projectMenuRef}>
+    <header className="workspace-topbar">
+      <a className="workspace-wordmark" href="./" aria-label="Sargam home">
+        <span className="workspace-wordmark-logo" aria-hidden="true">
+          <img src="/aacm-logo-2015.jpg" alt="" />
+        </span>
+        <span>Sargam</span>
+      </a>
+
+      <nav className="workspace-primary-nav" aria-label="Workspace">
         <button
-          className={'tb-btn' + (projectName ? ' tb-on' : '')}
-          onClick={() => setProjectMenuOpen((value) => !value)}
-          aria-expanded={projectMenuOpen}
-          title={projectName ? `Project folder: ${projectName}` : 'Local project folder and extracted clips'}
+          type="button"
+          className={view === 'notation' || view === 'split' ? 'is-active' : ''}
+          aria-current={view === 'notation' ? 'page' : undefined}
+          onClick={() => onView('notation')}
         >
-          Project ▾
+          Notation
         </button>
-        {projectMenuOpen && (
-          <div className="tb-menu" role="menu">
-            {!projectSupported && (
-              <div className="tb-menu-empty">Project folders require a browser with directory access.</div>
-            )}
-            <button className="tb-menu-item" disabled={!projectSupported} onClick={() => { setProjectMenuOpen(false); onNewProject?.(); }}>
-              New Project Folder…
-            </button>
-            <button className="tb-menu-item" disabled={!projectSupported} onClick={() => { setProjectMenuOpen(false); onOpenProject?.(); }}>
-              Open Project Folder…
-            </button>
-            <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onSaveProject?.(); }}>
-              Save Project
-            </button>
-            <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onClipVault?.(); }}>
-              Clip Vault ({clipCount})
-            </button>
-            <div className="tb-menu-separator" role="separator" />
-            <button className="tb-menu-item" onClick={() => { setProjectMenuOpen(false); onOpenPortable?.(); }}>
-              Open Portable Project…
-            </button>
-            <button className="tb-menu-item" disabled={!projectName} onClick={() => { setProjectMenuOpen(false); onExportPortable?.(); }}>
-              Export Portable .sargam…
-            </button>
-          </div>
-        )}
-      </span>
-      <span className="tb-recent-wrap" ref={menuRef}>
         <button
-          className="tb-btn"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-expanded={menuOpen}
+          type="button"
+          className={view === 'vilambit' || view === 'split' ? 'is-active' : ''}
+          aria-current={view === 'vilambit' ? 'page' : undefined}
+          onClick={() => onView('vilambit')}
         >
-          Recent ▾
+          Music
         </button>
-        {menuOpen && (
-          <div className="tb-menu" role="menu">
-            {recents.length === 0 ? (
-              <div className="tb-menu-empty">Nothing saved yet</div>
-            ) : (
-              recents.map((r) => (
-                <div className="tb-menu-row" key={r.id}>
-                  <button
-                    className="tb-menu-item"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onOpenRecent(r);
-                    }}
-                    title="Restores the autosaved copy"
-                  >
-                    {r.title || r.name || r.id.slice(0, 8)}
+      </nav>
+
+      <div className="workspace-top-actions">
+        <div className="workspace-menu-wrap" ref={sourcesRef}>
+          <button
+            type="button"
+            className={'workspace-menu-toggle' + (openMenu === 'sources' ? ' is-open' : '')}
+            aria-expanded={openMenu === 'sources'}
+            onClick={() => toggleMenu('sources')}
+          >
+            Sources <span aria-hidden="true">▾</span>
+          </button>
+          {openMenu === 'sources' && (
+            <div className="workspace-drawer workspace-sources-drawer">
+              <div className="workspace-drawer-heading">
+                <div>
+                  <span>Current project</span>
+                  <strong>{projectName || fileName || 'Untitled notation'}</strong>
+                </div>
+                <button type="button" aria-label="Close sources" onClick={() => setOpenMenu(null)}>×</button>
+              </div>
+
+              <section className="workspace-drawer-section">
+                <span className="workspace-drawer-label">Notation</span>
+                <p>
+                  <strong>{fileName || 'Untitled notation'}</strong>
+                  <span>{dirty ? 'Unsaved changes' : 'Saved locally'}</span>
+                </p>
+                <div className="workspace-drawer-actions">
+                  <button type="button" onClick={() => run(onNew)}>New</button>
+                  <button type="button" onClick={() => run(onOpen)}>Open</button>
+                  <button type="button" onClick={() => run(onSave)}>Save</button>
+                  <button type="button" onClick={() => run(onExport)}>Print / PDF</button>
+                  <button type="button" onClick={() => run(onExportXML)}>MusicXML</button>
+                </div>
+              </section>
+
+              <section className="workspace-drawer-section">
+                <span className="workspace-drawer-label">Recording</span>
+                <p>
+                  <strong>{sourceName || 'No recording loaded'}</strong>
+                  <span>Music remains on this device</span>
+                </p>
+                <button className="workspace-drawer-primary" type="button" onClick={() => run(() => onView('vilambit'))}>
+                  Open Music
+                </button>
+              </section>
+
+              <section className="workspace-drawer-section">
+                <span className="workspace-drawer-label">Project folder</span>
+                <p>
+                  <strong>{projectName || 'No project folder open'}</strong>
+                  <span>{clipCount} saved {clipCount === 1 ? 'clip' : 'clips'}</span>
+                </p>
+                <div className="workspace-drawer-actions">
+                  <button type="button" disabled={!projectSupported} onClick={() => run(onNewProject)}>
+                    New Project Folder…
                   </button>
-                  <button
-                    className="tb-menu-x"
-                    aria-label={`Remove ${r.title || r.name || 'entry'} from recents`}
-                    onClick={() => onRemoveRecent(r.id)}
-                  >
-                    ×
+                  <button type="button" disabled={!projectSupported} onClick={() => run(onOpenProject)}>
+                    Open Project Folder…
+                  </button>
+                  <button type="button" disabled={!projectName} onClick={() => run(onSaveProject)}>
+                    Save Project
+                  </button>
+                  <button type="button" disabled={!projectName} onClick={() => run(onClipVault)}>
+                    Clip Vault
+                  </button>
+                  <button type="button" onClick={() => run(onOpenPortable)}>
+                    Open Portable Project…
+                  </button>
+                  <button type="button" disabled={!projectName} onClick={() => run(onExportPortable)}>
+                    Export Portable .sargam…
                   </button>
                 </div>
-              ))
-            )}
-          </div>
-        )}
-      </span>
-      <button className="tb-btn" onClick={onExport}>Export</button>
-      <button className="tb-btn" onClick={onExportXML} title="MusicXML — opens in MuseScore, Sibelius, Dorico, Finale">
-        Staff ↗
-      </button>
-      <button
-        className="tb-btn tb-icon"
-        onClick={onToggleLayout}
-        aria-label={
-          layout === 'stacked'
-            ? 'Layout: notation on top — switch to side by side'
-            : 'Layout: side by side — switch to notation on top'
-        }
-        title={layout === 'stacked' ? 'Notation on top' : 'Side by side'}
-      >
-        {layout === 'stacked' ? '\u2B13' : '\u25EB'}
-      </button>
-      <button
-        className={'tb-btn' + (noteNames === 'western' ? ' tb-on' : '')}
-        onClick={onToggleNoteNames}
-        title={noteNames === 'western' ? 'Showing C D E — click for sargam' : 'Showing S R G — click for C D E'}
-      >
-        {noteNames === 'western' ? 'CDE' : 'SRG'}
-      </button>
-      <button className="tb-btn" onClick={onDictate} title="Type or say sargam syllables">
-        Dictate
-      </button>
-      <button className="tb-btn" onClick={onLegend} title="What every command means">
-        Key
-      </button>
-      <span className="tb-tabs" role="tablist" aria-label="Workspace">
-        {[
-          ['notation', 'Notation'],
-          ['vilambit', 'Player'],
-        ].map(([v, label]) => (
+              </section>
+
+              <section className="workspace-drawer-section">
+                <span className="workspace-drawer-label">Notation tools</span>
+                <div className="workspace-drawer-actions">
+                  <button type="button" onClick={() => run(onToggleLayout)}>
+                    {layout === 'stacked' ? 'Side-by-side editor' : 'Notation on top'}
+                  </button>
+                  <button type="button" onClick={() => run(onToggleNoteNames)}>
+                    {noteNames === 'western' ? 'Show SRG' : 'Show CDE'}
+                  </button>
+                  <button type="button" onClick={() => run(onDictate)}>Dictate</button>
+                  <button type="button" onClick={() => run(onLegend)}>Notation key</button>
+                </div>
+              </section>
+
+              {recents.length > 0 && (
+                <section className="workspace-drawer-section">
+                  <span className="workspace-drawer-label">Recent notation</span>
+                  <div className="workspace-recent-list">
+                    {recents.map((entry) => (
+                      <div key={entry.id}>
+                        <button
+                          type="button"
+                          onClick={() => run(() => onOpenRecent(entry))}
+                          title="Restore the autosaved copy"
+                        >
+                          {entry.title || entry.name || entry.id.slice(0, 8)}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${entry.title || entry.name || 'entry'} from recents`}
+                          onClick={() => onRemoveRecent(entry.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="workspace-menu-wrap" ref={queueRef}>
           <button
-            key={v}
-            role="tab"
-            aria-selected={view === v}
-            className={'tb-btn' + (view === v ? ' tb-on' : '')}
-            onClick={() => onView(v)}
-            title={v === 'vilambit' ? 'Loop a recording and notate — audio keeps playing on the other tab' : 'The notation editor'}
+            type="button"
+            className={'workspace-menu-toggle' + (openMenu === 'queue' ? ' is-open' : '')}
+            aria-expanded={openMenu === 'queue'}
+            onClick={() => toggleMenu('queue')}
           >
-            {label}
+            Queue <span aria-hidden="true">▾</span>
           </button>
-        ))}
-      </span>
-      <span className="tb-file">
-        <span
-          className={'tb-dot' + (dirty ? ' is-dirty' : '')}
-          title={dirty ? 'Unsaved changes' : 'Saved'}
-        />
-        {fileName || 'untitled'}
-      </span>
-    </div>
+          {openMenu === 'queue' && (
+            <div className="workspace-drawer workspace-queue-drawer">
+              <div className="workspace-drawer-heading">
+                <div>
+                  <span>Current project</span>
+                  <strong>Practice queue</strong>
+                </div>
+                <button type="button" aria-label="Close queue" onClick={() => setOpenMenu(null)}>×</button>
+              </div>
+              {queueItems.length === 0 ? (
+                <p className="workspace-drawer-empty">
+                  Attach an A–B loop to a passage in the notation and it will appear here.
+                </p>
+              ) : (
+                <div className="workspace-queue-list">
+                  {queueItems.map((item, index) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className={item.active ? 'is-active' : ''}
+                      onClick={() => run(() => onQueueItem?.(item.id))}
+                    >
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <span>
+                        <strong>{item.label}</strong>
+                        <small>{item.detail}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="workspace-open-recording"
+          onClick={() => onView('vilambit')}
+          title="Open Music, then choose a recording"
+        >
+          Open recording
+        </button>
+      </div>
+    </header>
   );
 }

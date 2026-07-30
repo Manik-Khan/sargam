@@ -196,7 +196,7 @@ export const smokes = [
       assert.match(app, /<iframe[\s\S]*?ref=\{vilambitRef\}[\s\S]*?src=["']sargam-player\/["']/);
       assert.match(bar, /−5s/);
       assert.match(bar, /\+5s/);
-      assert.match(bar, /Open Player/);
+      assert.match(bar, /Open Music/);
       assert.match(bar, /onClipExtracted/);
       assert.match(bar, /Extract Clip/);
       assert.doesNotMatch(bar, /AudioContext|createMediaElementSource|decodeAudioData/);

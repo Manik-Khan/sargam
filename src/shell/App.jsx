@@ -86,6 +86,7 @@ import Legend from './Legend.jsx';
 import EditorPane from './EditorPane.jsx';
 import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
+import WorkspaceRail from './WorkspaceRail.jsx';
 import NewDocDialog from './NewDocDialog.jsx';
 import ExportView from './ExportView.jsx';
 import ProblemsPanel from './ProblemsPanel.jsx';
@@ -93,7 +94,11 @@ import PracticeBar from './PracticeBar.jsx';
 import ClipVault from './ClipVault.jsx';
 import ClipLoopEditor from './ClipLoopEditor.jsx';
 import PortableProjectImport from './PortableProjectImport.jsx';
-import { EMPTY_VILAMBIT_STATE, postVilambitCommand } from './vilambit-bridge.js';
+import {
+  EMPTY_VILAMBIT_STATE,
+  formatVilambitTime,
+  postVilambitCommand,
+} from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import { applyBolCaptureKey, beginBolCapture } from '../engine/bol-capture.js';
 import './sargam.css';
@@ -151,11 +156,10 @@ export default function App() {
   const [noteNames, setNoteNames] = useState(() => store.getPref('noteNames', 'sargam'));
   const [showDictate, setShowDictate] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
-  // 'notation' | 'vilambit' — Vilambit (M's practice player, slow-without-
-  // pitch-change) lives in an ALWAYS-MOUNTED iframe, hidden with CSS when
-  // on the notation tab, never unmounted: the recording keeps looping
-  // while you notate (M, 2026-07-16 — the transcription workflow).
+  // 'notation' | 'vilambit' | 'split' — the practice player remains mounted
+  // in every mode so a recording can keep looping while notation is visible.
   const [view, setView] = useState('notation');
+  const [workspaceSplit, setWorkspaceSplit] = useState(null);
   const [cursorPos, setCursorPos] = useState(0);
   const [meterDraft, setMeterDraft] = useState(null);
   const [meterMessage, setMeterMessage] = useState(
@@ -185,6 +189,7 @@ export default function App() {
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
+  const stageRef = useRef(null);
 
   const sendVilambit = useCallback((type, payload = {}) => {
     const frameWindow = vilambitRef.current?.contentWindow;
@@ -227,6 +232,15 @@ export default function App() {
   const selectedAudioLink = useMemo(
     () => audioLinkModel.links.find((link) => link.id === selectedAudioLinkId) || null,
     [audioLinkModel.links, selectedAudioLinkId]
+  );
+  const queueItems = useMemo(
+    () => audioLinkModel.links.map((link, index) => ({
+      id: link.id,
+      label: `Linked phrase ${index + 1}`,
+      detail: `${formatVilambitTime(link.startTime)}–${formatVilambitTime(link.endTime)} · ${link.recording?.name || 'recording'}`,
+      active: linkedPlayback?.linkId === link.id,
+    })),
+    [audioLinkModel.links, linkedPlayback]
   );
   const allProblems = useMemo(
     () => [...problems, ...meterModel.problems, ...anchorModel.problems, ...audioLinkModel.problems],
@@ -1341,7 +1355,7 @@ export default function App() {
     }
 
     if (!recordingMatches(link.recording, vilambitStateRef.current)) {
-      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Sargam Player to use this phrase.`);
+      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Sargam Music to use this phrase.`);
       return;
     }
     stopLinkedPlayback();
@@ -1355,7 +1369,7 @@ export default function App() {
     if (play) {
       const sent = sendVilambit('play');
       if (!sent) {
-        setNotice('Sargam Player is not ready to play the linked source loop.');
+        setNotice('Sargam Music is not ready to play the linked source loop.');
         return;
       }
       setLinkedPlaybackState({
@@ -1388,7 +1402,7 @@ export default function App() {
       return;
     }
     if (!recordingMatches(link.recording, playerState)) {
-      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Sargam Player before extracting its clip.`);
+      setNotice(`Load “${link.recording?.name || 'the linked recording'}” in Sargam Music before extracting its clip.`);
       return;
     }
     const extraction = extractionRangeForLink(link, playerState.duration || link.recording?.duration);
@@ -1408,7 +1422,7 @@ export default function App() {
     if (!sent) {
       pendingClipRef.current = null;
       setExtractingClip(false);
-      setNotice('Sargam Player is not ready to extract the clip.');
+      setNotice('Sargam Music is not ready to extract the clip.');
     }
   };
 
@@ -1656,6 +1670,34 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const beginWorkspaceResize = (event) => {
+    if (view !== 'split' || !stageRef.current) return;
+    const divider = event.currentTarget;
+    divider.setPointerCapture?.(event.pointerId);
+
+    const resize = (moveEvent) => {
+      const stageBounds = stageRef.current?.getBoundingClientRect();
+      const railBounds = stageRef.current?.querySelector('.workspace-rail')?.getBoundingClientRect();
+      if (!stageBounds || !railBounds) return;
+      const contentLeft = railBounds.right;
+      const contentWidth = stageBounds.right - contentLeft;
+      if (contentWidth <= 0) return;
+      const width = moveEvent.clientX - contentLeft;
+      setWorkspaceSplit(Math.max(340, Math.min(contentWidth - 360, width)));
+    };
+
+    const finish = (upEvent) => {
+      divider.releasePointerCapture?.(upEvent.pointerId);
+      divider.removeEventListener('pointermove', resize);
+      divider.removeEventListener('pointerup', finish);
+      divider.removeEventListener('pointercancel', finish);
+    };
+
+    divider.addEventListener('pointermove', resize);
+    divider.addEventListener('pointerup', finish);
+    divider.addEventListener('pointercancel', finish);
+  };
+
   return (
     <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
       {showExport && (
@@ -1723,6 +1765,12 @@ export default function App() {
         onToggleLayout={toggleLayout}
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
+        sourceName={vilambitState.source?.name || null}
+        queueItems={queueItems}
+        onQueueItem={(id) => {
+          const link = audioLinkModel.links.find((item) => item.id === id);
+          if (link) activateAudioLink(link, { play: true });
+        }}
       />
       {notice && (
         <div className="app-notice">
@@ -1736,29 +1784,31 @@ export default function App() {
           </button>
         </div>
       )}
-      <Transport
-        playing={playing}
-        position={position}
-        duration={schedule.duration}
-        bpm={bpm}
-        loopMode={loopMode}
-        tracks={mutes}
-        volumes={volumes}
-        melodyVoice={melodyVoice}
-        tone={toneByVoice[melodyVoice]}
-        droneMode={droneMode}
-        talaSound={talaSound}
-        onPlayPause={doPlayPause}
-        onStop={doStop}
-        onBpm={doBpm}
-        onLoopMode={doLoopMode}
-        onTrackMute={doTrackMute}
-        onTrackGain={doTrackGain}
-        onMelodyVoice={doMelodyVoice}
-        onToneChange={doToneChange}
-        onDroneMode={doDroneMode}
-        onTalaSound={doTalaSound}
-      />
+      {view !== 'vilambit' && (
+        <Transport
+          playing={playing}
+          position={position}
+          duration={schedule.duration}
+          bpm={bpm}
+          loopMode={loopMode}
+          tracks={mutes}
+          volumes={volumes}
+          melodyVoice={melodyVoice}
+          tone={toneByVoice[melodyVoice]}
+          droneMode={droneMode}
+          talaSound={talaSound}
+          onPlayPause={doPlayPause}
+          onStop={doStop}
+          onBpm={doBpm}
+          onLoopMode={doLoopMode}
+          onTrackMute={doTrackMute}
+          onTrackGain={doTrackGain}
+          onMelodyVoice={doMelodyVoice}
+          onToneChange={doToneChange}
+          onDroneMode={doDroneMode}
+          onTalaSound={doTalaSound}
+        />
+      )}
 
       {view === 'notation' && (
         <PracticeBar
@@ -1787,20 +1837,32 @@ export default function App() {
           onClose={() => setShowDictate(false)}
         />
       )}
-      {/* Both views live on one stage, both always mounted at full size.
-          The inactive one is veiled (visibility), never display:none —
-          Vilambit measures its own width at startup and must keep playing
-          while you notate on the other tab. `allow="autoplay"` is
-          REQUIRED: it drives a <video> through createMediaElementSource,
-          and a frame without that permission simply cannot start it. */}
-      <div className="app-stage">
+      {/* Music and Notation stay mounted on one stage. Visibility switches
+          single-surface modes; split mode gives each surface a live column.
+          The iframe is never unmounted, so looping audio continues while the
+          user reads or edits notation. */}
+      <div
+        ref={stageRef}
+        className={`app-stage app-workspace-${view}`}
+        style={workspaceSplit == null ? undefined : { '--workspace-notation-width': `${workspaceSplit}px` }}
+      >
+        <WorkspaceRail view={view} raga={doc.directives.raga} onView={setView} />
         <iframe
           ref={vilambitRef}
-          title="Sargam Player — practice and archive audio"
+          title="Sargam Music — practice and archive audio"
           src="sargam-player/"
           allow="autoplay; fullscreen; encrypted-media; clipboard-read; clipboard-write"
-          className={'app-vilambit' + (view === 'vilambit' ? '' : ' app-veiled')}
+          className={'app-vilambit' + (view === 'notation' ? ' app-veiled' : '')}
         />
+        <button
+          type="button"
+          className="workspace-split-divider"
+          aria-label="Resize notation and Music panels"
+          hidden={view !== 'split'}
+          onPointerDown={beginWorkspaceResize}
+        >
+          <span aria-hidden="true">···</span>
+        </button>
         <div
           className={
             'app-panes app-layout-' + layout + (view === 'vilambit' ? ' app-veiled' : '')
@@ -1854,8 +1916,13 @@ export default function App() {
             />
           </div>
         </div>
+        <aside className="workspace-quote" aria-label="Listening note">
+          Listen &amp; learn first. Then notate.
+        </aside>
       </div>
-  <ProblemsPanel problems={allProblems} text={text} editorRef={editorRef} />
+      {view !== 'vilambit' && (
+        <ProblemsPanel problems={allProblems} text={text} editorRef={editorRef} />
+      )}
     </div>
   );
 }

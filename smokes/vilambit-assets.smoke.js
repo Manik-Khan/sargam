@@ -9,7 +9,7 @@ export const smokes = [
     name: 'sargam player: canonical entry page loads legacy-compatible split assets in order',
     async fn() {
       const html = await read('../public/sargam-player/index.html');
-      assert.match(html, /<title>Sargam Player/);
+      assert.match(html, /<title>Sargam Music/);
       assert.match(html, /<link rel="stylesheet" href="\.\.\/vilambit\/vilambit\.css">/);
       const signal = html.indexOf('../vilambit/vendor/signalsmith-stretch.js');
       const flac = html.indexOf('../vilambit/vendor/libflac.js');
