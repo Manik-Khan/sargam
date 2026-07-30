@@ -14,6 +14,7 @@ export const smokes = [
     async fn() {
       const pkg = JSON.parse(await read('../package.json'));
       assert.equal(pkg.scripts['build:player-server'], 'node scripts/build-player-server.mjs');
+      assert.equal(pkg.scripts['build:waveform-worker'], 'node scripts/build-waveform-worker.mjs');
       assert.equal(PLAYER_SERVER_OUTPUT, 'dist-player');
     },
   },

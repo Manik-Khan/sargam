@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:player-server": "node scripts/build-player-server.mjs",
+    "build:waveform-worker": "node scripts/build-waveform-worker.mjs",
     "preview": "vite preview",
     "smoke": "node smokes/run.js"
   },

@@ -25,6 +25,17 @@ export const smokes = [
     },
   },
   {
+    name: 'sargam player: missing class-audio sidecars request one lazy host build',
+    async fn() {
+      const app = await read('../public/vilambit/vilambit-app.js');
+      assert.match(app, /async function requestHostWaveform\(sourceURL\)/);
+      assert.match(app, /RemoteWaveform\.workerURLForSource\(sourceURL\)/);
+      assert.match(app, /if \(sidecarMissing && await beginHostWaveform\(sourceURL\)\) return;/);
+      assert.match(app, /Preparing complete waveform on archive host/);
+      assert.match(app, /pollHostWaveform\(sourceURL, generation\)/);
+    },
+  },
+  {
     name: 'sargam player: archive shell boots with every custom video and waveform control wired',
     async fn() {
       const [html, remoteWaveform, core, app] = await Promise.all([

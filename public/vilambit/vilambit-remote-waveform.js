@@ -166,9 +166,30 @@
     return new URL(`/sargam-waveforms/${relativePath}.json`, source.origin).href;
   }
 
+  function classAudioPathForSource(sourceURL) {
+    const source = new URL(sourceURL);
+    return source.pathname.startsWith('/classaudio/') ? source.pathname : null;
+  }
+
+  function workerURLForSource(sourceURL, port = 8091) {
+    const source = new URL(sourceURL);
+    const sourcePath = classAudioPathForSource(sourceURL);
+    if (!sourcePath) return null;
+    const worker = new URL(source.origin);
+    worker.port = String(port);
+    worker.pathname = '/v1/waveform';
+    worker.search = '';
+    worker.searchParams.set('src', sourcePath);
+    return worker.href;
+  }
+
   function normalizeSidecar(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('The waveform response is invalid.');
     return {
+      version: Number(payload.version) || 0,
+      source: typeof payload.source === 'string' ? payload.source : '',
+      sourceSize: Number(payload.sourceSize) || 0,
+      sourceModified: typeof payload.sourceModified === 'string' ? payload.sourceModified : '',
       duration: Number(payload.duration) || 0,
       peaks: normalizePeaks(payload.peaks),
     };
@@ -258,6 +279,8 @@
     normalizeSidecar,
     interpolateSparsePeaks,
     sidecarURLForSource,
+    classAudioPathForSource,
+    workerURLForSource,
     fetchApproximateWavPeaks,
   };
 });

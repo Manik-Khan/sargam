@@ -46,6 +46,19 @@ waveform exists at `/sargam-waveforms/<media-path>.json`, the player uses that
 more exact sidecar first. Other audio and video formats build a visible
 waveform progressively during playback.
 
+The optional class-audio waveform worker makes these sidecars lazily. When a
+`/classaudio/` sidecar is missing, the player asks the host worker on port 8091
+to scan that recording once. The first user can play immediately with the live
+fallback; once the worker finishes, every user receives the small cached
+overview. Source recordings remain untouched, and generated files live under:
+
+```text
+C:\website\sargam-waveforms\classaudio
+```
+
+The worker is intentionally limited to `/classaudio/` until the other archive
+URL roots are identified and explicitly allowed.
+
 Video uses Sargam's own play, seek, volume, and fullscreen controls. The
 fullscreen practice drawer keeps speed, pitch, looping, and markers available
 without leaving the picture.

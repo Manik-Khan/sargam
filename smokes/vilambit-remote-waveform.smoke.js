@@ -68,6 +68,23 @@ export const smokes = [
     },
   },
   {
+    name: 'remote waveform: class audio derives a separate host-worker request without changing FileMaker URLs',
+    fn() {
+      assert.equal(
+        Waveform.classAudioPathForSource('http://10.0.0.2/classaudio/A%20B.mp4'),
+        '/classaudio/A%20B.mp4',
+      );
+      assert.equal(
+        Waveform.workerURLForSource('http://10.0.0.2/classaudio/A%20B.mp4'),
+        'http://10.0.0.2:8091/v1/waveform?src=%2Fclassaudio%2FA%2520B.mp4',
+      );
+      assert.equal(
+        Waveform.workerURLForSource('http://10.0.0.2/concertvideo/A.mp4'),
+        null,
+      );
+    },
+  },
+  {
     name: 'remote waveform: archive overview uses only HTTP byte-range responses',
     async fn() {
       const wavBytes = makePCM16Wav({ seconds: 2 });

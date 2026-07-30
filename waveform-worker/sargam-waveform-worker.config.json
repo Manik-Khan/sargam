@@ -1,0 +1,15 @@
+{
+  "host": "0.0.0.0",
+  "port": 8091,
+  "classAudioRoot": "C:\\website\\classaudio",
+  "waveformRoot": "C:\\website\\sargam-waveforms\\classaudio",
+  "ffmpegPath": "C:\\SargamWaveformWorker\\ffmpeg.exe",
+  "ffprobePath": "C:\\SargamWaveformWorker\\ffprobe.exe",
+  "allowedOrigins": [
+    "http://10.0.0.2"
+  ],
+  "columns": 1600,
+  "height": 96,
+  "maxConcurrentJobs": 1,
+  "jobTimeoutMinutes": 30
+}

@@ -46,6 +46,7 @@ let granular = null, dryGain = null, wetGain = null;   // fallback shifter
 let waveAnalyser = null, waveAnalyserData = null, waveAnalyserBytes = null, waveAnalyserSilent = null;
 let lastLiveWaveCapture = 0;
 let realtimeCaptureActive = false;
+let waveformPollGeneration = 0;
 const GRAIN = 4096, RB_SIZE = 1 << 16, RB_MASK = RB_SIZE - 1;
 
 async function buildGraph(){
@@ -556,6 +557,73 @@ function ensureLiveWaveform(message){
   invalidateWaveCache();
 }
 
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function requestHostWaveform(sourceURL){
+  const workerURL = RemoteWaveform && RemoteWaveform.workerURLForSource(sourceURL);
+  if (!workerURL) return null;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeout = setTimeout(() => {
+    if (controller) controller.abort();
+  }, 1500);
+  try {
+    const response = await fetch(workerURL, {
+      cache: 'no-store',
+      mode: 'cors',
+      signal: controller ? controller.signal : undefined,
+    });
+    const payload = await response.json();
+    return {
+      ok: response.ok,
+      statusCode: response.status,
+      status: payload && payload.status,
+      waveform: payload && payload.waveform,
+      message: payload && payload.message,
+    };
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function installHostWaveform(sourceURL, payload){
+  if (state.fileURL !== sourceURL || !payload) return false;
+  try {
+    const waveform = RemoteWaveform.normalizeSidecar(payload);
+    installWaveform(waveform.peaks, 'sidecar', 'Archive waveform ready');
+    return true;
+  } catch (error) {
+    console.warn('The host returned an invalid waveform sidecar.', error);
+    return false;
+  }
+}
+
+async function pollHostWaveform(sourceURL, generation){
+  for (let attempt = 0; attempt < 240; attempt++) {
+    await wait(5000);
+    if (generation !== waveformPollGeneration || state.fileURL !== sourceURL) return;
+    const result = await requestHostWaveform(sourceURL);
+    if (!result) return;
+    if (result.status === 'ready' && installHostWaveform(sourceURL, result.waveform)) return;
+    if (result.status !== 'building') return;
+  }
+}
+
+async function beginHostWaveform(sourceURL){
+  const generation = waveformPollGeneration;
+  const result = await requestHostWaveform(sourceURL);
+  if (generation !== waveformPollGeneration || state.fileURL !== sourceURL || !result) return false;
+  if (result.status === 'ready' && installHostWaveform(sourceURL, result.waveform)) return true;
+  if (result.status === 'building') {
+    if (state.waveformMode === 'live') {
+      setWaveStatus('Preparing complete waveform on archive host · playback is ready');
+    }
+    pollHostWaveform(sourceURL, generation);
+  }
+  return false;
+}
+
 async function prepareArchiveWaveform(sourceURL){
   if (!RemoteWaveform || !state.archive || state.fileURL !== sourceURL) {
     ensureLiveWaveform('Waveform builds during playback');
@@ -563,6 +631,7 @@ async function prepareArchiveWaveform(sourceURL){
   }
 
   setWaveStatus('Loading archive waveform…');
+  let sidecarMissing = false;
   try {
     const sidecarURL = RemoteWaveform.sidecarURLForSource(sourceURL);
     const response = await fetch(sidecarURL, { cache: 'no-store', credentials: 'same-origin' });
@@ -572,9 +641,11 @@ async function prepareArchiveWaveform(sourceURL){
       installWaveform(waveform.peaks, 'sidecar', 'Archive waveform ready');
       return;
     }
+    sidecarMissing = response.status === 404;
   } catch (_) {
     // A sidecar is optional; WAV range sampling or live analysis follows.
   }
+  if (sidecarMissing && await beginHostWaveform(sourceURL)) return;
 
   if (/\.wav(?:$|[?#])/i.test(sourceURL)) {
     try {
@@ -626,6 +697,7 @@ function resetSourceState(source){
   });
   lastEff = null;
   lastLiveWaveCapture = 0;
+  waveformPollGeneration++;
   setWaveStatus('');
   renderMarkers(); renderLoop(); renderTune(); renderRegions(); renderBpm();
   $('expWav').disabled = $('expFlac').disabled = true;

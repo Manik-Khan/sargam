@@ -89,9 +89,30 @@ requests to create a PCM WAV overview without placing the full recording in
 the user computer's memory.
 
 The player first looks for an optional exact waveform sidecar beneath
-`/sargam-waveforms/`. No sidecars are required: WAV recordings fall back to a
-range-sampled overview, while other audio and video formats build their
-waveform as they play.
+`/sargam-waveforms/`. When the optional class-audio waveform worker is
+available, a missing `/classaudio/` sidecar is queued on first use and written
+to:
+
+```text
+C:\website\sargam-waveforms\classaudio
+```
+
+The worker runs separately on port 8091, reads only the configured class-audio
+folder, and never changes the recordings. The first user can play while the
+host builds the overview; later users receive the cached sidecar immediately.
+If the worker is unavailable, WAV recordings retain the range-sampled fallback
+and other media retain the live waveform.
+
+Build its deployment folder on the development Mac with:
+
+```bash
+npm run build:waveform-worker
+```
+
+The resulting `dist-waveform-worker` contents belong in
+`C:\SargamWaveformWorker`, not in the website root. Node.js plus `ffmpeg.exe`
+and `ffprobe.exe` are host prerequisites. They are not required on user
+computers.
 
 ## Updating
 
