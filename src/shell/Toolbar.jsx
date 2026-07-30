@@ -98,7 +98,7 @@ export default function Toolbar({
             aria-expanded={openMenu === 'sources'}
             onClick={() => toggleMenu('sources')}
           >
-            Sources <span aria-hidden="true">▾</span>
+            File <span aria-hidden="true">▾</span>
           </button>
           {openMenu === 'sources' && (
             <div className="workspace-drawer workspace-sources-drawer">
@@ -107,7 +107,7 @@ export default function Toolbar({
                   <span>Current project</span>
                   <strong>{projectName || fileName || 'Untitled notation'}</strong>
                 </div>
-                <button type="button" aria-label="Close sources" onClick={() => setOpenMenu(null)}>×</button>
+                <button type="button" aria-label="Close file menu" onClick={() => setOpenMenu(null)}>×</button>
               </div>
 
               <section className="workspace-drawer-section">

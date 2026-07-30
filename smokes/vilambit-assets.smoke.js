@@ -51,9 +51,9 @@ export const smokes = [
       const css = await read('../public/vilambit/vilambit.css');
       const app = await read('../public/vilambit/vilambit-app.js');
       assert.match(html, /tuningCard archiveUnsupported/);
-      assert.match(html, /<!-- BEATS -->\s*<div class="card archiveUnsupported">/);
-      assert.match(html, /<!-- SPEED REGIONS -->\s*<div class="card">/);
-      assert.match(html, /<!-- EXPORT -->\s*<div class="card archiveUnsupported">/);
+      assert.match(html, /<!-- BEATS -->\s*<details class="card collapsibleCard archiveUnsupported">/);
+      assert.match(html, /<!-- SPEED REGIONS -->\s*<details class="card collapsibleCard">/);
+      assert.match(html, /<!-- EXPORT -->\s*<details class="card collapsibleCard archiveUnsupported">/);
       assert.match(css, /body\.archiveMode[\s\S]*?\.archiveUnsupported\{display:none!important\}/);
       assert.match(app, /setArchiveMode\(true\)/);
       assert.match(app, /captureLiveWaveform\(p\)/);
@@ -75,6 +75,26 @@ export const smokes = [
       assert.match(css, /#videoWrap:fullscreen/);
       assert.match(app, /requestFullscreen \|\| wrap\.webkitRequestFullscreen/);
       assert.match(app, /if \(state\.archive\) event\.preventDefault\(\)/);
+    },
+  },
+  {
+    name: 'sargam player: approved Chronicle composition wraps the live player controls',
+    async fn() {
+      const html = await read('../public/sargam-player/index.html');
+      const css = await read('../public/vilambit/vilambit.css');
+      const app = await read('../public/vilambit/vilambit-app.js');
+      const shell = await read('../src/shell/App.jsx');
+      assert.match(html, /class="music-heading"/);
+      assert.match(html, /id="workspaceProjectTitle"/);
+      assert.match(html, /<h2>Practice<\/h2>/);
+      assert.match(html, /class="cardIndex"[^>]*>I<\/span>/);
+      assert.match(html, /class="cardIndex"[^>]*>II<\/span>/);
+      assert.match(html, /data-cent="-10"/);
+      assert.match(html, /data-cent="10"/);
+      assert.match(css, /#controls\.on\{\s*display:grid;\s*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
+      assert.match(css, /#controls > \.playbackCard[\s\S]*?#controls > \.loopMarkersCard/);
+      assert.match(app, /function syncWorkspaceContext\(\)/);
+      assert.match(shell, /data-project-title=\{doc\.directives\.raga \|\| ''\}/);
     },
   },
   {

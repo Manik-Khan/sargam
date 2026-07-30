@@ -21,6 +21,23 @@ const Core = window.VilambitCore;
 const RemoteWaveform = window.SargamRemoteWaveform;
 if (!Core) throw new Error('VilambitCore must load before vilambit-app.js');
 
+function syncWorkspaceContext(){
+  const rawTitle = window.frameElement?.dataset?.projectTitle?.trim() || '';
+  const heading = $('workspaceProjectTitle');
+  if (!heading) return;
+  heading.textContent = rawTitle
+    ? (/^raga\s/i.test(rawTitle) ? rawTitle : `Raga ${rawTitle}`)
+    : 'Sargam Music';
+}
+
+syncWorkspaceContext();
+if (window.frameElement && window.MutationObserver){
+  new MutationObserver(syncWorkspaceContext).observe(window.frameElement, {
+    attributes: true,
+    attributeFilter: ['data-project-title'],
+  });
+}
+
 const state = {
   fileURL: null, fileURLRevocable: false, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
   archive: false,

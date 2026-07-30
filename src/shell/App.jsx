@@ -1852,6 +1852,7 @@ export default function App() {
           title="Sargam Music — practice and archive audio"
           src="sargam-player/"
           allow="autoplay; fullscreen; encrypted-media; clipboard-read; clipboard-write"
+          data-project-title={doc.directives.raga || ''}
           className={'app-vilambit' + (view === 'notation' ? ' app-veiled' : '')}
         />
         <button

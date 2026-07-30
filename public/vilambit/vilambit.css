@@ -193,3 +193,382 @@
     .loopNudgeGroup{justify-content:flex-start;flex-wrap:wrap}
   }
   @media (max-width:640px){main{padding:12px}header{padding:12px 14px 10px}#clock{font-size:15px}#controls{grid-template-columns:1fr}}
+
+  /* AACM Chronicle player composition — approved workspace form.
+     These rules preserve the existing player IDs and engines while arranging
+     the live controls in the same hierarchy as the design prototype. */
+  body{
+    display:block;
+    min-height:100%;
+    background:rgba(248,239,218,.96);
+    font-family:var(--sans);
+  }
+
+  .music-heading{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(220px,auto);
+    align-items:end;
+    gap:32px;
+    max-width:1240px;
+    margin:0 auto;
+    border-bottom:1px solid var(--line);
+    padding:30px 34px 23px;
+  }
+  .music-heading-copy{min-width:0}
+  .music-eyebrow{
+    display:block;
+    margin-bottom:5px;
+    color:var(--brass);
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+  }
+  .music-heading h1{
+    margin:0;
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:clamp(38px,5vw,62px);
+    font-weight:500;
+    letter-spacing:-.035em;
+    line-height:.96;
+  }
+  .music-heading .tag{
+    margin-top:9px;
+    color:var(--dim);
+    font-family:var(--serif);
+    font-size:17px;
+    font-style:italic;
+  }
+  .music-source-meta{
+    display:grid;
+    width:min(250px,100%);
+    gap:3px;
+    border-left:1px solid var(--line);
+    padding-left:19px;
+    color:var(--dim);
+    font-size:9px;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+  }
+  .music-source-meta strong{
+    overflow:hidden;
+    margin:2px 0 5px;
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:0;
+    text-overflow:ellipsis;
+    text-transform:none;
+    white-space:nowrap;
+  }
+  .music-source-meta #engineBadge{
+    min-height:15px;
+    color:var(--wave-dim);
+    font-family:var(--mono);
+    font-size:9px;
+    letter-spacing:.04em;
+    text-transform:none;
+  }
+  .music-source-meta #openBtn{
+    justify-self:start;
+    margin-top:8px;
+    border-radius:0;
+    padding:6px 10px;
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+
+  main{
+    display:flex;
+    width:100%;
+    max-width:1240px;
+    margin:0 auto;
+    padding:0 34px 26px;
+    gap:0;
+  }
+  #sourceNotice{margin:12px 0 0}
+  #dropzone{
+    margin:24px 0;
+    border-radius:0;
+    padding:72px 20px;
+    background:rgba(241,228,192,.42);
+  }
+
+  #videoWrap{
+    margin-top:22px;
+    border-radius:0;
+    min-height:180px;
+    max-height:320px;
+  }
+  #videoWrap video{
+    width:100%;
+    max-height:320px;
+    object-fit:contain;
+  }
+
+  #waveWrap{
+    margin-top:22px;
+    border-width:1px 0;
+    border-radius:0;
+    background:rgba(248,239,218,.4);
+  }
+  #waveToolbar{
+    min-height:43px;
+    padding:8px 0;
+    background:transparent;
+  }
+  .waveToolbarLabel{
+    margin-right:10px;
+    color:var(--brass);
+    letter-spacing:.2em;
+  }
+  .waveToolGroup{gap:5px}
+  #waveToolbar .btn{
+    border-radius:0;
+    background:transparent;
+  }
+  #wave{
+    height:190px;
+    background:
+      linear-gradient(90deg,transparent 24.9%,var(--line) 25%,transparent 25.1%,transparent 49.9%,var(--line) 50%,transparent 50.1%,transparent 74.9%,var(--line) 75%,transparent 75.1%);
+  }
+  #waveHint{
+    top:52px;
+    right:0;
+    color:var(--dim);
+  }
+
+  #transport{
+    min-height:90px;
+    padding:15px 0;
+    border-bottom:1px solid var(--line);
+    gap:9px;
+  }
+  #playBtn{
+    width:48px;
+    height:48px;
+    flex:none;
+    border-radius:50%;
+    background:transparent;
+  }
+  #playBtn.playing{
+    color:var(--panel-2);
+    background:var(--brass);
+  }
+  .seekBtns{gap:5px}
+  .seekBtns .btn{
+    min-width:42px;
+    border-radius:50%;
+    padding:10px 7px;
+  }
+  #clock{
+    margin-left:8px;
+    font-family:var(--mono);
+    font-size:18px;
+    font-weight:500;
+  }
+  #volWrap{
+    margin-left:auto;
+    padding-left:30px;
+  }
+  #volWrap label{
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:.16em;
+  }
+
+  #controls.on{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:0;
+    border-bottom:1px solid var(--line);
+  }
+  #controls > .card{
+    min-width:0;
+    border:0;
+    border-radius:0;
+    padding:25px 27px;
+    background:transparent;
+  }
+  #controls > .playbackCard,
+  #controls > .loopMarkersCard{
+    grid-column:auto;
+    grid-row:1;
+  }
+  #controls > .playbackCard{
+    border-right:1px solid var(--line);
+  }
+  #controls > .loopMarkersCard{grid-column:2}
+  .cardTitleRow{
+    min-height:28px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:10px;
+  }
+  .card h2,
+  .cardTitleRow h2,
+  .summaryTitle{
+    color:var(--brass);
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:.2em;
+  }
+  .cardIndex{
+    margin-left:auto;
+    color:var(--madder);
+    font-family:var(--serif);
+    font-size:18px;
+    font-style:italic;
+  }
+  .loopMainActions{margin-left:12px}
+  .playbackGrid,
+  .loopMarkersGrid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:0;
+  }
+  .subPanel{
+    gap:10px;
+    border:0;
+    border-radius:0;
+    padding:17px 0 14px;
+    background:transparent;
+  }
+  .subPanel + .subPanel{border-top:1px solid var(--line)}
+  .subPanelTitle{
+    color:var(--dim);
+    font-size:9px;
+    letter-spacing:.15em;
+  }
+  .readout{
+    color:var(--brass);
+    font-family:var(--serif);
+    font-size:27px;
+  }
+  .readout small{
+    font-family:var(--serif);
+    font-size:12px;
+    font-style:italic;
+  }
+  .tuningButtons{margin-top:2px}
+  .tuningButtons .lbl{
+    font-size:8px;
+    font-weight:700;
+    letter-spacing:.12em;
+  }
+  .card .btn{
+    border-radius:0;
+    background:rgba(241,228,192,.38);
+  }
+  .card .btn:hover{background:var(--panel-2)}
+  .scaleMarks{font-size:9px}
+
+  .loopBoundaryRow{
+    grid-template-columns:18px minmax(80px,1fr) auto;
+    grid-template-areas:"point input playhead" ". marker marker" ". nudges nudges";
+    border-width:0 0 1px;
+    border-radius:0;
+    padding:9px 0;
+    background:transparent;
+  }
+  .loopBoundaryRow label{color:var(--madder)}
+  .loopNudgeGroup{justify-content:flex-start}
+  .timeIn{
+    border-radius:0;
+    background:rgba(248,239,218,.46);
+  }
+  #markerList{max-height:175px}
+  .mrow{
+    border-width:0 0 1px;
+    border-radius:0;
+    padding:7px 0;
+    background:transparent;
+  }
+  .markerTime{color:var(--brass)}
+
+  #controls > .collapsibleCard{
+    grid-column:auto;
+    border-top:1px solid var(--line);
+    padding:0;
+  }
+  #controls > .collapsibleCard:nth-of-type(even){
+    border-left:1px solid var(--line);
+  }
+  .cardSummary{
+    min-height:52px;
+    padding:16px 18px;
+    background:transparent;
+  }
+  .detailsBody{padding:0 18px 18px}
+
+  footer{
+    max-width:1240px;
+    margin:0 auto;
+    border-top:0;
+    padding:11px 34px 17px;
+    color:var(--dim);
+    font-family:var(--serif);
+    font-size:10px;
+    font-style:italic;
+    justify-content:flex-end;
+  }
+
+  @media (max-width:900px){
+    .music-heading{
+      grid-template-columns:1fr;
+      gap:18px;
+      padding:24px;
+    }
+    .music-source-meta{
+      width:100%;
+      grid-template-columns:auto minmax(0,1fr) auto;
+      align-items:center;
+      gap:5px 12px;
+      border-left:0;
+      border-top:1px solid var(--line);
+      padding:12px 0 0;
+    }
+    .music-source-meta strong{margin:0}
+    .music-source-meta #openBtn{
+      grid-column:3;
+      grid-row:1 / span 2;
+      margin:0;
+    }
+    main{padding:0 20px 22px}
+    #controls.on{grid-template-columns:1fr}
+    #controls > .playbackCard,
+    #controls > .loopMarkersCard{
+      grid-column:1;
+      grid-row:auto;
+    }
+    #controls > .playbackCard{
+      border-right:0;
+      border-bottom:1px solid var(--line);
+    }
+    #controls > .collapsibleCard{
+      grid-column:1;
+      border-left:0!important;
+    }
+  }
+
+  @media (max-width:600px){
+    .music-heading{padding:19px 15px}
+    .music-heading h1{font-size:36px}
+    .music-heading .tag{font-size:14px}
+    main{padding:0 14px 18px}
+    #wave{height:150px}
+    #transport{align-items:center}
+    .seekBtns .btn:nth-child(2),
+    .seekBtns .btn:nth-child(3){display:none}
+    #clock{width:100%;margin:4px 0 0}
+    #volWrap{margin-left:0;padding-left:0}
+    #controls > .card{padding:21px 18px}
+    .loopBoundaryRow{
+      grid-template-columns:18px minmax(0,1fr);
+      grid-template-areas:"point input" ". playhead" ". marker" ". nudges";
+    }
+    footer{padding-right:15px;padding-left:15px}
+  }
