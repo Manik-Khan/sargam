@@ -36,10 +36,19 @@ export const smokes = [
     name: 'workspace shell: player iframe stays mounted across all three view modes',
     async fn() {
       const app = await read('../src/shell/App.jsx');
+      const css = await read('../src/shell/sargam.css');
       assert.match(app, /'notation' \| 'vilambit' \| 'split'/);
       assert.match(app, /<WorkspaceRail[\s\S]*?<iframe[\s\S]*?ref=\{vilambitRef\}/);
       assert.match(app, /view === 'notation' \? ' app-veiled' : ''/);
       assert.match(app, /workspace-split-divider/);
+      assert.match(
+        css,
+        /\.app-stage > \.app-vilambit\s*\{[\s\S]*?width:\s*calc\(100% - 56px\)/,
+      );
+      assert.match(
+        css,
+        /\.app-workspace-split > \.app-vilambit\s*\{[\s\S]*?width:\s*calc\(100% - 28px\)/,
+      );
     },
   },
 ];
