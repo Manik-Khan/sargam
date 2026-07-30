@@ -104,6 +104,11 @@ export const smokes = [
       assert.match(source, /window\.print\(\)/);
       assert.match(source, /contentWidthInEm/);
       assert.match(source, /SCORE_GUTTER_EM = 2/);
+      assert.match(source, /const beforePrint = \(\) => \{[\s\S]*?printActive = true;[\s\S]*?cancelAnimationFrame/);
+      assert.match(source, /if \(disposed \|\| printActive\) return;/);
+      assert.match(source, /if \(printActive\) return;[\s\S]*?contentRect/);
+      assert.doesNotMatch(source, /const beforePrint = \(\) => renderSized\(\)/);
+      assert.doesNotMatch(source, /const afterPrint = \(\) => renderSized\(\)/);
     },
   },
 
@@ -116,7 +121,12 @@ export const smokes = [
       assert.match(css, /\.sr-export\s*\{\s*font-size:\s*14px;/);
       assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*17px;/);
       assert.match(css, /\.sr-export \.sr-cell\s*\{[^}]*min-width:\s*1\.7em;[^}]*padding-inline:\s*2px;/s);
-      assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*avoid-page;/s);
+      assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
+      assert.match(css, /@media print\s*\{[\s\S]*?\.app-root\.is-exporting\s*\{[^}]*display:\s*block !important;[^}]*height:\s*auto !important;[^}]*overflow:\s*visible !important;/s);
+      assert.match(css, /\.app-export-scroll\s*\{[^}]*display:\s*block !important;[^}]*overflow:\s*visible !important;/s);
+      assert.match(css, /@media print\s*\{[\s\S]*?\.sr-section\s*\{[^}]*break-inside:\s*auto;[^}]*page-break-inside:\s*auto;/s);
+      assert.match(css, /@media print\s*\{[\s\S]*?\.sr-line-group\s*\{[^}]*break-inside:\s*auto;[^}]*page-break-inside:\s*auto;/s);
+      assert.match(css, /@media print\s*\{[\s\S]*?\.sr-line-block\s*\{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;/s);
     },
   },
 ];

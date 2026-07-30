@@ -190,9 +190,18 @@ export default function App() {
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
+  const editorSyncTargetRef = useRef(null);
   const stageRef = useRef(null);
 
   const syncSourceLineFromEditor = useCallback((sourceLine) => {
+    const pendingTarget = editorSyncTargetRef.current;
+    if (pendingTarget !== null) {
+      // Focusing CodeMirror reports its previous selection before the
+      // rendered-score click can install the requested source range. Ignore
+      // that stale focus event; the target selection clears the guard below.
+      if (sourceLine !== pendingTarget) return;
+      editorSyncTargetRef.current = null;
+    }
     setActiveLine(sourceLine);
     // Selection can move within the same Markdown line after the rendered
     // notation has been scrolled elsewhere. A revision makes that repeat
@@ -558,9 +567,15 @@ export default function App() {
 
   const focusSourceLine = (sourceLine) => {
     const range = sourceLineRange(text, sourceLine);
+    // Set this before requestAnimationFrame so a focus event cannot restore
+    // the formerly selected source line while the reveal is pending.
+    editorSyncTargetRef.current = range.line;
     const reveal = () => {
       const el = editorRef.current;
-      if (!el) return;
+      if (!el) {
+        editorSyncTargetRef.current = null;
+        return;
+      }
       clearJumpSelection(el, false);
 
       try {

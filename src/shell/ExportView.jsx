@@ -76,6 +76,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
     let frame = 0;
     let observedWidth = -1;
     let disposed = false;
+    let printActive = window.matchMedia?.('print')?.matches || false;
 
     const renderSized = () => {
       if (disposed) return;
@@ -104,7 +105,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
     };
 
     const scheduleRender = () => {
-      if (disposed) return;
+      if (disposed || printActive) return;
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         frame = 0;
@@ -117,6 +118,11 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
     let observer;
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver((entries) => {
+        // The export preview is deliberately the same width as a Letter page.
+        // Print media briefly reports a different box while Chrome builds its
+        // preview. Re-rendering in that transition can replace the DOM after
+        // pagination has begun, leaving only the first page in the PDF.
+        if (printActive) return;
         const width = entries[0]?.contentRect?.width ?? mountEl.clientWidth;
         if (Math.abs(width - observedWidth) < 0.5) return;
         observedWidth = width;
@@ -125,18 +131,27 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
       observer.observe(mountEl);
     }
 
-    // Browsers apply @media print before producing the print preview. Measure
-    // again at that moment so portrait/landscape and the user's paper choice
-    // use the actual printable width rather than the old fixed 40em guess.
-    const beforePrint = () => renderSized();
-    const afterPrint = () => renderSized();
+    // Freeze the already approved preview DOM for the entire print lifecycle.
+    // Mutating it from beforeprint, matchMedia, or ResizeObserver races Chrome's
+    // pagination and also changes the preview after the dialog closes.
+    const beforePrint = () => {
+      printActive = true;
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    };
+    const afterPrint = () => {
+      printActive = false;
+      observedWidth = mountEl.clientWidth;
+    };
     window.addEventListener('beforeprint', beforePrint);
     window.addEventListener('afterprint', afterPrint);
 
     const printMedia = window.matchMedia?.('print');
     const mediaChange = (event) => {
-      if (event.matches) renderSized();
-      else scheduleRender();
+      if (event.matches) beforePrint();
+      else afterPrint();
     };
     printMedia?.addEventListener?.('change', mediaChange);
 

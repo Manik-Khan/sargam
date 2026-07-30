@@ -45,6 +45,8 @@ export const smokes = [
       assert.match(editor, /centerSelection\(\)[\s\S]*?EditorView\.scrollIntoView/);
       assert.match(app, /syncSourceLineFromEditor[\s\S]*?setSourceSyncRevision/);
       assert.match(app, /typeof el\.centerSelection === 'function'/);
+      assert.match(app, /editorSyncTargetRef\.current = range\.line[\s\S]*?requestAnimationFrame/);
+      assert.match(app, /pendingTarget !== null[\s\S]*?sourceLine !== pendingTarget\) return[\s\S]*?editorSyncTargetRef\.current = null/);
       assert.match(preview, /syncRevision[\s\S]*?activeLine,\s*syncRevision/);
       assert.match(render, /sr-source-active/);
       assert.match(css, /\.app-preview \.sr-source-active/);

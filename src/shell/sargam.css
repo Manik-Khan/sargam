@@ -601,9 +601,14 @@
 .sr-export .sr-exp-title { font-size: 12px; margin-top: 4px; }
 .sr-export .sr-exp-prov { margin-top: 8px; font-size: 11px; }
 .sr-export .sr-exp-meta { font-size: 11px; line-height: 1.65; }
-.sr-export .sr-section { margin-bottom: 16px; break-inside: avoid-page; }
-.sr-export .sr-section-label { margin-bottom: 7px; font-size: 11px; }
-.sr-export .sr-line-group { margin-bottom: 9px; break-inside: avoid-page; }
+.sr-export .sr-section { margin-bottom: 16px; break-inside: auto; }
+.sr-export .sr-section-label {
+  margin-bottom: 7px;
+  font-size: 11px;
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+.sr-export .sr-line-group { margin-bottom: 9px; break-inside: auto; }
 .sr-export .sr-line-block { margin-bottom: 3px; padding-inline: 1em; }
 .sr-export .sr-row { column-gap: 1px; padding-block: 1px; }
 .sr-export .sr-cell { min-width: 1.7em; padding-inline: 2px; }
@@ -616,14 +621,26 @@
 /* ---- print: only the paper reaches the page ---- */
 @page { margin: 18mm; }
 @media print {
+  html,
+  body,
+  #root,
+  .app-root,
+  .app-root.is-exporting {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
   .app-root.is-exporting > *:not(.app-export) { display: none !important; }
   .app-export { position: static !important; background: none !important; display: block !important; }
   .app-export-bar { display: none !important; }
-  .app-export-scroll { overflow: visible !important; padding: 0 !important; }
+  .app-export-scroll { display: block !important; overflow: visible !important; padding: 0 !important; }
   .app-export-paper { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
-  .sr-section { break-inside: avoid-page; page-break-inside: avoid; }
-  .sr-section-label { break-after: avoid; page-break-after: avoid; }
-  .sr-line-group { break-inside: avoid-page; page-break-inside: avoid; }
+  .sr-section { break-inside: auto; page-break-inside: auto; }
+  .sr-section-label { break-inside: avoid; break-after: avoid-page; page-break-after: avoid; }
+  .sr-line-group { break-inside: auto; page-break-inside: auto; }
   .sr-line-block { break-inside: avoid; page-break-inside: avoid; overflow: visible; }
   }
 
