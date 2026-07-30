@@ -86,7 +86,7 @@ export const smokes = [
       const shell = await read('../src/shell/App.jsx');
       assert.match(html, /class="music-heading"/);
       assert.match(html, /id="workspaceProjectTitle"/);
-      assert.match(html, /<h2>Practice<\/h2>/);
+      assert.match(html, /<h2>Controls<\/h2>/);
       assert.match(html, /class="cardIndex"[^>]*>I<\/span>/);
       assert.match(html, /class="cardIndex"[^>]*>II<\/span>/);
       assert.match(html, /class="loopReadout"/);

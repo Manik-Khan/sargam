@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { centeredLineScrollTop, sourceLineRange } from '../src/shell/editor-nav.js';
 
 export const smokes = [
@@ -30,6 +31,23 @@ export const smokes = [
         centeredLineScrollTop({ line: 1, lineHeight: 20, paddingTop: 16, clientHeight: 200 }),
         0,
       );
+    },
+  },
+  {
+    name: 'editor navigation: CodeMirror and rendered notation synchronize repeated line selections',
+    fn() {
+      const editor = readFileSync(new URL('../src/shell/EditorPane.jsx', import.meta.url), 'utf8');
+      const app = readFileSync(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
+      const preview = readFileSync(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
+      const render = readFileSync(new URL('../src/engine/render.js', import.meta.url), 'utf8');
+      const css = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
+
+      assert.match(editor, /centerSelection\(\)[\s\S]*?EditorView\.scrollIntoView/);
+      assert.match(app, /syncSourceLineFromEditor[\s\S]*?setSourceSyncRevision/);
+      assert.match(app, /typeof el\.centerSelection === 'function'/);
+      assert.match(preview, /syncRevision[\s\S]*?activeLine,\s*syncRevision/);
+      assert.match(render, /sr-source-active/);
+      assert.match(css, /\.app-preview \.sr-source-active/);
     },
   },
 ];

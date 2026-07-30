@@ -168,8 +168,12 @@ function renderSection(section, sectionIndex, opts) {
 // ---------------------------------------------------------------------------
 
 function renderLine(line, tal, ctx) {
-  const group = h('div', 'sr-line-group');
+  const group = h(
+    'div',
+    'sr-line-group' + (ctx.activeLine === line.sourceLine ? ' sr-source-active' : '')
+  );
   if (line.sourceLine !== undefined) group.setAttribute('data-source-line', String(line.sourceLine));
+  if (ctx.activeLine === line.sourceLine) group.setAttribute('aria-current', 'true');
   group.setAttribute('data-section-index', String(ctx.sectionIndex));
   group.setAttribute('data-line-index', String(ctx.lineIndex));
   const geometry = buildLineGeometry(line);

@@ -32,6 +32,7 @@ export default function PreviewPane({
   doc,
   sourceText,
   activeLine,
+  syncRevision = 0,
   activeCursor,
   noteNames,
   onSeek,
@@ -112,7 +113,7 @@ export default function PreviewPane({
       clientHeight: scroller.clientHeight,
     });
     return () => { cleanupAudio?.(); cleanupAnchors?.(); };
-  }, [doc, sourceText, activeLine, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid]);
+  }, [doc, sourceText, activeLine, syncRevision, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid]);
 
   useEffect(() => {
     applyPlaybackCursor(mount.current, activeCursor);

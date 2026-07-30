@@ -150,6 +150,7 @@ export default function App() {
   });
   const [recents, setRecents] = useState(() => store.listRecents());
   const [activeLine, setActiveLine] = useState(0);
+  const [sourceSyncRevision, setSourceSyncRevision] = useState(0);
   const [showNew, setShowNew] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [layout, setLayout] = useState(() => store.getPref('layout', 'side'));
@@ -190,6 +191,14 @@ export default function App() {
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
   const stageRef = useRef(null);
+
+  const syncSourceLineFromEditor = useCallback((sourceLine) => {
+    setActiveLine(sourceLine);
+    // Selection can move within the same Markdown line after the rendered
+    // notation has been scrolled elsewhere. A revision makes that repeat
+    // selection an explicit request to reveal the corresponding score line.
+    setSourceSyncRevision((revision) => revision + 1);
+  }, []);
 
   const sendVilambit = useCallback((type, payload = {}) => {
     const frameWindow = vilambitRef.current?.contentWindow;
@@ -554,19 +563,25 @@ export default function App() {
         el.focus();
       }
       el.setSelectionRange(range.start, range.end);
-      const styleTarget = el.dom || el;
-      const scrollTarget = el.scrollDOM || el;
-      const style = window.getComputedStyle(styleTarget);
-      let lineHeight = Number.parseFloat(style.lineHeight);
-      if (!Number.isFinite(lineHeight)) {
-        lineHeight = (Number.parseFloat(style.fontSize) || 14) * 1.7;
+      if (typeof el.centerSelection === 'function') {
+        // CodeMirror knows about wrapped source rows and folded metadata.
+        // Its native geometry is more accurate than estimating line height.
+        el.centerSelection();
+      } else {
+        const styleTarget = el.dom || el;
+        const scrollTarget = el.scrollDOM || el;
+        const style = window.getComputedStyle(styleTarget);
+        let lineHeight = Number.parseFloat(style.lineHeight);
+        if (!Number.isFinite(lineHeight)) {
+          lineHeight = (Number.parseFloat(style.fontSize) || 14) * 1.7;
+        }
+        scrollTarget.scrollTop = centeredLineScrollTop({
+          line: range.line,
+          lineHeight,
+          paddingTop: Number.parseFloat(style.paddingTop) || 0,
+          clientHeight: scrollTarget.clientHeight,
+        });
       }
-      scrollTarget.scrollTop = centeredLineScrollTop({
-        line: range.line,
-        lineHeight,
-        paddingTop: Number.parseFloat(style.paddingTop) || 0,
-        clientHeight: scrollTarget.clientHeight,
-      });
 
       jumpSelectionRef.current = { ...range, caret: range.start };
       jumpTimerRef.current = setTimeout(() => clearJumpSelection(el), 1400);
@@ -1874,6 +1889,7 @@ export default function App() {
           <PreviewPane
             doc={doc}
             activeLine={activeLine}
+            syncRevision={sourceSyncRevision}
             activeCursor={playCursor}
             noteNames={noteNames}
             onSeek={doSeek}
@@ -1908,7 +1924,7 @@ export default function App() {
             <EditorPane
               text={text}
               onChange={setText}
-              onCursorLine={setActiveLine}
+              onCursorLine={syncSourceLineFromEditor}
               onCursorPos={setCursorPos}
               onBeforeEdit={doEditorBeforeEdit}
               bolCapture={bolCapture}

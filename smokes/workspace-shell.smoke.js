@@ -45,7 +45,7 @@ export const smokes = [
       assert.match(app, /workspace-split-divider/);
       assert.match(
         css,
-        /\.app-stage > \.app-vilambit\s*\{[\s\S]*?width:\s*100%;[\s\S]*?background:\s*transparent;/,
+        /\.app-stage > \.app-vilambit\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?width:\s*100%;[\s\S]*?background:\s*transparent;/,
       );
       assert.match(
         css,

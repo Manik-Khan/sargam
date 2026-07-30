@@ -67,6 +67,11 @@ function makeFacade(view) {
       const b = Math.max(0, Math.min(length, Number(end) || 0));
       view.dispatch({ selection: { anchor: a, head: b }, scrollIntoView: true });
     },
+    centerSelection() {
+      view.dispatch({
+        effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'center' }),
+      });
+    },
     focus() { view.focus(); },
     get scrollTop() { return view.scrollDOM.scrollTop; },
     set scrollTop(value) { view.scrollDOM.scrollTop = value; },
