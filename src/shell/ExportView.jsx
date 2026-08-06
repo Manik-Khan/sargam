@@ -22,7 +22,12 @@ function contentWidthInEm(el) {
   if (!el || !el.clientWidth) return FALLBACK_SYSTEM_EM;
 
   const style = getComputedStyle(el);
-  const fontSize = Number.parseFloat(style.fontSize) || 16;
+  const score = el.querySelector('.sr-export') || el;
+  const scoreStyle = getComputedStyle(score);
+  // Browser measurements below are expressed in the notation row's em
+  // units. Use the score's font size here as well so systems do not wrap
+  // before they reach the printable right edge.
+  const fontSize = Number.parseFloat(scoreStyle.fontSize) || 15;
   const padding =
     (Number.parseFloat(style.paddingLeft) || 0) +
     (Number.parseFloat(style.paddingRight) || 0);
