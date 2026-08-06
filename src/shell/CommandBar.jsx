@@ -96,7 +96,7 @@ export default function CommandBar({
             type="button"
             className={`cmd-btn cmd-rhythm-grid${rhythmGrid ? ' active' : ''}`}
             aria-pressed={rhythmGrid}
-            title="Show one shared rhythmic cell grid for notes, repeats, meter, and bols"
+            title="Outline every matra as one beat cell and show subdivisions inside it"
             onClick={() => onRhythmGrid?.(!rhythmGrid)}
           >Rhythm Grid</button>
           {anchorTool && <button type="button" className="cmd-btn" onClick={() => onAnchorTool?.(null)}>Done</button>}

@@ -27,6 +27,11 @@ const EXPORT_FONTS = [
   { value: 'Avenir, "Helvetica Neue", Arial, sans-serif', label: 'Clean sans' },
 ];
 
+const EXPORT_GRIDS = [
+  { value: 'clean', label: 'Clean' },
+  { value: 'matra', label: 'Matra cells' },
+];
+
 function allMusicLines(doc) {
   return (doc?.sections || []).flatMap((section) => section.lines || []);
 }
@@ -88,6 +93,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
   const mount = useRef(null);
   const [paperColor, setPaperColor] = useState(EXPORT_PAPER_COLORS[0].value);
   const [fontFamily, setFontFamily] = useState(EXPORT_FONTS[0].value);
+  const [gridStyle, setGridStyle] = useState(EXPORT_GRIDS[0].value);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -197,7 +203,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
       printMedia?.removeEventListener?.('change', mediaChange);
       allMusicLines(doc).forEach(clearMeasuredLineLayout);
     };
-  }, [doc, noteNames, sourceText, anchorMarks, fontFamily]);
+  }, [doc, noteNames, sourceText, anchorMarks, fontFamily, gridStyle]);
 
   useEffect(() => {
     const esc = (e) => {
@@ -209,7 +215,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
 
   return (
     <div
-      className="app-export"
+      className={`app-export${gridStyle === 'matra' ? ' app-export-grid' : ''}`}
       style={{ '--sr-export-paper': paperColor, '--sr-export-font': fontFamily }}
     >
       <div className="app-export-bar">
@@ -239,6 +245,18 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
             >
               {EXPORT_FONTS.map((option) => (
                 <option key={option.label} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Grid</span>
+            <select
+              aria-label="PDF notation grid"
+              value={gridStyle}
+              onChange={(event) => setGridStyle(event.target.value)}
+            >
+              {EXPORT_GRIDS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>

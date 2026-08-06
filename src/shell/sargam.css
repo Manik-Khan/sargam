@@ -1935,13 +1935,21 @@
 .sr-marker { transform: translateX(var(--sr-marker-shift, 0px)); transition: transform 80ms linear; }
 .sr-marker-on-boundary::after { content: none; }
 .sr-line-block { position: relative; }
-.app-rhythm-grid .sr-cell {
-  border-inline: 1px solid color-mix(in srgb, var(--sr-accent) 24%, transparent);
-  border-radius: 0.2em;
-  background: color-mix(in srgb, var(--sr-accent) 3%, transparent);
+.app-rhythm-grid .sr-cell,
+.app-export-grid .sr-cell {
+  border: 1px solid color-mix(in srgb, var(--sr-accent) 34%, transparent);
+  border-radius: 0.16em;
+  background: color-mix(in srgb, var(--sr-accent) 4%, transparent);
+  padding-block: 0.14em 0.08em;
+  box-sizing: border-box;
 }
-.app-rhythm-grid .sr-slot {
-  box-shadow: inset 1px 0 color-mix(in srgb, var(--sr-accent) 17%, transparent);
+.app-rhythm-grid .sr-slot + .sr-slot,
+.app-export-grid .sr-slot + .sr-slot {
+  border-inline-start: 1px dashed color-mix(in srgb, var(--sr-accent) 28%, transparent);
+}
+.app-rhythm-grid .sr-cell:hover {
+  border-color: color-mix(in srgb, var(--sr-accent) 68%, transparent);
+  background: color-mix(in srgb, var(--sr-accent) 8%, transparent);
 }
 .sr-rhythm-grid-layer {
   position: absolute;

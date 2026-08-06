@@ -187,6 +187,7 @@ export const smokes = [
       assert.match(command, />Apply Meter</);
       assert.match(command, /onApplyMeter\?\.\(customMeter\)/);
       assert.match(command, />Rhythm Grid</);
+      assert.match(command, /Outline every matra as one beat cell/);
       assert.match(preview, /mountMeterOverlays/);
       assert.match(preview, /app-rhythm-grid/);
       assert.doesNotMatch(await read('../src/engine/meter.js'), /scheduleDocument|createPlayer|AudioContext/);

@@ -108,6 +108,8 @@ export const smokes = [
       assert.match(source, /const fontSize = Number\.parseFloat\(scoreStyle\.fontSize\) \|\| 15;/);
       assert.match(source, /aria-label="PDF page color"/);
       assert.match(source, /aria-label="PDF typeface"/);
+      assert.match(source, /aria-label="PDF notation grid"/);
+      assert.match(source, /app-export-grid/);
       assert.match(source, /--sr-export-paper/);
       assert.match(source, /--sr-export-font/);
       assert.match(source, /document\.documentElement/);
@@ -135,6 +137,8 @@ export const smokes = [
       assert.match(css, /\.sr-bar\s*\{[^}]*border-inline-start:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
       assert.match(css, /\.app-export::before\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*-14mm;[^}]*background:\s*var\(--sr-export-paper, #fff\);/s);
       assert.match(css, /\.sr-marker-on-boundary::after\s*\{\s*content:\s*none;/);
+      assert.match(css, /\.app-rhythm-grid \.sr-cell,[\s\S]*?\.app-export-grid \.sr-cell\s*\{[^}]*border:\s*1px solid/s);
+      assert.match(css, /\.app-export-grid \.sr-slot \+ \.sr-slot\s*\{[^}]*border-inline-start:\s*1px dashed/s);
       assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.app-root\.is-exporting\s*\{[^}]*display:\s*block !important;[^}]*height:\s*auto !important;[^}]*overflow:\s*visible !important;/s);
       assert.match(css, /\.app-export-scroll\s*\{[^}]*display:\s*block !important;[^}]*overflow:\s*visible !important;/s);
