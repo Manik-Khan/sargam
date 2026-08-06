@@ -5,7 +5,7 @@
 // dependency, no second typographic implementation — renderExport is the
 // same engine output as the preview.
 // @media print in sargam.css hides everything except .app-export-paper.
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderExport } from '../engine/render.js';
 import { alignTalaMarkers, stampAnchorTargets, mountAnchorOverlays } from './anchor-overlay.js';
 import { clearMeasuredLineLayout, setMeasuredLineLayout } from '../engine/layout.js';
@@ -13,6 +13,19 @@ import { clearMeasuredLineLayout, setMeasuredLineLayout } from '../engine/layout
 const RIGHT_EDGE_BREATH_EM = 0.3;
 const SCORE_GUTTER_EM = 2;
 const FALLBACK_SYSTEM_EM = 40;
+
+const EXPORT_PAPER_COLORS = [
+  { value: '#ffffff', label: 'White' },
+  { value: '#fffaf0', label: 'Ivory' },
+  { value: '#f5edda', label: 'Warm sand' },
+  { value: '#eef3e8', label: 'Soft sage' },
+];
+
+const EXPORT_FONTS = [
+  { value: 'Charter, Georgia, "Times New Roman", serif', label: 'Traditional serif' },
+  { value: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif', label: 'Classic book' },
+  { value: 'Avenir, "Helvetica Neue", Arial, sans-serif', label: 'Clean sans' },
+];
 
 function allMusicLines(doc) {
   return (doc?.sections || []).flatMap((section) => section.lines || []);
@@ -73,6 +86,8 @@ function installBrowserMeasurements(doc, mountEl) {
 
 export default function ExportView({ doc, noteNames, onClose, sourceText, anchorMarks = [] }) {
   const mount = useRef(null);
+  const [paperColor, setPaperColor] = useState(EXPORT_PAPER_COLORS[0].value);
+  const [fontFamily, setFontFamily] = useState(EXPORT_FONTS[0].value);
 
   useLayoutEffect(() => {
     const mountEl = mount.current;
@@ -172,7 +187,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
       printMedia?.removeEventListener?.('change', mediaChange);
       allMusicLines(doc).forEach(clearMeasuredLineLayout);
     };
-  }, [doc, noteNames, sourceText, anchorMarks]);
+  }, [doc, noteNames, sourceText, anchorMarks, fontFamily]);
 
   useEffect(() => {
     const esc = (e) => {
@@ -183,12 +198,41 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
   }, [onClose]);
 
   return (
-    <div className="app-export">
+    <div
+      className="app-export"
+      style={{ '--sr-export-paper': paperColor, '--sr-export-font': fontFamily }}
+    >
       <div className="app-export-bar">
         <span className="app-export-title">Export</span>
         <button className="tb-btn" onClick={() => window.print()}>
           Print / Save as PDF
         </button>
+        <div className="app-export-style-controls" aria-label="PDF appearance">
+          <label>
+            <span>Page</span>
+            <select
+              aria-label="PDF page color"
+              value={paperColor}
+              onChange={(event) => setPaperColor(event.target.value)}
+            >
+              {EXPORT_PAPER_COLORS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Typeface</span>
+            <select
+              aria-label="PDF typeface"
+              value={fontFamily}
+              onChange={(event) => setFontFamily(event.target.value)}
+            >
+              {EXPORT_FONTS.map((option) => (
+                <option key={option.label} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <button className="tb-btn app-export-close" onClick={onClose}>
           Close
         </button>

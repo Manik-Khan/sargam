@@ -106,6 +106,10 @@ export const smokes = [
       assert.match(source, /SCORE_GUTTER_EM = 2/);
       assert.match(source, /const score = el\.querySelector\('\.sr-export'\) \|\| el;/);
       assert.match(source, /const fontSize = Number\.parseFloat\(scoreStyle\.fontSize\) \|\| 15;/);
+      assert.match(source, /aria-label="PDF page color"/);
+      assert.match(source, /aria-label="PDF typeface"/);
+      assert.match(source, /--sr-export-paper/);
+      assert.match(source, /--sr-export-font/);
       assert.match(source, /const beforePrint = \(\) => \{[\s\S]*?printActive = true;[\s\S]*?cancelAnimationFrame/);
       assert.match(source, /if \(disposed \|\| printActive\) return;/);
       assert.match(source, /if \(printActive\) return;[\s\S]*?contentRect/);
@@ -118,12 +122,14 @@ export const smokes = [
     name: 'print width: screen paper matches printable width and uses compact export typography',
     fn() {
       const css = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
-      assert.match(css, /\.app-export-paper\s*\{[^}]*width:\s*816px;[^}]*padding:\s*46px 53px 60px;[^}]*box-sizing:\s*border-box;/s);
+      assert.match(css, /\.app-export-paper\s*\{[^}]*background:\s*var\(--sr-export-paper, #fff\);[^}]*width:\s*816px;[^}]*padding:\s*46px 53px 60px;[^}]*box-sizing:\s*border-box;/s);
       assert.match(css, /\.app-export\s*\{[^}]*z-index:\s*120;/s);
-      assert.match(css, /\.sr-export\s*\{\s*font-size:\s*15px;/);
+      assert.match(css, /\.sr-export\s*\{[^}]*font-size:\s*15px;/s);
       assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*19px;/);
       assert.match(css, /\.sr-export \.sr-cell\s*\{[^}]*min-width:\s*1\.72em;[^}]*padding-inline:\s*2px;/s);
       assert.match(css, /@page\s*\{\s*size:\s*Letter portrait;\s*margin:\s*14mm;/);
+      assert.match(css, /\.sr-bar\s*\{[^}]*border-inline-start:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
+      assert.match(css, /\.app-export-paper\s*\{[^}]*-webkit-print-color-adjust:\s*exact;[^}]*print-color-adjust:\s*exact;/s);
       assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.app-root\.is-exporting\s*\{[^}]*display:\s*block !important;[^}]*height:\s*auto !important;[^}]*overflow:\s*visible !important;/s);
       assert.match(css, /\.app-export-scroll\s*\{[^}]*display:\s*block !important;[^}]*overflow:\s*visible !important;/s);
