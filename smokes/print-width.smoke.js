@@ -110,6 +110,8 @@ export const smokes = [
       assert.match(source, /aria-label="PDF typeface"/);
       assert.match(source, /--sr-export-paper/);
       assert.match(source, /--sr-export-font/);
+      assert.match(source, /document\.documentElement/);
+      assert.match(source, /root\.style\.setProperty\('--sr-export-paper', paperColor\)/);
       assert.match(source, /const beforePrint = \(\) => \{[\s\S]*?printActive = true;[\s\S]*?cancelAnimationFrame/);
       assert.match(source, /if \(disposed \|\| printActive\) return;/);
       assert.match(source, /if \(printActive\) return;[\s\S]*?contentRect/);
@@ -127,9 +129,12 @@ export const smokes = [
       assert.match(css, /\.sr-export\s*\{[^}]*font-size:\s*15px;/s);
       assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*19px;/);
       assert.match(css, /\.sr-export \.sr-cell\s*\{[^}]*min-width:\s*1\.72em;[^}]*padding-inline:\s*2px;/s);
+      assert.match(css, /\.sr-export \.sr-cell:has\(\.sr-sustain\)\s*\{[^}]*min-width:\s*1em;[^}]*padding-inline:\s*0;/s);
+      assert.match(css, /\.sr-export \.sargam-render,[\s\S]*?\.sr-export \.sr-return-cue\s*\{\s*font-family:\s*inherit;/);
       assert.match(css, /@page\s*\{\s*size:\s*Letter portrait;\s*margin:\s*14mm;/);
       assert.match(css, /\.sr-bar\s*\{[^}]*border-inline-start:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
-      assert.match(css, /\.app-export-paper\s*\{[^}]*-webkit-print-color-adjust:\s*exact;[^}]*print-color-adjust:\s*exact;/s);
+      assert.match(css, /\.app-export::before\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*-14mm;[^}]*background:\s*var\(--sr-export-paper, #fff\);/s);
+      assert.match(css, /\.sr-marker-on-boundary::after\s*\{\s*content:\s*none;/);
       assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.app-root\.is-exporting\s*\{[^}]*display:\s*block !important;[^}]*height:\s*auto !important;[^}]*overflow:\s*visible !important;/s);
       assert.match(css, /\.app-export-scroll\s*\{[^}]*display:\s*block !important;[^}]*overflow:\s*visible !important;/s);

@@ -601,6 +601,8 @@
 /* The printed score follows the compact AACM computer-notation precedent:
    the same renderer and geometry, packed more densely only inside Export. */
 .sr-export { font-family: var(--sr-export-font, Charter, Georgia, 'Times New Roman', serif); font-size: 15px; }
+.sr-export .sargam-render,
+.sr-export .sr-return-cue { font-family: inherit; }
 .sr-export .sr-exp-head { gap: 30px; margin-bottom: 20px; padding-bottom: 11px; }
 .sr-export .sr-exp-raga { font-family: inherit; font-size: 29px; }
 .sr-export .sr-exp-title { font-size: 12px; margin-top: 4px; }
@@ -617,6 +619,10 @@
 .sr-export .sr-line-block { margin-bottom: 3px; padding-inline: 1em; }
 .sr-export .sr-row { column-gap: 1px; padding-block: 1px; }
 .sr-export .sr-cell { min-width: 1.72em; padding-inline: 2px; }
+/* A standalone dash is elapsed time, not a wide glyph-bearing note cell.
+   Compact only whole-matra holds; note clusters and internal micro-holds keep
+   their measured rhythmic geometry. */
+.sr-export .sr-cell:has(.sr-sustain) { min-width: 1em; padding-inline: 0; }
 .sr-export .sr-glyphs { font-size: 19px; }
 .sr-export .sr-marker { font-size: 11.5px; }
 .sr-export .sr-lyric,
@@ -624,7 +630,7 @@
 .sr-export .sr-return-cue { font-size: 11px; }
 
 /* ---- print: only the paper reaches the page ---- */
-@page { size: Letter portrait; margin: 14mm; }
+@page { size: Letter portrait; margin: 14mm; background: var(--sr-export-paper, #fff); }
 @media print {
   html,
   body,
@@ -637,12 +643,24 @@
     min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
+    background: var(--sr-export-paper, #fff) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .app-root.is-exporting > *:not(.app-export) { display: none !important; }
   .app-export { position: static !important; background: var(--sr-export-paper, #fff) !important; display: block !important; }
+  .app-export::before {
+    content: '';
+    position: fixed;
+    inset: -14mm;
+    z-index: 0;
+    background: var(--sr-export-paper, #fff);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .app-export-bar { display: none !important; }
-  .app-export-scroll { display: block !important; overflow: visible !important; padding: 0 !important; background: var(--sr-export-paper, #fff) !important; }
-  .app-export-paper { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: var(--sr-export-paper, #fff) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .app-export-scroll { position: relative; z-index: 1; display: block !important; overflow: visible !important; padding: 0 !important; background: transparent !important; }
+  .app-export-paper { position: relative; width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sr-section { break-inside: auto; page-break-inside: auto; }
   .sr-section-label { break-inside: avoid; break-after: avoid-page; page-break-after: avoid; }
   .sr-line-group { break-inside: auto; page-break-inside: auto; }
@@ -1915,7 +1933,7 @@
 .sr-boundary-start { left: -0.22rem; }
 .sr-boundary-end { right: -0.22rem; }
 .sr-marker { transform: translateX(var(--sr-marker-shift, 0px)); transition: transform 80ms linear; }
-.sr-marker-on-boundary::after { content: ''; position: absolute; left: 50%; top: 1.05em; height: 0.58em; border-left: 1px solid currentColor; opacity: 0.55; }
+.sr-marker-on-boundary::after { content: none; }
 .sr-line-block { position: relative; }
 .app-rhythm-grid .sr-cell {
   border-inline: 1px solid color-mix(in srgb, var(--sr-accent) 24%, transparent);

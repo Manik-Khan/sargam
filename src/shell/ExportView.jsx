@@ -89,6 +89,16 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
   const [paperColor, setPaperColor] = useState(EXPORT_PAPER_COLORS[0].value);
   const [fontFamily, setFontFamily] = useState(EXPORT_FONTS[0].value);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.getPropertyValue('--sr-export-paper');
+    root.style.setProperty('--sr-export-paper', paperColor);
+    return () => {
+      if (previous) root.style.setProperty('--sr-export-paper', previous);
+      else root.style.removeProperty('--sr-export-paper');
+    };
+  }, [paperColor]);
+
   useLayoutEffect(() => {
     const mountEl = mount.current;
     if (!mountEl) return undefined;
