@@ -1,7 +1,8 @@
-// src/shell/Transport.jsx — notation transport and compact sound controls.
-// Presentational: all playback and preference behavior is injected from App.
+// src/shell/Transport.jsx — compact notation transport with detailed sound
+// controls kept in a settings popover. Presentational: playback and preference
+// behavior remains owned by App.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   isSoundfontVoice,
   melodyVoiceLabel,
@@ -28,7 +29,6 @@ const TONE_LABELS = Object.freeze({
   chorus: ['Chorus', 'None', 'Wide'],
 });
 
-
 function ToneSelect({ label, value, onChange, options }) {
   return (
     <label className="tp-tone-select-row">
@@ -36,8 +36,8 @@ function ToneSelect({ label, value, onChange, options }) {
       <select
         className="tp-tone-select"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => event.stopPropagation()}
       >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>{optionLabel}</option>
@@ -60,13 +60,41 @@ function ToneSlider({ name, value, onChange, disabled = false }) {
         step="0.01"
         value={value}
         disabled={disabled}
-        onChange={(e) => onChange(name, Number(e.target.value))}
-        onKeyDown={(e) => e.stopPropagation()}
+        onChange={(event) => onChange(name, Number(event.target.value))}
+        onKeyDown={(event) => event.stopPropagation()}
         aria-label={`${label}: ${pct(value)}`}
       />
       <span className="tp-tone-edge tp-tone-edge-right">{high}</span>
       <output>{pct(value)}</output>
     </label>
+  );
+}
+
+function MixRow({ track, label, muted, volume, onTrackMute, onTrackGain }) {
+  return (
+    <div className="tp-mix-row">
+      <label className="tp-check">
+        <input
+          type="checkbox"
+          checked={!muted}
+          onChange={(event) => onTrackMute(track, !event.target.checked)}
+        />
+        {label}
+      </label>
+      <input
+        className="tp-volume"
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={volume}
+        onChange={(event) => onTrackGain(track, Number(event.target.value))}
+        onKeyDown={(event) => event.stopPropagation()}
+        aria-label={`${label} volume`}
+        title={`${label} volume: ${pct(volume)}`}
+      />
+      <output className="tp-volume-value">{pct(volume)}</output>
+    </div>
   );
 }
 
@@ -82,6 +110,8 @@ export default function Transport({
   tone,
   droneMode,
   talaSound,
+  followEditing = true,
+  followPlayback = true,
   onPlayPause,
   onStop,
   onBpm,
@@ -92,13 +122,19 @@ export default function Transport({
   onToneChange,
   onDroneMode,
   onTalaSound,
+  onFollowEditing,
+  onFollowPlayback,
 }) {
   const [bpmDraft, setBpmDraft] = useState(String(bpm));
+  const lastDroneMode = useRef(droneMode === 'off' ? 'sa-pa' : droneMode);
   useEffect(() => setBpmDraft(String(bpm)), [bpm]);
+  useEffect(() => {
+    if (droneMode !== 'off') lastDroneMode.current = droneMode;
+  }, [droneMode]);
 
   const commitBpm = () => {
-    const v = parseInt(bpmDraft, 10);
-    if (Number.isFinite(v) && v >= 10 && v <= 400 && v !== bpm) onBpm(v);
+    const value = parseInt(bpmDraft, 10);
+    if (Number.isFinite(value) && value >= 10 && value <= 400 && value !== bpm) onBpm(value);
     else setBpmDraft(String(bpm));
   };
 
@@ -115,120 +151,183 @@ export default function Transport({
     neutralWaveform: 'triangle',
   };
   const sampledVoice = isSoundfontVoice(melodyVoice);
+  const talaEnabled = talaSound !== 'off' && !tracks.tick;
+
+  const toggleTala = () => {
+    if (talaSound === 'off') {
+      onTalaSound('click');
+      onTrackMute('tick', false);
+      return;
+    }
+    onTrackMute('tick', !tracks.tick);
+  };
 
   return (
-    <div className="transport">
+    <div className="transport" aria-label="Notation playback controls">
+      <span className="tp-context">Notation</span>
       <button
         className="tp-btn tp-primary"
         onClick={onPlayPause}
         title="Play/Pause (Space)"
-        aria-label={playing ? 'Pause' : 'Play'}
+        aria-label={playing ? 'Pause notation' : 'Play notation'}
       >
         {playing ? '⏸' : '▶'}
       </button>
-      <button className="tp-btn" onClick={onStop} title="Stop" aria-label="Stop">
+      <button className="tp-btn" onClick={onStop} title="Stop notation" aria-label="Stop notation">
         ⏹
       </button>
-      <span className="tp-pos">
-        {fmt(position)} / {fmt(duration)}
-      </span>
+      <span className="tp-pos">{fmt(position)} / {fmt(duration)}</span>
       <span className="tp-sep" />
-      <label className="tp-label" htmlFor="tp-bpm">
-        BPM
-      </label>
+      <label className="tp-label" htmlFor="tp-bpm">BPM</label>
       <input
         id="tp-bpm"
         className="tp-tempo"
         value={bpmDraft}
         inputMode="numeric"
-        onChange={(e) => setBpmDraft(e.target.value.replace(/[^0-9]/g, ''))}
+        onChange={(event) => setBpmDraft(event.target.value.replace(/[^0-9]/g, ''))}
         onBlur={commitBpm}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
             commitBpm();
-            e.target.blur();
+            event.target.blur();
           }
-          e.stopPropagation();
+          event.stopPropagation();
         }}
         title="Playback speed — writes the tempo: directive"
       />
       <span className="tp-sep" />
       <span className="tp-label">Loop</span>
-      <span className="tp-seg" role="group" aria-label="Loop mode">
-        {['off', 'line', 'section'].map((m) => (
+      <span className="tp-seg tp-loop" role="group" aria-label="Loop mode">
+        {['off', 'line', 'section'].map((mode) => (
           <button
-            key={m}
-            className={loopMode === m ? 'on' : ''}
-            aria-pressed={loopMode === m}
-            onClick={() => onLoopMode(m)}
+            key={mode}
+            className={loopMode === mode ? 'on' : ''}
+            aria-pressed={loopMode === mode}
+            onClick={() => onLoopMode(mode)}
           >
-            {m}
+            {mode}
           </button>
         ))}
       </span>
       <span className="tp-sep" />
-      <label className="tp-label" htmlFor="tp-melody-voice">
-        Melody sound
-      </label>
-      <select
-        id="tp-melody-voice"
-        className="tp-select"
-        value={melodyVoice}
-        onChange={(e) => onMelodyVoice(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
-        title="Choose the notation melody voice; every choice preserves the written pitch"
-      >
-        {MELODY_VOICE_OPTIONS.map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
-        ))}
-      </select>
-      <details className="tp-tone" onKeyDown={(e) => e.stopPropagation()}>
-        <summary>Sound settings</summary>
-        <div className="tp-tone-menu">
-          <div className="tp-tone-heading">{melodyVoiceLabel(melodyVoice)}</div>
-          <ToneSlider name="velocity" value={voiceTone.velocity} onChange={onToneChange} />
-          <ToneSlider name="brightness" value={voiceTone.brightness} onChange={onToneChange} />
-          <ToneSlider name="attack" value={voiceTone.attack} onChange={onToneChange} />
-          <ToneSlider name="release" value={voiceTone.release} onChange={onToneChange} />
-          <ToneSlider name="reverb" value={voiceTone.reverb} onChange={onToneChange} />
-          {sampledVoice && (
-            <ToneSlider name="chorus" value={voiceTone.chorus} onChange={onToneChange} />
-          )}
-          {melodyVoice === 'neutral' && (
-            <div className="tp-tone-special">
-              <ToneSelect
-                label="Envelope"
-                value={voiceTone.neutralEnvelope || 'soft'}
-                onChange={(value) => onToneChange('neutralEnvelope', value)}
-                options={[
-                  ['soft', 'Soft and rounded'],
-                  ['bell', 'Bell-like decay'],
-                  ['sustain', 'Sustained'],
-                  ['pluck', 'Short pluck'],
-                ]}
-              />
-              <ToneSelect
-                label="Wave"
-                value={voiceTone.neutralWaveform || 'triangle'}
-                onChange={(value) => onToneChange('neutralWaveform', value)}
-                options={[
-                  ['sine', 'Pure sine'],
-                  ['triangle', 'Rounded triangle'],
-                ]}
-              />
-              <p className="tp-tone-note">
-                The neutral tone always follows the composition's written pitch and octave.
-              </p>
+      <div className="tp-quick-group" role="group" aria-label="Quick sound toggles">
+        <button
+          type="button"
+          className="tp-quick"
+          aria-pressed={!tracks.melody}
+          onClick={() => onTrackMute('melody', !tracks.melody)}
+          title="Turn the notation melody on or off"
+        >
+          <span aria-hidden="true" /> Melody
+        </button>
+        <button
+          type="button"
+          className="tp-quick"
+          aria-pressed={droneMode !== 'off'}
+          onClick={() => onDroneMode(droneMode === 'off' ? lastDroneMode.current : 'off')}
+          title="Turn the tanpura on or off"
+        >
+          <span aria-hidden="true" /> Tanpura
+        </button>
+        <button
+          type="button"
+          className="tp-quick"
+          aria-pressed={talaEnabled}
+          onClick={toggleTala}
+          title="Turn the tala on or off"
+        >
+          <span aria-hidden="true" /> Tala
+        </button>
+      </div>
+      <details className="tp-settings" onKeyDown={(event) => event.stopPropagation()}>
+        <summary title="Playback and workspace settings" aria-label="Sound settings">
+          <span aria-hidden="true">⚙</span> Settings
+        </summary>
+        <div className="tp-settings-menu">
+          <section className="tp-settings-section">
+            <div className="tp-settings-heading">
+              <strong>Live workspace</strong>
+              <span>The score keeps rendering while the editor stays anchored.</span>
             </div>
-          )}
-          {melodyVoice === 'harmonium' && (
-            <div className="tp-tone-special">
+            <label className="tp-setting-check">
+              <input
+                type="checkbox"
+                checked={followEditing}
+                onChange={(event) => onFollowEditing?.(event.target.checked)}
+              />
+              Keep the measure I am editing visible
+            </label>
+            <label className="tp-setting-check">
+              <input
+                type="checkbox"
+                checked={followPlayback}
+                onChange={(event) => onFollowPlayback?.(event.target.checked)}
+              />
+              Follow the measure being played
+            </label>
+          </section>
+
+          <section className="tp-settings-section">
+            <div className="tp-settings-heading">
+              <strong>Melody sound</strong>
+              <span>Voice and tone for the rendered notation.</span>
+            </div>
+            <label className="tp-tone-select-row">
+              <span className="tp-tone-name">Voice</span>
+              <select
+                id="tp-melody-voice"
+                className="tp-tone-select"
+                value={melodyVoice}
+                onChange={(event) => onMelodyVoice(event.target.value)}
+                title="Every choice preserves the written pitch"
+              >
+                {MELODY_VOICE_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="tp-tone-heading">{melodyVoiceLabel(melodyVoice)}</div>
+            <p className="tp-tone-note">Changing instruments never transposes the notation.</p>
+            <ToneSlider name="velocity" value={voiceTone.velocity} onChange={onToneChange} />
+            <ToneSlider name="brightness" value={voiceTone.brightness} onChange={onToneChange} />
+            <ToneSlider name="attack" value={voiceTone.attack} onChange={onToneChange} />
+            <ToneSlider name="release" value={voiceTone.release} onChange={onToneChange} />
+            <ToneSlider name="reverb" value={voiceTone.reverb} onChange={onToneChange} />
+            {sampledVoice && <ToneSlider name="chorus" value={voiceTone.chorus} onChange={onToneChange} />}
+            {melodyVoice === 'neutral' && (
+              <div className="tp-tone-special">
+                <ToneSelect
+                  label="Envelope"
+                  value={voiceTone.neutralEnvelope || 'soft'}
+                  onChange={(value) => onToneChange('neutralEnvelope', value)}
+                  options={[
+                    ['soft', 'Soft and rounded'],
+                    ['bell', 'Bell-like decay'],
+                    ['sustain', 'Sustained'],
+                    ['pluck', 'Short pluck'],
+                  ]}
+                />
+                <ToneSelect
+                  label="Wave"
+                  value={voiceTone.neutralWaveform || 'triangle'}
+                  onChange={(value) => onToneChange('neutralWaveform', value)}
+                  options={[
+                    ['sine', 'Pure sine'],
+                    ['triangle', 'Rounded triangle'],
+                  ]}
+                />
+                <p className="tp-tone-note">
+                  The neutral tone follows the composition's written pitch and octave.
+                </p>
+              </div>
+            )}
+            {melodyVoice === 'harmonium' && (
               <div className="tp-tone-switches">
                 <label>
                   <input
                     type="checkbox"
                     checked={voiceTone.coupler}
-                    onChange={(e) => onToneChange('coupler', e.target.checked)}
+                    onChange={(event) => onToneChange('coupler', event.target.checked)}
                   />
                   Add upper-octave coupler
                 </label>
@@ -236,110 +335,100 @@ export default function Transport({
                   <input
                     type="checkbox"
                     checked={voiceTone.subOctave}
-                    onChange={(e) => onToneChange('subOctave', e.target.checked)}
+                    onChange={(event) => onToneChange('subOctave', event.target.checked)}
                   />
                   Add sub-octave layer
                 </label>
+                <p className="tp-tone-note">The written pitch remains present.</p>
               </div>
+            )}
+            {sampledVoice && (
               <p className="tp-tone-note">
-                These are optional layers; the written pitch remains present.
+                GeneralUser GS is bundled locally for the sampled instruments.
               </p>
+            )}
+          </section>
+
+          <section className="tp-settings-section">
+            <div className="tp-settings-heading">
+              <strong>Tanpura</strong>
+              <span>Drone tuning and level.</span>
             </div>
-          )}
-          {sampledVoice && (
-            <p className="tp-tone-note">
-              GeneralUser GS is bundled locally and played through SpessaSynth. Changing instruments never transposes the notation.
-            </p>
-          )}
+            <div className="tp-setting-row">
+              <span className="tp-seg" role="group" aria-label="Tanpura support">
+                {[
+                  ['off', 'Off'],
+                  ['sa-pa', 'Sa–Pa'],
+                  ['sa-ma', 'Sa–ma'],
+                ].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    className={droneMode === mode ? 'on' : ''}
+                    aria-pressed={droneMode === mode}
+                    onClick={() => onDroneMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </span>
+              <input
+                className="tp-volume"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volumes.drone}
+                disabled={droneMode === 'off'}
+                onChange={(event) => onTrackGain('drone', Number(event.target.value))}
+                aria-label="Tanpura volume"
+              />
+              <output className="tp-volume-value">{pct(volumes.drone)}</output>
+            </div>
+          </section>
+
+          <section className="tp-settings-section">
+            <div className="tp-settings-heading">
+              <strong>Tala sound</strong>
+              <span>Choose click, tabla, or silence.</span>
+            </div>
+            <span className="tp-seg" role="group" aria-label="Tala sound">
+              {['click', 'tabla', 'off'].map((mode) => (
+                <button
+                  key={mode}
+                  className={talaSound === mode ? 'on' : ''}
+                  aria-pressed={talaSound === mode}
+                  onClick={() => onTalaSound(mode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </span>
+          </section>
+
+          <section className="tp-settings-section">
+            <div className="tp-settings-heading">
+              <strong>Mix</strong>
+              <span>Notation melody and tala levels.</span>
+            </div>
+            <MixRow
+              track="melody"
+              label="Melody"
+              muted={tracks.melody}
+              volume={volumes.melody}
+              onTrackMute={onTrackMute}
+              onTrackGain={onTrackGain}
+            />
+            <MixRow
+              track="tick"
+              label="Tala"
+              muted={tracks.tick}
+              volume={volumes.tick}
+              onTrackMute={onTrackMute}
+              onTrackGain={onTrackGain}
+            />
+          </section>
         </div>
       </details>
-      <span className="tp-sep" />
-      <span className="tp-label">Tanpura</span>
-      <span className="tp-seg" role="group" aria-label="Tanpura support">
-        {[
-          ['off', 'off'],
-          ['sa-pa', 'Sa–Pa'],
-          ['sa-ma', 'Sa–ma'],
-        ].map(([mode, label]) => (
-          <button
-            key={mode}
-            className={droneMode === mode ? 'on' : ''}
-            aria-pressed={droneMode === mode}
-            onClick={() => onDroneMode(mode)}
-            title={
-              mode === 'off'
-                ? 'No tanpura support'
-                : `Synthesized four-string ${label} drone tuned from the document's Sa`
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </span>
-      <div className="tp-drone-volume">
-        <input
-          className="tp-volume"
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volumes.drone}
-          disabled={droneMode === 'off'}
-          onChange={(e) => onTrackGain('drone', Number(e.target.value))}
-          onKeyDown={(e) => e.stopPropagation()}
-          aria-label="Tanpura volume"
-          title={`Tanpura volume: ${pct(volumes.drone)}`}
-        />
-        <output className="tp-volume-value">{pct(volumes.drone)}</output>
-      </div>
-      <span className="tp-sep" />
-      <span className="tp-label">Tala sound</span>
-      <span className="tp-seg" role="group" aria-label="Tala sound">
-        {['click', 'tabla', 'off'].map((mode) => (
-          <button
-            key={mode}
-            className={talaSound === mode ? 'on' : ''}
-            aria-pressed={talaSound === mode}
-            onClick={() => onTalaSound(mode)}
-            title={
-              mode === 'tabla'
-                ? 'Recorded tabla prototype; Rupak is mapped first and other talas retain the click'
-                : undefined
-            }
-          >
-            {mode}
-          </button>
-        ))}
-      </span>
-      <span className="tp-sep" />
-      {[
-        ['melody', 'Melody'],
-        ['tick', 'Tala'],
-      ].map(([track, label]) => (
-        <div className="tp-track" key={track}>
-          <label className="tp-check">
-            <input
-              type="checkbox"
-              checked={!tracks[track]}
-              onChange={(e) => onTrackMute(track, !e.target.checked)}
-            />
-            {label}
-          </label>
-          <input
-            className="tp-volume"
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={volumes[track]}
-            onChange={(e) => onTrackGain(track, Number(e.target.value))}
-            onKeyDown={(e) => e.stopPropagation()}
-            aria-label={`${label} volume`}
-            title={`${label} volume: ${pct(volumes[track])}`}
-          />
-          <output className="tp-volume-value">{pct(volumes[track])}</output>
-        </div>
-      ))}
     </div>
   );
 }

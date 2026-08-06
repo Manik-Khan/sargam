@@ -70,7 +70,7 @@ export default function PracticeBar({
   return (
     <div className="app-practice-bar" aria-label="Sargam Music recording controls">
       <div className="app-practice-source" title={sourceName}>
-        <span className="app-practice-kicker">Sargam Music recording</span>
+        <span className="app-practice-kicker">Recording</span>
         <strong>{sourceName}</strong>
       </div>
       <span className="app-practice-time" aria-label="Recording position">
@@ -88,18 +88,27 @@ export default function PracticeBar({
         </button>
       </div>
       <span className={'app-practice-loop' + (player.loop.on ? ' is-on' : '')}>{loopText}</span>
-      <div className="app-practice-link-actions" aria-label="Linked notation loop actions">
-        <button
-          type="button"
-          className="app-practice-attach"
-          disabled={!loaded || !player.loop.ready}
-          title="Select notation, set an A–B loop, then attach it"
-          onClick={() => onAttachLoop?.(player)}
-        >
-          Attach Loop
-        </button>
-        {selectedLink && (
-          <>
+      <button
+        type="button"
+        className="app-practice-attach"
+        disabled={!loaded || !player.loop.ready}
+        title="Select notation, set an A–B loop, then attach it"
+        onClick={() => onAttachLoop?.(player)}
+      >
+        Attach Loop
+      </button>
+      {selectedLink && (
+        <details className="app-practice-more">
+          <summary>Linked</summary>
+          <div className="app-practice-more-menu" aria-label="Linked notation loop actions">
+            <span className="app-practice-linked" title={selectedLink.recording?.name || ''}>
+              {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}
+              {selectedLink.clipAssetId ? ' · clip ready' : ''}
+              {linkedPlayback?.linkId === selectedLink.id
+                ? linkedPlayback.kind === 'clip' ? ' · clip looping' : ' · source looping'
+                : ''}
+            </span>
+            <>
             <button
               type="button"
               aria-pressed={linkedPlayback?.linkId === selectedLink.id}
@@ -123,17 +132,9 @@ export default function PracticeBar({
               </button>
             )}
             <button type="button" onClick={() => onRemoveLinked?.(selectedLink.id)}>Remove Link</button>
-          </>
-        )}
-      </div>
-      {selectedLink && (
-        <span className="app-practice-linked" title={selectedLink.recording?.name || ''}>
-          Linked {formatVilambitTime(selectedLink.startTime)}–{formatVilambitTime(selectedLink.endTime)}
-          {selectedLink.clipAssetId ? ' · clip ready' : ''}
-          {linkedPlayback?.linkId === selectedLink.id
-            ? linkedPlayback.kind === 'clip' ? ' · clip looping' : ' · source looping'
-            : ''}
-        </span>
+            </>
+          </div>
+        </details>
       )}
       {player.error && <span className="app-practice-error" title={player.error}>Sargam Music error</span>}
       <button type="button" className="app-practice-open" onClick={onOpen}>Open Music</button>

@@ -6,6 +6,7 @@ import {
   previewAnchorIdentity,
   previewLineElement,
   previewSourceLine,
+  revealElementScrollTop,
 } from '../src/shell/preview-scroll.js';
 
 export const smokes = [
@@ -36,6 +37,29 @@ export const smokes = [
         beforeTop: undefined,
         afterTop: 200,
       }), 315);
+    },
+  },
+  {
+    name: 'preview scroll: playback reveal moves only the score scroller',
+    fn() {
+      assert.equal(revealElementScrollTop({
+        scrollTop: 300,
+        scrollerTop: 100,
+        scrollerBottom: 500,
+        elementTop: 520,
+        elementBottom: 560,
+        scrollHeight: 1600,
+        clientHeight: 400,
+      }), 388);
+      assert.equal(revealElementScrollTop({
+        scrollTop: 300,
+        scrollerTop: 100,
+        scrollerBottom: 500,
+        elementTop: 220,
+        elementBottom: 260,
+        scrollHeight: 1600,
+        clientHeight: 400,
+      }), 300);
     },
   },
   {

@@ -154,6 +154,16 @@ export default function App() {
   const [showNew, setShowNew] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [layout, setLayout] = useState(() => store.getPref('layout', 'side'));
+  const [editorHeight, setEditorHeight] = useState(() => {
+    const saved = Number(store.getPref('editorHeight', 0));
+    return Number.isFinite(saved) && saved >= 140 ? saved : null;
+  });
+  const [followEditing, setFollowEditing] = useState(() =>
+    store.getPref('followEditing', true) !== false
+  );
+  const [followPlayback, setFollowPlayback] = useState(() =>
+    store.getPref('followPlayback', true) !== false
+  );
   const [noteNames, setNoteNames] = useState(() => store.getPref('noteNames', 'sargam'));
   const [showDictate, setShowDictate] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
@@ -192,6 +202,7 @@ export default function App() {
   const jumpTimerRef = useRef(null);
   const editorSyncTargetRef = useRef(null);
   const stageRef = useRef(null);
+  const panesRef = useRef(null);
 
   const syncSourceLineFromEditor = useCallback((sourceLine) => {
     const pendingTarget = editorSyncTargetRef.current;
@@ -1734,6 +1745,53 @@ export default function App() {
     divider.addEventListener('pointercancel', finish);
   };
 
+  const clampEditorHeight = (value) => {
+    const paneHeight = panesRef.current?.clientHeight || window.innerHeight;
+    return Math.round(Math.max(140, Math.min(Math.max(140, paneHeight - 180), value)));
+  };
+
+  const changeEditorHeight = (value, save = false) => {
+    const next = clampEditorHeight(value);
+    setEditorHeight(next);
+    if (save) store.setPref('editorHeight', next);
+    return next;
+  };
+
+  const beginNotationResize = (event) => {
+    if (layout !== 'stacked' || !panesRef.current) return;
+    const divider = event.currentTarget;
+    divider.setPointerCapture?.(event.pointerId);
+    let nextHeight = editorHeight || Math.round(panesRef.current.clientHeight * 0.4);
+
+    const resize = (moveEvent) => {
+      const bounds = panesRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      nextHeight = changeEditorHeight(bounds.bottom - moveEvent.clientY);
+    };
+
+    const finish = (upEvent) => {
+      divider.releasePointerCapture?.(upEvent.pointerId);
+      divider.removeEventListener('pointermove', resize);
+      divider.removeEventListener('pointerup', finish);
+      divider.removeEventListener('pointercancel', finish);
+      store.setPref('editorHeight', nextHeight);
+    };
+
+    divider.addEventListener('pointermove', resize);
+    divider.addEventListener('pointerup', finish);
+    divider.addEventListener('pointercancel', finish);
+  };
+
+  const changeFollowEditing = (value) => {
+    setFollowEditing(value);
+    store.setPref('followEditing', value);
+  };
+
+  const changeFollowPlayback = (value) => {
+    setFollowPlayback(value);
+    store.setPref('followPlayback', value);
+  };
+
   return (
     <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
       {showExport && (
@@ -1822,7 +1880,8 @@ export default function App() {
         </div>
       )}
       {view !== 'vilambit' && (
-        <Transport
+        <div className="app-workspace-controls">
+          <Transport
           playing={playing}
           position={position}
           duration={schedule.duration}
@@ -1834,6 +1893,8 @@ export default function App() {
           tone={toneByVoice[melodyVoice]}
           droneMode={droneMode}
           talaSound={talaSound}
+          followEditing={followEditing}
+          followPlayback={followPlayback}
           onPlayPause={doPlayPause}
           onStop={doStop}
           onBpm={doBpm}
@@ -1844,27 +1905,29 @@ export default function App() {
           onToneChange={doToneChange}
           onDroneMode={doDroneMode}
           onTalaSound={doTalaSound}
-        />
-      )}
-
-      {view === 'notation' && (
-        <PracticeBar
-          frameRef={vilambitRef}
-          onOpen={() => setView('vilambit')}
-          onState={receiveVilambitState}
-          onAttachLoop={doAttachAudioLoop}
-          projectOpen={Boolean(project)}
-          extracting={extractingClip}
-          onExtractClip={doExtractAudioClip}
-          onClipExtracted={receiveExtractedClip}
-          onVilambitError={receiveVilambitError}
-          selectedLink={selectedAudioLink}
-          linkedPlayback={linkedPlayback}
-          onPlayLinked={(link) => activateAudioLink(link, { play: true })}
-          onStopLinked={() => stopLinkedPlayback({ announce: true })}
-          onEditClip={doOpenClipEditor}
-          onRemoveLinked={doRemoveAudioLink}
-        />
+          onFollowEditing={changeFollowEditing}
+          onFollowPlayback={changeFollowPlayback}
+          />
+          {view === 'notation' && (
+            <PracticeBar
+              frameRef={vilambitRef}
+              onOpen={() => setView('vilambit')}
+              onState={receiveVilambitState}
+              onAttachLoop={doAttachAudioLoop}
+              projectOpen={Boolean(project)}
+              extracting={extractingClip}
+              onExtractClip={doExtractAudioClip}
+              onClipExtracted={receiveExtractedClip}
+              onVilambitError={receiveVilambitError}
+              selectedLink={selectedAudioLink}
+              linkedPlayback={linkedPlayback}
+              onPlayLinked={(link) => activateAudioLink(link, { play: true })}
+              onStopLinked={() => stopLinkedPlayback({ announce: true })}
+              onEditClip={doOpenClipEditor}
+              onRemoveLinked={doRemoveAudioLink}
+            />
+          )}
+        </div>
       )}
       {showLegend && view === 'notation' && <Legend onClose={() => setShowLegend(false)} />}
       {showDictate && (
@@ -1904,6 +1967,8 @@ export default function App() {
           <span aria-hidden="true">···</span>
         </button>
         <div
+          ref={panesRef}
+          style={editorHeight == null ? undefined : { '--notation-editor-height': `${editorHeight}px` }}
           className={
             'app-panes app-layout-' + layout + (view === 'vilambit' ? ' app-veiled' : '')
           }
@@ -1929,8 +1994,32 @@ export default function App() {
             selectedAudioLinkId={selectedAudioLinkId}
             onActivateAudioLink={activateAudioLink}
             rhythmGrid={rhythmGrid}
+            followEditing={followEditing}
+            followPlayback={followPlayback}
           
-          /><div className="app-editor-col">
+          />
+          <button
+            type="button"
+            className="notation-resize-divider"
+            role="separator"
+            aria-label="Resize the score and notation editor"
+            aria-orientation="horizontal"
+            aria-valuenow={editorHeight || undefined}
+            onPointerDown={beginNotationResize}
+            onKeyDown={(event) => {
+              const current = editorHeight || Math.round((panesRef.current?.clientHeight || 600) * 0.4);
+              if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                changeEditorHeight(current + 16, true);
+              } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                changeEditorHeight(current - 16, true);
+              }
+            }}
+          >
+            <span aria-hidden="true" />
+          </button>
+          <div className="app-editor-col">
             <CommandBar
             onApply={doCommand}
             anchorTool={anchorTool}

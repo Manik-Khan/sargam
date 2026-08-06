@@ -53,4 +53,20 @@ export const smokes = [
       );
     },
   },
+  {
+    name: 'workspace shell: compact live controls preserve editing and playback follow',
+    async fn() {
+      const app = await read('../src/shell/App.jsx');
+      const transport = await read('../src/shell/Transport.jsx');
+      const preview = await read('../src/shell/PreviewPane.jsx');
+      const css = await read('../src/shell/sargam.css');
+      assert.match(app, /app-workspace-controls[\s\S]*?<Transport[\s\S]*?<PracticeBar/);
+      assert.match(transport, /Quick sound toggles/);
+      assert.match(transport, /Keep the measure I am editing visible/);
+      assert.match(transport, /Follow the measure being played/);
+      assert.match(preview, /followEditing[\s\S]*?followPlayback/);
+      assert.match(app, /notation-resize-divider/);
+      assert.match(css, /\.app-workspace-controls\s*\{[\s\S]*?min-height:\s*48px/);
+    },
+  },
 ];

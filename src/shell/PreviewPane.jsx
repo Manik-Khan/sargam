@@ -12,6 +12,7 @@ import {
   previewAnchorElement,
   previewAnchorIdentity,
   previewSourceLine,
+  revealElementScrollTop,
   restorePreviewAnchor,
 } from './preview-scroll.js';
 import {
@@ -49,6 +50,8 @@ export default function PreviewPane({
   selectedAudioLinkId = null,
   onActivateAudioLink,
   rhythmGrid = false,
+  followEditing = true,
+  followPlayback = true,
 }) {
   const mount = useRef(null);
   const gesture = useRef(null);
@@ -74,7 +77,9 @@ export default function PreviewPane({
     if (!mount.current) return undefined;
     const scroller = mount.current;
     const sourceLine = previewSourceLine(doc, activeLine, bolCapture);
-    const beforeAnchor = previewAnchorElement(scroller, sourceLine, bolCapture);
+    const beforeAnchor = followEditing
+      ? previewAnchorElement(scroller, sourceLine, bolCapture)
+      : null;
     const anchorIdentity = previewAnchorIdentity(beforeAnchor);
     const scrollerRect = scroller.getBoundingClientRect();
     const beforeRect = beforeAnchor?.getBoundingClientRect();
@@ -103,21 +108,44 @@ export default function PreviewPane({
       onActivate: onActivateAudioLink,
     });
     applyPlaybackCursor(scroller, activeCursorRef.current);
-    const afterAnchor = restorePreviewAnchor(scroller, anchorIdentity)
-      || previewAnchorElement(scroller, sourceLine, bolCapture);
-    scroller.scrollTop = lineAnchoredScrollTop({
-      scrollTop: beforeScrollTop,
-      beforeTop,
-      afterTop: afterAnchor?.getBoundingClientRect().top,
+    if (followEditing) {
+      const afterAnchor = restorePreviewAnchor(scroller, anchorIdentity)
+        || previewAnchorElement(scroller, sourceLine, bolCapture);
+      scroller.scrollTop = lineAnchoredScrollTop({
+        scrollTop: beforeScrollTop,
+        beforeTop,
+        afterTop: afterAnchor?.getBoundingClientRect().top,
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+      });
+    } else {
+      scroller.scrollTop = Math.min(
+        Math.max(0, scroller.scrollHeight - scroller.clientHeight),
+        beforeScrollTop,
+      );
+    }
+    return () => { cleanupAudio?.(); cleanupAnchors?.(); };
+  }, [doc, sourceText, activeLine, syncRevision, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid, followEditing]);
+
+  useEffect(() => {
+    const scroller = mount.current;
+    applyPlaybackCursor(scroller, activeCursor);
+    if (!followPlayback || !scroller || !activeCursor) return;
+    const active = scroller.querySelector('.sr-cell.sr-active')
+      || scroller.querySelector(`[data-source-line="${activeCursor.sourceLine}"]`);
+    if (!active) return;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    scroller.scrollTop = revealElementScrollTop({
+      scrollTop: scroller.scrollTop,
+      scrollerTop: scrollerRect.top,
+      scrollerBottom: scrollerRect.bottom,
+      elementTop: activeRect.top,
+      elementBottom: activeRect.bottom,
       scrollHeight: scroller.scrollHeight,
       clientHeight: scroller.clientHeight,
     });
-    return () => { cleanupAudio?.(); cleanupAnchors?.(); };
-  }, [doc, sourceText, activeLine, syncRevision, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid]);
-
-  useEffect(() => {
-    applyPlaybackCursor(mount.current, activeCursor);
-  }, [activeCursor]);
+  }, [activeCursor, followPlayback]);
 
   useEffect(() => {
     const onPointerUp = (event) => {

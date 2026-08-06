@@ -2083,6 +2083,291 @@
   .sr-slot.sr-audio-linked { background: transparent !important; box-shadow: none !important; }
 }
 
+/* SARGAM_COMPACT_LIVE_WORKSPACE — notation and recording transports share
+   one working strip. Detailed sound choices live in the Settings popover so
+   the score/editor receive the vertical space. */
+.app-workspace-controls {
+  position: relative;
+  z-index: 35;
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  border-bottom: 1px solid var(--sr-line);
+  background: rgba(248, 239, 218, 0.98);
+  box-shadow: 0 4px 18px rgba(3, 29, 16, 0.08);
+}
+
+.app-workspace-controls .transport {
+  flex: 0 0 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 7px;
+  border: 0;
+  padding: 6px 10px 6px 14px;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.tp-context,
+.app-practice-kicker {
+  color: var(--sr-accent);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tp-loop button { padding-inline: 7px; }
+
+.tp-quick-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tp-quick {
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--sr-line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--sr-ink-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tp-quick > span {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--sr-dim);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.tp-quick[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--sr-accent) 55%, var(--sr-line));
+  color: var(--sr-accent);
+  background: color-mix(in srgb, var(--sr-accent) 5%, transparent);
+}
+
+.tp-quick[aria-pressed="true"] > span {
+  border-color: var(--sr-accent);
+  background: var(--sr-accent);
+}
+
+.tp-settings,
+.app-practice-more {
+  position: relative;
+}
+
+.tp-settings > summary,
+.app-practice-more > summary {
+  list-style: none;
+  min-height: 27px;
+  border: 1px solid var(--sr-line);
+  border-radius: 5px;
+  padding: 4px 8px;
+  color: var(--sr-ink-soft);
+  background: var(--sr-paper);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tp-settings > summary::-webkit-details-marker,
+.app-practice-more > summary::-webkit-details-marker { display: none; }
+
+.tp-settings[open] > summary,
+.app-practice-more[open] > summary {
+  border-color: var(--sr-accent);
+  color: var(--sr-paper-raised);
+  background: var(--sr-accent);
+}
+
+.tp-settings-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 9px);
+  left: 0;
+  width: min(460px, calc(100vw - 28px));
+  max-height: calc(100vh - 125px);
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--sr-accent) 60%, var(--sr-line));
+  border-radius: 8px;
+  color: var(--sr-ink);
+  background: rgba(248, 239, 218, 0.99);
+  box-shadow: 0 18px 48px rgba(3, 29, 16, 0.3);
+  white-space: normal;
+}
+
+.tp-settings-section {
+  display: grid;
+  gap: 7px;
+  border-bottom: 1px solid var(--sr-line);
+  padding: 12px 14px;
+}
+
+.tp-settings-section:last-child { border-bottom: 0; }
+
+.tp-settings-heading {
+  display: grid;
+  gap: 1px;
+  margin-bottom: 2px;
+}
+
+.tp-settings-heading strong {
+  font-family: var(--workspace-serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tp-settings-heading span {
+  color: var(--sr-ink-soft);
+  font-size: 10px;
+}
+
+.tp-setting-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tp-setting-row,
+.tp-mix-row {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(90px, 1fr) 38px;
+  align-items: center;
+  gap: 8px;
+}
+
+.tp-mix-row .tp-check { min-width: 0; }
+.tp-mix-row .tp-volume,
+.tp-setting-row .tp-volume { width: 100%; }
+.tp-setting-row .tp-volume:disabled { opacity: 0.4; }
+
+.app-workspace-controls .app-practice-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-wrap: nowrap;
+  gap: 6px;
+  border: 0;
+  border-left: 1px solid var(--sr-line);
+  padding: 6px 14px 6px 10px;
+  background: transparent;
+}
+
+.app-workspace-controls .app-practice-source {
+  flex: 1 1 170px;
+  min-width: 82px;
+  max-width: 250px;
+}
+
+.app-workspace-controls .app-practice-source strong { font-size: 11px; }
+.app-workspace-controls .app-practice-time { min-width: 82px; font-size: 11px; }
+.app-workspace-controls .app-practice-loop { font-size: 10px; }
+.app-workspace-controls .app-practice-bar button { min-height: 27px; padding: 3px 7px; }
+.app-workspace-controls .app-practice-open { margin-left: 0; }
+
+.app-practice-more-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 9px);
+  right: 0;
+  display: grid;
+  width: 220px;
+  gap: 5px;
+  border: 1px solid var(--sr-line);
+  border-radius: 7px;
+  padding: 9px;
+  background: var(--sr-paper-raised);
+  box-shadow: 0 14px 36px rgba(3, 29, 16, 0.24);
+}
+
+.app-practice-more-menu button { width: 100%; }
+.app-practice-linked { white-space: normal; }
+
+.notation-resize-divider { display: none; }
+
+.app-layout-stacked .notation-resize-divider {
+  position: relative;
+  order: 2;
+  display: grid;
+  flex: 0 0 10px;
+  width: 100%;
+  place-items: center;
+  border: 0;
+  border-top: 1px solid var(--sr-line);
+  border-bottom: 1px solid var(--sr-line);
+  padding: 0;
+  background: color-mix(in srgb, var(--sr-paper-raised) 88%, var(--sr-accent));
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.app-layout-stacked .notation-resize-divider > span {
+  width: 36px;
+  border-top: 2px solid color-mix(in srgb, var(--sr-accent) 55%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--sr-accent) 55%, transparent);
+  padding-top: 2px;
+}
+
+.app-layout-stacked .notation-resize-divider:focus-visible {
+  outline: 2px solid var(--sr-accent);
+  outline-offset: -2px;
+}
+
+.app-layout-stacked .app-preview { order: 1; }
+.app-layout-stacked .app-editor-col {
+  order: 3;
+  height: var(--notation-editor-height, 40%);
+  min-height: 140px;
+  resize: none;
+  border-top: 0;
+}
+
+.app-stage > .app-panes { margin-top: 18px; margin-bottom: 20px; }
+.app-workspace-split > .workspace-split-divider { margin-top: 18px; margin-bottom: 20px; }
+
+@media (max-width: 1540px) {
+  .app-workspace-controls .app-practice-source strong,
+  .app-workspace-controls .app-practice-loop { display: none; }
+  .app-workspace-controls .app-practice-source { flex: 0 0 auto; min-width: 0; }
+}
+
+@media (max-width: 1350px) {
+  .app-workspace-controls .tp-context { display: none; }
+}
+
+@media (max-width: 1180px) {
+  .app-workspace-controls { flex-wrap: wrap; }
+  .app-workspace-controls .transport { flex: 1 1 100%; }
+  .app-workspace-controls .app-practice-bar {
+    flex: 1 1 100%;
+    border-top: 1px solid var(--sr-line);
+    border-left: 0;
+  }
+  .tp-settings-menu { right: 0; left: auto; }
+}
+
+@media (max-width: 720px) {
+  .app-workspace-controls .transport { overflow-x: auto; }
+  .tp-settings-menu { position: fixed; top: 106px; right: 10px; left: 10px; width: auto; }
+  .app-workspace-controls .app-practice-time,
+  .app-workspace-controls .app-practice-source { display: none; }
+}
+
+@media print {
+  .app-workspace-controls,
+  .notation-resize-divider { display: none !important; }
+}
+
 /* SARGAM_PROJECT_FOLDER_PHASE_3B — local project and Clip Vault surfaces. */
 .tb-menu-item:disabled {
   color: var(--sr-dim);

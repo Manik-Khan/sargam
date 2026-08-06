@@ -116,3 +116,35 @@ export function lineAnchoredScrollTop({
     : Number.POSITIVE_INFINITY;
   return Math.min(max, Math.max(0, next));
 }
+
+// Reveal an edited or playing measure inside the preview scroller without
+// invoking Element.scrollIntoView(), which can also move the page/editor.
+export function revealElementScrollTop({
+  scrollTop = 0,
+  scrollerTop,
+  scrollerBottom,
+  elementTop,
+  elementBottom,
+  padding = 28,
+  scrollHeight = Number.POSITIVE_INFINITY,
+  clientHeight = 0,
+} = {}) {
+  const current = Math.max(0, Number(scrollTop) || 0);
+  const top = Number(scrollerTop);
+  const bottom = Number(scrollerBottom);
+  const itemTop = Number(elementTop);
+  const itemBottom = Number(elementBottom);
+  const inset = Math.max(0, Number(padding) || 0);
+  if (![top, bottom, itemTop, itemBottom].every(Number.isFinite)) return current;
+
+  let next = current;
+  if (itemTop < top + inset) next += itemTop - (top + inset);
+  else if (itemBottom > bottom - inset) next += itemBottom - (bottom - inset);
+
+  const height = Number(scrollHeight);
+  const viewport = Math.max(0, Number(clientHeight) || 0);
+  const max = Number.isFinite(height)
+    ? Math.max(0, height - viewport)
+    : Number.POSITIVE_INFINITY;
+  return Math.min(max, Math.max(0, next));
+}
