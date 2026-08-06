@@ -568,7 +568,7 @@
 .app-export-style-controls label { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--sr-ink-soft); }
 .app-export-style-controls select { min-width: 118px; border: 1px solid var(--sr-line); border-radius: 4px; background: var(--sr-paper); color: var(--sr-ink); padding: 4px 24px 4px 7px; font: inherit; }
 .app-export-scroll { flex: 1; overflow: auto; padding: 22px 0 40px; }
-.app-export-paper { background: var(--sr-export-paper, #fff); width: 816px; max-width: calc(100vw - 32px); margin: 0 auto; padding: 46px 53px 60px; box-shadow: 0 2px 10px rgba(43, 38, 32, 0.14); box-sizing: border-box; }
+.app-export-paper { background: var(--sr-export-paper, #fff); width: 816px; max-width: calc(100vw - 32px); margin: 0 auto; padding: 29px 27px 31px; box-shadow: 0 2px 10px rgba(43, 38, 32, 0.14); box-sizing: border-box; }
 
 /* export page header: raga is the title, metadata lists at the far right */
 .sr-exp-head {
@@ -630,7 +630,7 @@
 .sr-export .sr-return-cue { font-size: 11px; }
 
 /* ---- print: only the paper reaches the page ---- */
-@page { size: Letter portrait; margin: 14mm; background: var(--sr-export-paper, #fff); }
+@page { size: Letter portrait; margin: 0.3in 0.28in; background: var(--sr-export-paper, #fff); }
 @media print {
   html,
   body,
@@ -652,7 +652,7 @@
   .app-export::before {
     content: '';
     position: fixed;
-    inset: -14mm;
+    inset: -0.3in -0.28in;
     z-index: 0;
     background: var(--sr-export-paper, #fff);
     -webkit-print-color-adjust: exact;
@@ -1942,6 +1942,62 @@
   background: color-mix(in srgb, var(--sr-accent) 4%, transparent);
   padding-block: 0.14em 0.08em;
   box-sizing: border-box;
+}
+.app-rhythm-grid .sr-cell {
+  width: 3em;
+  min-width: 3em;
+  max-width: 3em;
+}
+.app-export-grid .sr-cell,
+.app-export-grid .sr-export .sr-cell:has(.sr-sustain) {
+  width: 2.65em;
+  min-width: 2.65em;
+  max-width: 2.65em;
+}
+.app-rhythm-grid .sr-timed-slots,
+.app-export-grid .sr-timed-slots {
+  grid-template-columns: repeat(var(--sr-written-slots), minmax(0, 1fr)) !important;
+  width: 100%;
+  min-width: 0;
+  column-gap: 0;
+}
+.app-rhythm-grid .sr-slot,
+.app-export-grid .sr-slot { min-width: 0; }
+.app-rhythm-grid .sr-timed-slots[data-written-slots="2"],
+.app-export-grid .sr-timed-slots[data-written-slots="2"] { font-size: 0.84em; }
+.app-rhythm-grid .sr-timed-slots[data-written-slots="3"],
+.app-export-grid .sr-timed-slots[data-written-slots="3"] { font-size: 0.76em; }
+.app-rhythm-grid .sr-timed-slots[data-written-slots="4"],
+.app-export-grid .sr-timed-slots[data-written-slots="4"] { font-size: 0.68em; }
+.app-rhythm-grid .sr-timed-slots[data-written-slots="5"],
+.app-export-grid .sr-timed-slots[data-written-slots="5"] { font-size: 0.6em; }
+.app-rhythm-grid .sr-timed-slots[data-written-slots="6"],
+.app-export-grid .sr-timed-slots[data-written-slots="6"],
+.app-rhythm-grid .sr-timed-slots[data-written-slots="7"],
+.app-export-grid .sr-timed-slots[data-written-slots="7"] { font-size: 0.48em; }
+.app-rhythm-grid .sr-timed-slots[data-written-slots="8"],
+.app-export-grid .sr-timed-slots[data-written-slots="8"] { font-size: 0.42em; }
+.app-rhythm-grid .sr-slot-ornament,
+.app-export-grid .sr-slot-ornament {
+  display: inline-grid;
+  justify-items: center;
+  min-width: 0.9em;
+  padding-top: 0.38em;
+}
+.app-rhythm-grid .sr-ornament-graces,
+.app-export-grid .sr-ornament-graces {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 0.3em);
+  display: inline-flex;
+  gap: 0.05em;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.app-rhythm-grid .sr-ornament-graces .sr-grace,
+.app-export-grid .sr-ornament-graces .sr-grace {
+  font-size: 0.48em;
+  transform: none;
 }
 .app-rhythm-grid .sr-slot + .sr-slot,
 .app-export-grid .sr-slot + .sr-slot {

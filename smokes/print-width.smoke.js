@@ -126,19 +126,25 @@ export const smokes = [
     name: 'print width: screen paper matches printable width and uses compact export typography',
     fn() {
       const css = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
-      assert.match(css, /\.app-export-paper\s*\{[^}]*background:\s*var\(--sr-export-paper, #fff\);[^}]*width:\s*816px;[^}]*padding:\s*46px 53px 60px;[^}]*box-sizing:\s*border-box;/s);
+      const render = readFileSync(new URL('../src/engine/render.js', import.meta.url), 'utf8');
+      assert.match(css, /\.app-export-paper\s*\{[^}]*background:\s*var\(--sr-export-paper, #fff\);[^}]*width:\s*816px;[^}]*padding:\s*29px 27px 31px;[^}]*box-sizing:\s*border-box;/s);
       assert.match(css, /\.app-export\s*\{[^}]*z-index:\s*120;/s);
       assert.match(css, /\.sr-export\s*\{[^}]*font-size:\s*15px;/s);
       assert.match(css, /\.sr-export \.sr-glyphs\s*\{\s*font-size:\s*19px;/);
       assert.match(css, /\.sr-export \.sr-cell\s*\{[^}]*min-width:\s*1\.72em;[^}]*padding-inline:\s*2px;/s);
       assert.match(css, /\.sr-export \.sr-cell:has\(\.sr-sustain\)\s*\{[^}]*min-width:\s*1em;[^}]*padding-inline:\s*0;/s);
       assert.match(css, /\.sr-export \.sargam-render,[\s\S]*?\.sr-export \.sr-return-cue\s*\{\s*font-family:\s*inherit;/);
-      assert.match(css, /@page\s*\{\s*size:\s*Letter portrait;\s*margin:\s*14mm;/);
+      assert.match(css, /@page\s*\{\s*size:\s*Letter portrait;\s*margin:\s*0\.3in 0\.28in;/);
       assert.match(css, /\.sr-bar\s*\{[^}]*border-inline-start:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
-      assert.match(css, /\.app-export::before\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*-14mm;[^}]*background:\s*var\(--sr-export-paper, #fff\);/s);
+      assert.match(css, /\.app-export::before\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*-0\.3in -0\.28in;[^}]*background:\s*var\(--sr-export-paper, #fff\);/s);
       assert.match(css, /\.sr-marker-on-boundary::after\s*\{\s*content:\s*none;/);
       assert.match(css, /\.app-rhythm-grid \.sr-cell,[\s\S]*?\.app-export-grid \.sr-cell\s*\{[^}]*border:\s*1px solid/s);
       assert.match(css, /\.app-export-grid \.sr-slot \+ \.sr-slot\s*\{[^}]*border-inline-start:\s*1px dashed/s);
+      assert.match(css, /\.app-export-grid \.sr-cell,[\s\S]*?width:\s*2\.65em;[\s\S]*?max-width:\s*2\.65em;/);
+      assert.match(css, /grid-template-columns:\s*repeat\(var\(--sr-written-slots\), minmax\(0, 1fr\)\) !important;/);
+      assert.match(css, /\.app-export-grid \.sr-ornament-graces\s*\{[^}]*position:\s*absolute;/s);
+      assert.match(render, /--sr-written-slots/);
+      assert.match(render, /sr-ornament-graces/);
       assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.app-root\.is-exporting\s*\{[^}]*display:\s*block !important;[^}]*height:\s*auto !important;[^}]*overflow:\s*visible !important;/s);
       assert.match(css, /\.app-export-scroll\s*\{[^}]*display:\s*block !important;[^}]*overflow:\s*visible !important;/s);

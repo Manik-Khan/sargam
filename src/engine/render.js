@@ -675,6 +675,7 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   if (visualSlots.length > 0) {
     const slots = h('span', 'sr-timed-slots');
     slots.setAttribute('data-written-slots', String(visualSlots.length));
+    slots.style.setProperty('--sr-written-slots', String(visualSlots.length));
     // Every written microbeat is a real, discrete column. Do not use `1fr`
     // in an intrinsic-width inline grid: browsers can collapse those tracks
     // until adjacent em dashes read as one stretched line. Fixed minimum
@@ -713,7 +714,9 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
           'span',
           'sr-slot-ornament' + (scopedKrintan ? ' sr-scoped-krintan' : '')
         );
-        for (const grace of item.graces) ornament.appendChild(renderEvent(grace.event, ctx));
+        const graceRun = h('span', 'sr-ornament-graces');
+        for (const grace of item.graces) graceRun.appendChild(renderEvent(grace.event, ctx));
+        ornament.appendChild(graceRun);
         ornament.appendChild(renderEvent(item.event, ctx));
         slot.appendChild(ornament);
       } else {
