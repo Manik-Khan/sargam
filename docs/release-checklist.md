@@ -1,0 +1,46 @@
+# Sargam release checklist
+
+Run this short audit after a change to notation, playback, the editor, or printing.
+
+## Automated gate
+
+```bash
+npm run verify
+```
+
+The command must end with every smoke check passing and a successful production build.
+
+## Writing and score stability
+
+- Open the Bageshri reference composition.
+- In a line near the top, middle, and bottom, type notes, holds, `|`, and an ornament.
+- Confirm the active score line remains at the same visual height while the notation reflows.
+- Click a rendered matra and confirm its Markdown source line is selected and centered.
+- Turn **Graph Grid** on. Confirm each matra has one cell, its tala-matra coordinate is visible, subdivisions stay inside the cell, and the selected cell remains highlighted after an edit.
+- Resize the score/editor divider and confirm neither surface jumps to another line.
+
+## Playback
+
+- Play from the beginning and from a clicked matra.
+- Confirm melody, tanpura, and tala toggles work independently.
+- Confirm editing stops stale playback instead of continuing against changed notation.
+- Test line and section looping, then turn looping off.
+- With playback following enabled, confirm only the score pane scrolls.
+
+## Print and PDF
+
+- Open **File → Print / PDF**.
+- Check Clean and Matra cells, Color and Printer B&W, and each typeface.
+- Confirm a long composition uses every required page and no ornament or cell is cut at a page edge.
+- Open and cancel the browser print dialog twice; the preview must remain unchanged.
+- Close and reopen Export; the last-used page, typeface, grid, and ink choices must return.
+- For a physical-printer check, verify mandra notes, tala markers, and held-beat dashes remain readable in grayscale.
+
+## Files and restoration
+
+- Save, close, and reopen the Markdown file.
+- Confirm autosave restoration does not silently claim the file was saved.
+- If a project folder is open, confirm its recording, A–B loop, markers, speed, pitch, and EQ restore only for the matching source identity.
+- Export and re-import a `.sargam` project without overwriting the original project.
+
+Record the date, browser, composition, check count, and any failure before release.

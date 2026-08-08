@@ -20,6 +20,7 @@ import {
   mountAnchorOverlays,
   stampAnchorTargets,
 } from './anchor-overlay.js';
+import { decorateRhythmGrid, rhythmGridIdentity } from './rhythm-grid.js';
 
 function widthInEm(el) {
   if (!el || !el.clientWidth) return 56;
@@ -59,6 +60,7 @@ export default function PreviewPane({
   const activeCursorRef = useRef(activeCursor);
   activeCursorRef.current = activeCursor;
   const [maxSystemEm, setMaxSystemEm] = useState(56);
+  const [gridSelection, setGridSelection] = useState(null);
 
   useLayoutEffect(() => {
     if (!mount.current) return;
@@ -127,6 +129,11 @@ export default function PreviewPane({
     return () => { cleanupAudio?.(); cleanupAnchors?.(); };
   }, [doc, sourceText, activeLine, syncRevision, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid, followEditing]);
 
+  useLayoutEffect(() => {
+    if (!rhythmGrid || !mount.current) return;
+    decorateRhythmGrid(mount.current, gridSelection);
+  }, [doc, sourceText, syncRevision, maxSystemEm, rhythmGrid, gridSelection]);
+
   useEffect(() => {
     const scroller = mount.current;
     applyPlaybackCursor(scroller, activeCursor);
@@ -188,12 +195,15 @@ export default function PreviewPane({
     if (!blockEl) return;
     const sourceLine = Number(blockEl.getAttribute('data-source-line'));
     const matraIndex = cell ? Number(cell.getAttribute('data-matra')) : 0;
+    if (rhythmGrid && cell) setGridSelection(rhythmGridIdentity(cell));
     onSeek(sourceLine, Number.isFinite(matraIndex) ? matraIndex : 0);
   };
 
   return (
     <div
       className={`app-preview${anchorTool ? ' app-preview-anchoring' : ''}${rhythmGrid ? ' app-rhythm-grid' : ''}`}
+      role={rhythmGrid ? 'grid' : undefined}
+      aria-label={rhythmGrid ? 'Graph-paper matra grid' : undefined}
       ref={mount}
       onClick={handleClick}
       onPointerDown={handlePointerDown}

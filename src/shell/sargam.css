@@ -1964,9 +1964,31 @@
   box-sizing: border-box;
 }
 .app-rhythm-grid .sr-cell {
-  width: 3em;
-  min-width: 3em;
-  max-width: 3em;
+  width: 3.15em;
+  min-width: 3.15em;
+  max-width: 3.15em;
+  min-height: 5.25em;
+  align-self: stretch;
+  border-radius: 0;
+}
+.app-rhythm-grid .sr-row { column-gap: 0; align-items: stretch; }
+.app-rhythm-grid .sr-bar {
+  margin-inline: 0;
+  border-inline-start-width: 2px;
+  opacity: 0.72;
+}
+.app-rhythm-grid .sr-cell::before {
+  content: attr(data-cycle-matra);
+  position: absolute;
+  z-index: 2;
+  top: 0.2em;
+  right: 0.28em;
+  color: color-mix(in srgb, var(--sr-ink-soft) 66%, transparent);
+  font: 700 0.58em/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+.app-rhythm-grid .sr-cell:has(.sr-marker:not(:empty)) {
+  background: color-mix(in srgb, var(--sr-accent) 8%, transparent);
 }
 .app-export-grid .sr-cell,
 .app-export-grid .sr-export .sr-cell:has(.sr-sustain) {
@@ -2026,6 +2048,12 @@
 .app-rhythm-grid .sr-cell:hover {
   border-color: color-mix(in srgb, var(--sr-accent) 68%, transparent);
   background: color-mix(in srgb, var(--sr-accent) 8%, transparent);
+}
+.app-rhythm-grid .sr-cell.sr-grid-selected {
+  z-index: 3;
+  border-color: var(--sr-accent);
+  background: color-mix(in srgb, var(--sr-accent) 15%, var(--sr-paper-raised));
+  box-shadow: inset 0 0 0 1px var(--sr-accent), 0 0 0 2px color-mix(in srgb, var(--sr-accent) 24%, transparent);
 }
 .sr-rhythm-grid-layer {
   position: absolute;

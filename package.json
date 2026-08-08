@@ -9,7 +9,8 @@
     "build:player-server": "node scripts/build-player-server.mjs",
     "build:waveform-worker": "node scripts/build-waveform-worker.mjs",
     "preview": "vite preview",
-    "smoke": "node smokes/run.js"
+    "smoke": "node smokes/run.js",
+    "verify": "npm run smoke && npm run build"
   },
   "dependencies": {
     "react": "^18.3.1",

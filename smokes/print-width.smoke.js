@@ -112,6 +112,9 @@ export const smokes = [
       assert.match(source, /aria-label="PDF ink style"/);
       assert.match(source, /app-export-grid/);
       assert.match(source, /app-export-monochrome/);
+      assert.match(source, /useStoredOption\(store, 'exportPaperColor'/);
+      assert.match(source, /useStoredOption\(store, 'exportGridStyle'/);
+      assert.match(source, /useStoredOption\(store, 'exportInkStyle'/);
       assert.match(source, /--sr-export-paper/);
       assert.match(source, /--sr-export-font/);
       assert.match(source, /document\.documentElement/);

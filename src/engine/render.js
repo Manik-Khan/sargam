@@ -605,6 +605,12 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   const globalMatraIndex = (Number(line._matraOffset) || 0) + k;
   const geometryMatra = ctx.geometry?.matras?.[globalMatraIndex] || null;
   cell.setAttribute('data-matra', String(globalMatraIndex));
+  if (tal) {
+    cell.setAttribute(
+      'data-cycle-matra',
+      String(wrapMatra(tal, line.startMatra + performedOffsetAt(line, k)))
+    );
+  }
 
   // Build timed slots before the upper lanes. Repeated local approaches need
   // the same slot columns twice: once for their ordinary kan arcs above the
@@ -744,6 +750,7 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   // Under-arc = rhythmic subdivision of TIMED notes only (M, 2026-07-16);
   // graces never trigger it. {dP}m: curve only. {d}Pm: curve + arc.
   const writtenSlotCount = visualSlots.length;
+  cell.setAttribute('data-grid-subdivisions', String(Math.max(1, writtenSlotCount)));
   cell.appendChild(writtenSlotCount > 1 ? underarcSvg() : h('div', 'sr-arc-lane sr-arc-slot'));
 
   // Exact metric boundaries are part of the core render geometry. The left

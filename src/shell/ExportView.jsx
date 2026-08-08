@@ -37,6 +37,18 @@ const EXPORT_INKS = [
   { value: 'mono', label: 'Printer B&W' },
 ];
 
+function useStoredOption(store, key, options) {
+  const fallback = options[0].value;
+  const [value, setValue] = useState(() => {
+    const saved = store?.getPref?.(key, fallback);
+    return options.some((option) => option.value === saved) ? saved : fallback;
+  });
+  useEffect(() => {
+    store?.setPref?.(key, value);
+  }, [store, key, value]);
+  return [value, setValue];
+}
+
 function allMusicLines(doc) {
   return (doc?.sections || []).flatMap((section) => section.lines || []);
 }
@@ -94,12 +106,12 @@ function installBrowserMeasurements(doc, mountEl) {
   return () => lines.forEach(clearMeasuredLineLayout);
 }
 
-export default function ExportView({ doc, noteNames, onClose, sourceText, anchorMarks = [] }) {
+export default function ExportView({ doc, noteNames, onClose, sourceText, anchorMarks = [], store = null }) {
   const mount = useRef(null);
-  const [paperColor, setPaperColor] = useState(EXPORT_PAPER_COLORS[0].value);
-  const [fontFamily, setFontFamily] = useState(EXPORT_FONTS[0].value);
-  const [gridStyle, setGridStyle] = useState(EXPORT_GRIDS[0].value);
-  const [inkStyle, setInkStyle] = useState(EXPORT_INKS[0].value);
+  const [paperColor, setPaperColor] = useStoredOption(store, 'exportPaperColor', EXPORT_PAPER_COLORS);
+  const [fontFamily, setFontFamily] = useStoredOption(store, 'exportFontFamily', EXPORT_FONTS);
+  const [gridStyle, setGridStyle] = useStoredOption(store, 'exportGridStyle', EXPORT_GRIDS);
+  const [inkStyle, setInkStyle] = useStoredOption(store, 'exportInkStyle', EXPORT_INKS);
 
   useEffect(() => {
     const root = document.documentElement;

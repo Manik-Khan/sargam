@@ -181,7 +181,9 @@ export default function App() {
   const [anchorMessage, setAnchorMessage] = useState(
     'Choose a mark, then click or drag directly on the rendered notation.'
   );
-  const [rhythmGrid, setRhythmGrid] = useState(false);
+  const [rhythmGrid, setRhythmGrid] = useState(() =>
+    store.getPref('rhythmGrid', false) === true
+  );
   const [selectedMarkId, setSelectedMarkId] = useState(null);
   const [bolCapture, setBolCapture] = useState(null);
   const [bolMessage, setBolMessage] = useState('');
@@ -1792,13 +1794,22 @@ export default function App() {
     store.setPref('followPlayback', value);
   };
 
+  const changeRhythmGrid = (value) => {
+    setRhythmGrid(value);
+    store.setPref('rhythmGrid', value);
+  };
+
   return (
     <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
       {showExport && (
-        <ExportView doc={doc} noteNames={noteNames} onClose={() => setShowExport(false)}
-  sourceText={text}
-  anchorMarks={anchorModel.marks}
-/>
+        <ExportView
+          doc={doc}
+          noteNames={noteNames}
+          onClose={() => setShowExport(false)}
+          sourceText={text}
+          anchorMarks={anchorModel.marks}
+          store={store}
+        />
       )}
       {showNew && <NewDocDialog onCreate={createDoc} onCancel={() => setShowNew(false)} />}
       {portableImport && (
@@ -2030,7 +2041,7 @@ export default function App() {
             onRemoveSelectedMark={doRemoveSelectedMark}
             anchorMessage={anchorMessage}
             rhythmGrid={rhythmGrid}
-            onRhythmGrid={setRhythmGrid}
+            onRhythmGrid={changeRhythmGrid}
           />
             <EditorPane
               text={text}
