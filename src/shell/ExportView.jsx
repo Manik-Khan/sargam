@@ -32,6 +32,11 @@ const EXPORT_GRIDS = [
   { value: 'matra', label: 'Matra cells' },
 ];
 
+const EXPORT_INKS = [
+  { value: 'color', label: 'Color' },
+  { value: 'mono', label: 'Printer B&W' },
+];
+
 function allMusicLines(doc) {
   return (doc?.sections || []).flatMap((section) => section.lines || []);
 }
@@ -94,6 +99,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
   const [paperColor, setPaperColor] = useState(EXPORT_PAPER_COLORS[0].value);
   const [fontFamily, setFontFamily] = useState(EXPORT_FONTS[0].value);
   const [gridStyle, setGridStyle] = useState(EXPORT_GRIDS[0].value);
+  const [inkStyle, setInkStyle] = useState(EXPORT_INKS[0].value);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -215,7 +221,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
 
   return (
     <div
-      className={`app-export${gridStyle === 'matra' ? ' app-export-grid' : ''}`}
+      className={`app-export${gridStyle === 'matra' ? ' app-export-grid' : ''}${inkStyle === 'mono' ? ' app-export-monochrome' : ''}`}
       style={{ '--sr-export-paper': paperColor, '--sr-export-font': fontFamily }}
     >
       <div className="app-export-bar">
@@ -256,6 +262,18 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
               onChange={(event) => setGridStyle(event.target.value)}
             >
               {EXPORT_GRIDS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Ink</span>
+            <select
+              aria-label="PDF ink style"
+              value={inkStyle}
+              onChange={(event) => setInkStyle(event.target.value)}
+            >
+              {EXPORT_INKS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>

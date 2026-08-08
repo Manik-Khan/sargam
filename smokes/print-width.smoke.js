@@ -109,7 +109,9 @@ export const smokes = [
       assert.match(source, /aria-label="PDF page color"/);
       assert.match(source, /aria-label="PDF typeface"/);
       assert.match(source, /aria-label="PDF notation grid"/);
+      assert.match(source, /aria-label="PDF ink style"/);
       assert.match(source, /app-export-grid/);
+      assert.match(source, /app-export-monochrome/);
       assert.match(source, /--sr-export-paper/);
       assert.match(source, /--sr-export-font/);
       assert.match(source, /document\.documentElement/);
@@ -143,6 +145,8 @@ export const smokes = [
       assert.match(css, /\.app-export-grid \.sr-cell,[\s\S]*?width:\s*2\.65em;[\s\S]*?max-width:\s*2\.65em;/);
       assert.match(css, /grid-template-columns:\s*repeat\(var\(--sr-written-slots\), minmax\(0, 1fr\)\) !important;/);
       assert.match(css, /\.app-export-grid \.sr-ornament-graces\s*\{[^}]*position:\s*absolute;/s);
+      assert.match(css, /\.app-export\.app-export-monochrome\s*\{[^}]*--sr-ink:\s*#080808;[^}]*--sr-dim:\s*#363636;[^}]*--sr-cool:\s*#252525;/s);
+      assert.match(css, /\.app-export-monochrome \.sr-sustain \.sr-ch::after\s*\{[^}]*border-top-width:\s*1\.7px;/s);
       assert.match(render, /--sr-written-slots/);
       assert.match(render, /sr-ornament-graces/);
       assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
