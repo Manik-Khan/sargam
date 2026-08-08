@@ -145,7 +145,16 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
         // This reads the real content width in both the on-screen paper and
         // print media. The print CSS itself remains untouched.
         const maxSystemEm = contentWidthInEm(mountEl);
-        mountEl.replaceChildren(renderExport(doc, { noteNames, maxSystemEm }));
+        const graphPaper = gridStyle === 'paper';
+        const graphColumns = graphPaper
+          ? Math.max(4, Math.floor((maxSystemEm + RIGHT_EDGE_BREATH_EM + SCORE_GUTTER_EM) / 2.65))
+          : undefined;
+        mountEl.replaceChildren(renderExport(doc, {
+          noteNames,
+          maxSystemEm: graphPaper ? graphColumns * 2.6 : maxSystemEm,
+          graphPaper,
+          graphColumns,
+        }));
       // SARGAM_EXPORT_MARKER_ALIGNMENT — align tala numerals to the
       // struck attack (or a true boundary tick) after final print packing.
       alignTalaMarkers(mountEl);

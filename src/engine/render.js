@@ -154,13 +154,31 @@ export function renderExport(doc, opts = {}) {
 function renderSection(section, sectionIndex, opts) {
   const el = h('section', 'sr-section');
   if (section.label !== null && section.label !== undefined) {
-    el.appendChild(h('div', 'sr-section-label', section.label));
+    if (opts.graphPaper) {
+      el.appendChild(renderGraphStructureRow(section.label, opts));
+    } else {
+      el.appendChild(h('div', 'sr-section-label', section.label));
+    }
   }
   const tal = section.tal !== 'free' ? getTal(section.tal) : null;
   for (let li = 0; li < section.lines.length; li++) {
     el.appendChild(renderLine(section.lines[li], tal, { sectionIndex, lineIndex: li, ...opts }));
   }
   return el;
+}
+
+function renderGraphStructureRow(label, ctx) {
+  const columns = Math.max(1, Number(ctx.graphColumns) || 1);
+  const row = h('div', 'sr-graph-structure-row');
+  row.setAttribute('data-graph-columns', String(columns));
+  row.style.gridTemplateColumns = `repeat(${columns}, var(--sr-graph-cell-width))`;
+  for (let column = 0; column < columns; column++) {
+    const cell = h('div', 'sr-graph-structure-cell');
+    cell.setAttribute('aria-hidden', column === 0 ? 'false' : 'true');
+    if (column === 0) cell.appendChild(h('span', 'sr-graph-structure-label', label));
+    row.appendChild(cell);
+  }
+  return row;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +215,8 @@ function renderLineBlock(line, tal, ctx) {
   if (line.sourceLine !== undefined) {
     block.setAttribute('data-source-line', String(line.sourceLine));
   }
-  const row = h('div', 'sr-row' + (tal ? '' : ' sr-free'));
+  const graphPaper = Boolean(ctx.graphPaper);
+  const row = h('div', 'sr-row' + (tal ? '' : ' sr-free') + (graphPaper ? ' sr-graph-row' : ''));
   block.appendChild(row);
 
   // --- column plan: [repeat-open?] cells with bar columns interleaved
@@ -210,26 +229,35 @@ function renderLineBlock(line, tal, ctx) {
   // gutters and never creates a grid track or shifts matra columns.
   for (let k = 0; k < line.matras.length; k++) {
     colOf[k] = cols.length + 1;
-    cols.push(tal ? 'minmax(2.6em, max-content)' : 'max-content');
-    if (tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
+    cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : tal ? 'minmax(2.6em, max-content)' : 'max-content');
+    if (!graphPaper && tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
       cols.push('max-content'); // barline column
     }
   }
   const repeatCloseCol = showRepeatClose ? 0 : null; // sentinel; no grid track
   let returnCueCol = null;
   if (line.returnCue) {
-    cols.push('max-content');
+    cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : 'max-content');
     returnCueCol = cols.length;
   }
   if (line.passthrough.length > 0) {
-    for (let i = 0; i < line.passthrough.length; i++) cols.push('max-content');
+    for (let i = 0; i < line.passthrough.length; i++) {
+      cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : 'max-content');
+    }
   }
   const contentColumnCount = cols.length;
-  // Paper mode turns the otherwise blank remainder of a system into empty
-  // matra-sized boxes. The zero-width tail is inert in every other view;
-  // CSS gives it the remaining row width only on the Paper surface.
-  cols.push('var(--sr-paper-tail, 0px)');
-  const paperTailCol = cols.length;
+  const graphColumnCount = graphPaper
+    ? Math.max(contentColumnCount, Math.max(1, Number(ctx.graphColumns) || 1))
+    : 0;
+  while (graphPaper && cols.length < graphColumnCount) cols.push('var(--sr-graph-cell-width)');
+  let paperTailCol = null;
+  if (!graphPaper) {
+    // The zero-width compatibility tail is inert outside the retired painted
+    // paper treatment. Graph Paper now uses real empty cell elements.
+    cols.push('var(--sr-paper-tail, 0px)');
+    paperTailCol = cols.length;
+  }
+  if (graphPaper) row.setAttribute('data-graph-columns', String(graphColumnCount));
   row.style.gridTemplateColumns = cols.join(' ');
 
   // --- over-arc lane (grid row 1)
@@ -314,10 +342,14 @@ function renderLineBlock(line, tal, ctx) {
     cell.style.gridColumn = String(colOf[k]);
     row.appendChild(cell);
     if (tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
-      const bar = h('div', 'sr-bar');
-      bar.style.gridRow = '2';
-      bar.style.gridColumn = String(colOf[k] + 1);
-      row.appendChild(bar);
+      if (graphPaper) {
+        cell.classList.add('sr-graph-vibhag-end');
+      } else {
+        const bar = h('div', 'sr-bar');
+        bar.style.gridRow = '2';
+        bar.style.gridColumn = String(colOf[k] + 1);
+        row.appendChild(bar);
+      }
     }
   }
 
@@ -348,11 +380,22 @@ function renderLineBlock(line, tal, ctx) {
     row.appendChild(el);
   }
 
-  const paperTail = h('div', 'sr-paper-tail');
-  paperTail.setAttribute('aria-hidden', 'true');
-  paperTail.style.gridRow = '2';
-  paperTail.style.gridColumn = String(paperTailCol);
-  row.appendChild(paperTail);
+  if (graphPaper) {
+    for (let column = contentColumnCount + 1; column <= graphColumnCount; column++) {
+      const emptyCell = h('div', 'sr-graph-empty-cell');
+      emptyCell.setAttribute('aria-hidden', 'true');
+      emptyCell.setAttribute('data-graph-empty', 'true');
+      emptyCell.style.gridRow = '2';
+      emptyCell.style.gridColumn = String(column);
+      row.appendChild(emptyCell);
+    }
+  } else {
+    const paperTail = h('div', 'sr-paper-tail');
+    paperTail.setAttribute('aria-hidden', 'true');
+    paperTail.style.gridRow = '2';
+    paperTail.style.gridColumn = String(paperTailCol);
+    row.appendChild(paperTail);
+  }
 
   // --- lyric row (grid row 3)
   for (const lyr of line.lyrics) {

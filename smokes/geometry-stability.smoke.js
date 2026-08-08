@@ -35,7 +35,9 @@ export const smokes = [
       assert.equal(group.querySelector('.sr-row'), row, 'cursor updates preserve node identity');
 
       const preview = readFileSync(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
-      assert.match(preview, /renderDocument\(doc, \{ activeLine, noteNames, maxSystemEm \}\)/);
+      assert.match(preview, /const el = renderDocument\(doc, \{/);
+      assert.match(preview, /graphPaper,/);
+      assert.match(preview, /graphColumns,/);
       assert.doesNotMatch(preview, /\[doc, sourceText, activeLine, activeCursor,/);
     },
   },

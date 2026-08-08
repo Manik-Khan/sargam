@@ -93,7 +93,20 @@ export default function PreviewPane({
       beforeRect.top <= scrollerRect.bottom;
     const beforeTop = beforeVisible ? beforeRect.top : rail;
     const beforeScrollTop = scroller.scrollTop;
-    const el = renderDocument(doc, { activeLine, noteNames, maxSystemEm });
+    const graphPaper = rhythmGrid && rhythmGridStyle === 'paper';
+    // widthInEm reserves the normal score's punctuation gutters. Graph Paper
+    // has no outside gutters: the real cells themselves should reach the
+    // writing surface's right edge.
+    const graphColumns = graphPaper
+      ? Math.max(4, Math.floor((maxSystemEm + 5.5) / 3.15))
+      : undefined;
+    const el = renderDocument(doc, {
+      activeLine,
+      noteNames,
+      maxSystemEm: graphPaper ? graphColumns * 2.6 : maxSystemEm,
+      graphPaper,
+      graphColumns,
+    });
     scroller.replaceChildren(el);
     stampAnchorTargets(scroller, sourceText);
     // Keep legacy >> spans visible while new work is stored in anchor metadata.
@@ -129,7 +142,7 @@ export default function PreviewPane({
       );
     }
     return () => { cleanupAudio?.(); cleanupAnchors?.(); };
-  }, [doc, sourceText, activeLine, syncRevision, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid, followEditing]);
+  }, [doc, sourceText, activeLine, syncRevision, noteNames, maxSystemEm, meterSpans, meterDraft, anchorMarks, bolCapture, selectedMarkId, onSelectMark, audioLinks, selectedAudioLinkId, onActivateAudioLink, rhythmGrid, rhythmGridStyle, followEditing]);
 
   useLayoutEffect(() => {
     if (!rhythmGrid || !mount.current) return;

@@ -47,6 +47,28 @@ export const smokes = [
     },
   },
   {
+    name: 'rhythm grid UI: Graph Paper is made of real one-matra cells rather than a painted overlay',
+    fn() {
+      const parsed = parseDocument('tal: rupak\n\nGat\nS [R G] m');
+      assert.equal(parsed.problems.length, 0);
+      const root = renderDocument(parsed.doc, {
+        graphPaper: true,
+        graphColumns: 7,
+        maxSystemEm: 18.2,
+      });
+      const row = root.querySelector('.sr-graph-row');
+      assert.equal(row?.dataset.graphColumns, '7');
+      assert.equal(row?.querySelectorAll('.sr-cell').length, 3);
+      assert.equal(row?.querySelectorAll('.sr-graph-empty-cell').length, 4);
+      assert.equal(row?.querySelectorAll('.sr-paper-tail').length, 0);
+      assert.equal(root.querySelectorAll('.sr-graph-structure-cell').length, 7);
+      assert.deepEqual(
+        [...row.querySelectorAll('.sr-cell')].map((cell) => cell.style.gridColumn),
+        ['1', '2', '3']
+      );
+    },
+  },
+  {
     name: 'rhythm grid UI: one selected matra survives as an accessible grid cell',
     fn() {
       const root = gridCorpus();
