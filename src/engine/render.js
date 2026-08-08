@@ -651,6 +651,23 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
     }
   }
   const hasLocalApproach = visualSlots.some((item) => item.event?.approachSlide && !item.hold);
+  const longestGraceRun = visualSlots.reduce(
+    (longest, item) => Math.max(longest, item.graces?.length || 0),
+    0
+  );
+  // A regular matra occupies one grid unit. Dense rhythmic clusters, kan
+  // ornaments, approach slides, and repeat endings reserve more horizontal
+  // units instead of making their notation progressively microscopic. Cell
+  // mode uses the same hint for a modest expansion; true graph-paper mode
+  // maps the hint to two or three exact squares.
+  let gridSpan = visualSlots.length >= 7 ? 3 : visualSlots.length >= 4 ? 2 : 1;
+  if (longestGraceRun > 0 || hasLocalApproach || suffix || repeatLanding) {
+    gridSpan = Math.max(gridSpan, 2);
+  }
+  if (longestGraceRun >= 4 || (visualSlots.length >= 6 && (suffix || repeatLanding))) {
+    gridSpan = 3;
+  }
+  cell.setAttribute('data-grid-span', String(gridSpan));
   const slotColumns = hasLocalApproach
     ? visualSlots
         .map((item) => item.event?.approachSlide && !item.hold
@@ -853,7 +870,10 @@ function repeatGlyph(kind) {
 
 function attachRepeatGlyph(cell, kind) {
   const glyphs = cell?.querySelector(':scope > .sr-glyphs');
-  if (glyphs) glyphs.appendChild(repeatGlyph(kind));
+  if (glyphs) {
+    glyphs.appendChild(repeatGlyph(kind));
+    cell.setAttribute('data-grid-span', String(Math.max(2, Number(cell.dataset.gridSpan) || 1)));
+  }
 }
 
 // ---------------------------------------------------------------------------

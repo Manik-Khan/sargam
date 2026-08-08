@@ -79,8 +79,20 @@ export const smokes = [
       assert.match(preview, /app-rhythm-grid-paper/);
       assert.match(commandBar, /aria-label="Grid appearance"/);
       assert.match(commandBar, />Cells<\/button>/);
-      assert.match(commandBar, />Paper<\/button>/);
+      assert.match(commandBar, />Graph Paper<\/button>/);
       assert.match(gridEditor, /app-grid-writer-paper/);
+    },
+  },
+  {
+    name: 'rhythm grid UI: ornaments and dense matras reserve readable grid spans',
+    fn() {
+      const result = parseDocument('tal: rupak\n\nGat\n{m}g | [S R G m]');
+      assert.equal(result.problems.length, 0);
+      const root = renderDocument(result.doc);
+      assert.deepEqual(
+        [...root.querySelectorAll('.sr-cell')].map((cell) => cell.dataset.gridSpan),
+        ['2', '2']
+      );
     },
   },
 ];

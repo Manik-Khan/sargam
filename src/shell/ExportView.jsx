@@ -235,7 +235,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
 
   return (
     <div
-      className={`app-export${gridStyle !== 'clean' ? ' app-export-grid' : ''}${gridStyle === 'paper' ? ' app-export-grid-paper' : ''}${inkStyle === 'mono' ? ' app-export-monochrome' : ''}`}
+      className={`app-export${gridStyle === 'matra' ? ' app-export-grid' : ''}${gridStyle === 'paper' ? ' app-export-graph-paper' : ''}${inkStyle === 'mono' ? ' app-export-monochrome' : ''}`}
       style={{ '--sr-export-paper': paperColor, '--sr-export-font': fontFamily }}
     >
       <div className="app-export-bar">

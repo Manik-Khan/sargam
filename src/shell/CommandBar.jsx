@@ -116,7 +116,7 @@ export default function CommandBar({
                 className={`cmd-btn${rhythmGridStyle === 'paper' ? ' active' : ''}`}
                 aria-pressed={rhythmGridStyle === 'paper'}
                 onClick={() => onRhythmGridStyle?.('paper')}
-              >Paper</button>
+              >Graph Paper</button>
             </div>
           )}
           {anchorTool && <button type="button" className="cmd-btn" onClick={() => onAnchorTool?.(null)}>Done</button>}

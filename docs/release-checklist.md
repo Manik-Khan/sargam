@@ -36,6 +36,8 @@ The command must end with every smoke check passing and a successful production 
 
 - Open **File → Print / PDF**.
 - Check Clean, Matra cells, and Graph paper; Color and Printer B&W; and each typeface.
+- Confirm Graph paper rules the entire printed sheet—including unused space—with one continuous square grid and does not draw a second layer of matra boxes.
+- Confirm kan runs, approach slides, four-to-eight-slot matras, phrase-repeat endings, and repeat punctuation expand into readable grid spans instead of shrinking or colliding.
 - Confirm a long composition uses every required page and no ornament or cell is cut at a page edge.
 - Open and cancel the browser print dialog twice; the preview must remain unchanged.
 - Close and reopen Export; the last-used page, typeface, grid, and ink choices must return.

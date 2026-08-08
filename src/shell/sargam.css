@@ -678,6 +678,14 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  .app-export-graph-paper::before {
+    background-color: var(--sr-export-paper, #fff);
+    background-image:
+      linear-gradient(to right, var(--sr-graph-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--sr-graph-line) 1px, transparent 1px);
+    background-position: 0.28in 0.3in;
+    background-size: var(--sr-graph-square) var(--sr-graph-square);
+  }
   .app-export-bar { display: none !important; }
   .app-export-scroll { position: relative; z-index: 1; display: block !important; overflow: visible !important; padding: 0 !important; background: transparent !important; }
   .app-export-paper { position: relative; width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -2119,6 +2127,16 @@
   align-self: stretch;
   border-radius: 0;
 }
+.app-rhythm-grid .sr-cell[data-grid-span="2"] {
+  width: 4.35em;
+  min-width: 4.35em;
+  max-width: 4.35em;
+}
+.app-rhythm-grid .sr-cell[data-grid-span="3"] {
+  width: 5.55em;
+  min-width: 5.55em;
+  max-width: 5.55em;
+}
 .app-rhythm-grid .sr-row { column-gap: 0; align-items: stretch; }
 .app-rhythm-grid .sr-bar {
   margin-inline: 0;
@@ -2153,31 +2171,53 @@
   min-width: 2.65em;
   max-width: 2.65em;
 }
+.app-export-grid .sr-cell[data-grid-span="2"],
+.app-export-grid .sr-export .sr-cell[data-grid-span="2"]:has(.sr-sustain) {
+  width: 3.65em;
+  min-width: 3.65em;
+  max-width: 3.65em;
+}
+.app-export-grid .sr-cell[data-grid-span="3"],
+.app-export-grid .sr-export .sr-cell[data-grid-span="3"]:has(.sr-sustain) {
+  width: 4.75em;
+  min-width: 4.75em;
+  max-width: 4.75em;
+}
 .app-rhythm-grid .sr-timed-slots,
-.app-export-grid .sr-timed-slots {
+.app-export-grid .sr-timed-slots,
+.app-export-graph-paper .sr-timed-slots {
   grid-template-columns: repeat(var(--sr-written-slots), minmax(0, 1fr)) !important;
   width: 100%;
   min-width: 0;
   column-gap: 0;
 }
 .app-rhythm-grid .sr-slot,
-.app-export-grid .sr-slot { min-width: 0; }
+.app-export-grid .sr-slot,
+.app-export-graph-paper .sr-slot { min-width: 0; }
 .app-rhythm-grid .sr-timed-slots[data-written-slots="2"],
-.app-export-grid .sr-timed-slots[data-written-slots="2"] { font-size: 0.84em; }
+.app-export-grid .sr-timed-slots[data-written-slots="2"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="2"] { font-size: 0.9em; }
 .app-rhythm-grid .sr-timed-slots[data-written-slots="3"],
-.app-export-grid .sr-timed-slots[data-written-slots="3"] { font-size: 0.76em; }
+.app-export-grid .sr-timed-slots[data-written-slots="3"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="3"] { font-size: 0.8em; }
 .app-rhythm-grid .sr-timed-slots[data-written-slots="4"],
-.app-export-grid .sr-timed-slots[data-written-slots="4"] { font-size: 0.68em; }
+.app-export-grid .sr-timed-slots[data-written-slots="4"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="4"] { font-size: 0.82em; }
 .app-rhythm-grid .sr-timed-slots[data-written-slots="5"],
-.app-export-grid .sr-timed-slots[data-written-slots="5"] { font-size: 0.6em; }
+.app-export-grid .sr-timed-slots[data-written-slots="5"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="5"] { font-size: 0.74em; }
 .app-rhythm-grid .sr-timed-slots[data-written-slots="6"],
 .app-export-grid .sr-timed-slots[data-written-slots="6"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="6"],
 .app-rhythm-grid .sr-timed-slots[data-written-slots="7"],
-.app-export-grid .sr-timed-slots[data-written-slots="7"] { font-size: 0.48em; }
+.app-export-grid .sr-timed-slots[data-written-slots="7"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="7"] { font-size: 0.66em; }
 .app-rhythm-grid .sr-timed-slots[data-written-slots="8"],
-.app-export-grid .sr-timed-slots[data-written-slots="8"] { font-size: 0.42em; }
+.app-export-grid .sr-timed-slots[data-written-slots="8"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="8"] { font-size: 0.6em; }
 .app-rhythm-grid .sr-slot-ornament,
-.app-export-grid .sr-slot-ornament {
+.app-export-grid .sr-slot-ornament,
+.app-export-graph-paper .sr-slot-ornament {
   display: inline-grid;
   justify-items: center;
   min-width: 0.9em;
@@ -2185,7 +2225,8 @@
   padding-inline-start: 0.28em;
 }
 .app-rhythm-grid .sr-ornament-graces,
-.app-export-grid .sr-ornament-graces {
+.app-export-grid .sr-ornament-graces,
+.app-export-graph-paper .sr-ornament-graces {
   position: absolute;
   right: calc(50% + 0.14em);
   bottom: 0.76em;
@@ -2195,7 +2236,8 @@
   transform: none;
 }
 .app-rhythm-grid .sr-ornament-graces .sr-grace,
-.app-export-grid .sr-ornament-graces .sr-grace {
+.app-export-grid .sr-ornament-graces .sr-grace,
+.app-export-graph-paper .sr-ornament-graces .sr-grace {
   font-size: 0.58em;
   transform: none;
 }
@@ -2214,56 +2256,120 @@
   box-shadow: inset 0 0 0 1px var(--sr-accent), 0 0 0 2px color-mix(in srgb, var(--sr-accent) 24%, transparent);
 }
 
-/* In Paper mode the matra boxes are the graph paper. Existing cells become
-   transparent members of one continuous row; a flexible visual-only tail
-   continues the same cell boundaries through the unused system width. */
-.sr-paper-tail { min-width: 0; align-self: stretch; pointer-events: none; }
-.app-rhythm-grid-paper .sr-row,
-.app-export-grid-paper .sr-row {
-  --sr-paper-tail: minmax(0, 1fr);
-  width: 100%;
-}
-.app-rhythm-grid-paper .sr-paper-tail,
-.app-export-grid-paper .sr-paper-tail {
-  --sr-paper-cell-width: 3.15em;
-  min-height: 5.25em;
-  border-block: 1px solid color-mix(in srgb, var(--sr-accent) 34%, transparent);
-  background-image: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--sr-accent) 34%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: var(--sr-paper-cell-width) 100%;
-}
-.app-export-grid-paper .sr-paper-tail {
-  --sr-paper-cell-width: 2.65em;
-  min-height: 4.25em;
+/* True graph-paper mode is one uninterrupted sheet. The grid belongs to the
+   writing surface itself; notation is transparent and sits directly in the
+   existing squares. It is deliberately separate from Matra cells, which
+   remain discrete boxes around the musical data. */
+.sr-paper-tail { display: none; }
+.app-rhythm-grid-paper {
+  --sr-graph-square: 3.15em;
+  background-color: var(--sr-paper-raised);
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--sr-accent) 32%, var(--sr-line)) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--sr-accent) 32%, var(--sr-line)) 1px, transparent 1px);
+  background-position: 24px 20px;
+  background-size: var(--sr-graph-square) var(--sr-graph-square);
 }
 .app-rhythm-grid-paper .sr-cell,
-.app-rhythm-grid-paper .sr-cell:has(.sr-marker:not(:empty)),
-.app-export-grid-paper .sr-cell,
-.app-export-grid-paper .sr-export .sr-cell:has(.sr-sustain) {
-  background-color: transparent;
+.app-rhythm-grid-paper .sr-cell:has(.sr-marker:not(:empty)) {
+  width: var(--sr-graph-square);
+  min-width: var(--sr-graph-square);
+  max-width: var(--sr-graph-square);
+  min-height: calc(var(--sr-graph-square) * 2);
+  border-color: transparent;
+  background: transparent;
 }
+.app-rhythm-grid-paper .sr-cell[data-grid-span="2"] {
+  width: calc(var(--sr-graph-square) * 2);
+  min-width: calc(var(--sr-graph-square) * 2);
+  max-width: calc(var(--sr-graph-square) * 2);
+}
+.app-rhythm-grid-paper .sr-cell[data-grid-span="3"] {
+  width: calc(var(--sr-graph-square) * 3);
+  min-width: calc(var(--sr-graph-square) * 3);
+  max-width: calc(var(--sr-graph-square) * 3);
+}
+.app-rhythm-grid-paper .sr-slot + .sr-slot { border-inline-start: 0; }
 .app-rhythm-grid-paper .sr-source-active {
-  background-color: color-mix(in srgb, var(--sr-accent) 5%, transparent);
+  background-color: color-mix(in srgb, var(--sr-accent) 8%, transparent);
 }
-.app-grid-writer-paper .app-grid-writer-scroll { background: var(--sr-paper-raised); }
-.app-grid-writer-paper .app-grid-writer-cells {
-  min-height: 4.35rem;
-  align-content: flex-start;
+
+.app-export-graph-paper {
+  --sr-graph-square: 39.75px;
+  --sr-graph-line: color-mix(in srgb, var(--sr-accent) 28%, #aeb8ae);
+}
+.app-export-graph-paper .app-export-paper {
+  min-height: 1056px;
+  background-color: var(--sr-export-paper, #fff);
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--sr-accent) 42%, var(--sr-line)) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--sr-accent) 42%, var(--sr-line)) 1px, transparent 1px);
-  background-size: 5.1rem 4.35rem;
+    linear-gradient(to right, var(--sr-graph-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--sr-graph-line) 1px, transparent 1px);
+  background-position: 27px 29px;
+  background-size: var(--sr-graph-square) var(--sr-graph-square);
+}
+.app-export-graph-paper .sr-row { column-gap: 0; }
+.app-export-graph-paper .sr-cell,
+.app-export-graph-paper .sr-export .sr-cell:has(.sr-sustain) {
+  width: 2.65em;
+  min-width: 2.65em;
+  max-width: 2.65em;
+  min-height: 5.3em;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+.app-export-graph-paper .sr-cell[data-grid-span="2"],
+.app-export-graph-paper .sr-export .sr-cell[data-grid-span="2"]:has(.sr-sustain) {
+  width: 5.3em;
+  min-width: 5.3em;
+  max-width: 5.3em;
+}
+.app-export-graph-paper .sr-cell[data-grid-span="3"],
+.app-export-graph-paper .sr-export .sr-cell[data-grid-span="3"]:has(.sr-sustain) {
+  width: 7.95em;
+  min-width: 7.95em;
+  max-width: 7.95em;
+}
+.app-export-graph-paper .sr-marker {
+  width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding-inline: 0.28em;
+  text-align: left;
+  transform: none !important;
+}
+.app-export-graph-paper .sr-slot + .sr-slot { border-inline-start: 0; }
+.app-export-graph-paper .sr-bar {
+  width: 0;
+  margin-inline: 0;
+  transform: translateX(-1px);
+  border-inline-start-width: 2px;
+  opacity: 0.72;
+}
+
+.app-grid-writer-paper .app-grid-writer-scroll {
+  --sr-writer-square: 2.55rem;
+  background-color: var(--sr-paper-raised);
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--sr-accent) 34%, var(--sr-line)) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--sr-accent) 34%, var(--sr-line)) 1px, transparent 1px);
+  background-position: 12px 11px;
+  background-size: var(--sr-writer-square) var(--sr-writer-square);
 }
 .app-grid-writer-paper .app-grid-write-cell,
 .app-grid-writer-paper .app-grid-write-add {
-  width: 5.1rem;
-  min-height: 4.35rem;
+  width: calc(var(--sr-writer-square) * 2);
+  min-height: calc(var(--sr-writer-square) * 2);
   margin: 0;
+  border-color: transparent;
   box-sizing: border-box;
-  background: color-mix(in srgb, var(--sr-paper-raised) 74%, transparent);
+  background: transparent;
+}
+.app-grid-writer-paper .app-grid-write-cell:focus-within {
+  border-color: var(--sr-accent);
+  background: color-mix(in srgb, var(--sr-paper-raised) 70%, transparent);
 }
 .sr-rhythm-grid-layer {
   position: absolute;
