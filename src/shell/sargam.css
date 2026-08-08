@@ -209,6 +209,10 @@
   padding: 0 2px;
   align-self: center;
 }
+.sr-phrase-report {
+  display: inline-flex;
+  align-items: flex-start;
+}
 
 /* passthrough */
 .sr-passthrough {
@@ -2257,12 +2261,14 @@
   --sr-graph-cell-width: 3.15em;
   --sr-graph-cell-height: 5.25em;
   --sr-graph-line: color-mix(in srgb, var(--sr-accent) 36%, var(--sr-line));
+  --sr-graph-label-bg: color-mix(in srgb, var(--sr-accent) 9%, var(--sr-paper-raised));
   background: var(--sr-paper-raised);
 }
 .app-export-graph-paper {
   --sr-graph-cell-width: 2.65em;
   --sr-graph-cell-height: 5.3em;
   --sr-graph-line: color-mix(in srgb, var(--sr-accent) 30%, #aeb8ae);
+  --sr-graph-label-bg: color-mix(in srgb, var(--sr-ink) 7%, var(--sr-export-paper, #fff));
 }
 .app-export-graph-paper .app-export-paper {
   min-height: 1056px;
@@ -2296,6 +2302,7 @@
   display: grid;
   grid-auto-rows: var(--sr-graph-cell-height);
   width: max-content;
+  background: color-mix(in srgb, var(--sr-graph-label-bg) 58%, transparent);
   box-shadow: inset -1px 0 var(--sr-graph-line), inset 0 -1px var(--sr-graph-line);
 }
 .app-rhythm-grid-paper .sr-cell,
@@ -2327,7 +2334,7 @@
 .app-export-graph-paper .sr-export .sr-cell:has(.sr-sustain) {
   align-self: stretch;
   overflow: hidden;
-  padding: 0.92em 0.1em 0.08em;
+  padding: 0.92em 0.18em 0.08em;
 }
 .app-rhythm-grid-paper .sr-cell.sr-graph-vibhag-end,
 .app-export-graph-paper .sr-cell.sr-graph-vibhag-end {
@@ -2349,9 +2356,11 @@
 .app-rhythm-grid-paper .sr-glyphs,
 .app-export-graph-paper .sr-glyphs {
   width: 100%;
+  min-width: 0;
   justify-content: center;
   box-sizing: border-box;
-  padding-inline: 0.08em;
+  padding-inline: 0.04em;
+  overflow: visible;
 }
 .app-rhythm-grid-paper .sr-graph-row > .sr-arc,
 .app-export-graph-paper .sr-graph-row > .sr-arc,
@@ -2376,6 +2385,23 @@
 .app-export-graph-paper .sr-lyric { padding-bottom: 0.08em; }
 .app-rhythm-grid-paper .sr-slot + .sr-slot,
 .app-export-graph-paper .sr-slot + .sr-slot { border-inline-start: 0; }
+.app-rhythm-grid-paper .sr-timed-slots,
+.app-export-graph-paper .sr-timed-slots {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  column-gap: 0.04em;
+  overflow: visible;
+}
+.app-rhythm-grid-paper .sr-slot,
+.app-export-graph-paper .sr-slot {
+  width: 100%;
+  min-width: 0;
+}
+.app-rhythm-grid-paper .sr-timed-slots[data-written-slots="3"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="3"] { font-size: 0.76em; }
+.app-rhythm-grid-paper .sr-timed-slots[data-written-slots="4"],
+.app-export-graph-paper .sr-timed-slots[data-written-slots="4"] { font-size: 0.68em; }
 .app-rhythm-grid-paper .sr-timed-slots[data-written-slots="5"],
 .app-rhythm-grid-paper .sr-timed-slots[data-written-slots="6"],
 .app-rhythm-grid-paper .sr-timed-slots[data-written-slots="7"],
@@ -2396,15 +2422,54 @@
 .app-export-graph-paper .sr-repeat-close {
   top: 50%;
   right: auto;
-  left: 0.06em;
-  font-size: 0.58em;
+  left: 0.02em;
+  z-index: 6;
+  padding: 0.06em 0.02em;
+  background: var(--sr-export-paper, var(--sr-paper-raised));
+  font-size: 0.54em;
+  font-weight: 700;
   line-height: 1;
   transform: translateY(-50%);
 }
 .app-rhythm-grid-paper .sr-repeat-close,
 .app-export-graph-paper .sr-repeat-close {
-  right: 0.06em;
+  right: 0.02em;
   left: auto;
+}
+.app-rhythm-grid-paper .sr-has-repeat-open > .sr-glyphs,
+.app-export-graph-paper .sr-has-repeat-open > .sr-glyphs { padding-inline-start: 0.72em; }
+.app-rhythm-grid-paper .sr-has-repeat-close > .sr-glyphs,
+.app-export-graph-paper .sr-has-repeat-close > .sr-glyphs { padding-inline-end: 0.72em; }
+.app-rhythm-grid-paper .sr-has-repeat-open.sr-has-repeat-close > .sr-glyphs,
+.app-export-graph-paper .sr-has-repeat-open.sr-has-repeat-close > .sr-glyphs {
+  font-size: 0.86em;
+}
+.app-rhythm-grid-paper .sr-phrase-report,
+.app-export-graph-paper .sr-phrase-report {
+  position: absolute;
+  right: 0.08em;
+  bottom: -0.82em;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  padding: 0.05em 0.12em;
+  border-radius: 2px;
+  background: var(--sr-export-paper, var(--sr-paper-raised));
+  font-size: 0.58em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.app-rhythm-grid-paper .sr-phrase-report .sr-phrase-glyph,
+.app-export-graph-paper .sr-phrase-report .sr-phrase-glyph {
+  padding: 0;
+  font-size: 1em;
+}
+.app-rhythm-grid-paper .sr-phrase-report .sr-repeat-landing,
+.app-export-graph-paper .sr-phrase-report .sr-repeat-landing {
+  margin: 0;
+  font-size: 0.82em;
+  transform: none;
 }
 .app-rhythm-grid-paper .sr-graph-structure-cell,
 .app-export-graph-paper .sr-graph-structure-cell {
@@ -2417,12 +2482,25 @@
   top: 50%;
   z-index: 2;
   width: max-content;
+  max-width: calc(var(--sr-graph-cell-width) * var(--sr-graph-label-columns, 12));
+  box-sizing: border-box;
+  padding: 0.32em 0.55em;
+  border-radius: 2px;
+  background: var(--sr-graph-label-bg);
+  box-shadow: 0 0 0 0.16em var(--sr-graph-label-bg);
   color: var(--sr-ink-soft);
   font-size: 0.76em;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: normal;
   transform: translateY(-50%);
+}
+.app-rhythm-grid-paper .sr-return-cue,
+.app-export-graph-paper .sr-return-cue,
+.app-rhythm-grid-paper .sr-passthrough,
+.app-export-graph-paper .sr-passthrough {
+  background: color-mix(in srgb, var(--sr-graph-label-bg) 72%, transparent);
 }
 .app-rhythm-grid-paper .sr-source-active {
   background-color: color-mix(in srgb, var(--sr-accent) 6%, transparent);

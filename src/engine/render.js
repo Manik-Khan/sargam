@@ -745,7 +745,7 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   // krintan such as [-[[RS]]-.n] over the S position rather than before the
   // beat's leading hold.
   const glyphs = h('div', 'sr-glyphs');
-  if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph', prefix));
+  if (prefix) glyphs.appendChild(h('span', 'sr-phrase-glyph sr-phrase-prefix', prefix));
   for (const e of evs.filter((event) => event.grace && event.preBeat)) {
     glyphs.appendChild(renderEvent(e, ctx));
   }
@@ -805,12 +805,14 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
     glyphs.appendChild(slots);
   }
   if (suffix) {
-    glyphs.appendChild(h('span', 'sr-phrase-glyph', suffix));
+    const report = h('span', 'sr-phrase-report');
+    report.appendChild(h('span', 'sr-phrase-glyph sr-phrase-suffix', suffix));
     if (repeatLanding) {
       const landingMark = h('span', 'sr-repeat-landing', `→${repeatLanding.text}`);
       landingMark.title = `The repeated phrase continues at tala matra ${repeatLanding.matra}`;
-      glyphs.appendChild(landingMark);
+      report.appendChild(landingMark);
     }
+    glyphs.appendChild(report);
   }
   cell.appendChild(glyphs);
 
@@ -915,6 +917,8 @@ function attachRepeatGlyph(cell, kind) {
   const glyphs = cell?.querySelector(':scope > .sr-glyphs');
   if (glyphs) {
     glyphs.appendChild(repeatGlyph(kind));
+    cell.classList.add(`sr-has-repeat-${kind}`);
+    cell.setAttribute(`data-repeat-${kind}`, 'true');
     cell.setAttribute('data-grid-span', String(Math.max(2, Number(cell.dataset.gridSpan) || 1)));
   }
 }

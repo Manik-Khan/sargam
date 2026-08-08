@@ -69,6 +69,23 @@ export const smokes = [
     },
   },
   {
+    name: 'rhythm grid UI: graph repeats reserve protected edges inside their owning cells',
+    fn() {
+      const parsed = parseDocument('tal: rupak\n\nGat\n||: S R G :||');
+      assert.equal(parsed.problems.length, 0);
+      const root = renderDocument(parsed.doc, {
+        graphPaper: true,
+        graphColumns: 7,
+        maxSystemEm: 18.2,
+      });
+      const cells = [...root.querySelectorAll('.sr-graph-row .sr-cell')];
+      assert.equal(cells[0]?.dataset.repeatOpen, 'true');
+      assert.equal(cells.at(-1)?.dataset.repeatClose, 'true');
+      assert.equal(cells[0]?.querySelector('.sr-repeat-open .sr-ch')?.textContent, '||:');
+      assert.equal(cells.at(-1)?.querySelector('.sr-repeat-close .sr-ch')?.textContent, ':||');
+    },
+  },
+  {
     name: 'rhythm grid UI: one selected matra survives as an accessible grid cell',
     fn() {
       const root = gridCorpus();

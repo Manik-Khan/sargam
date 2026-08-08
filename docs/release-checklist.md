@@ -37,7 +37,9 @@ The command must end with every smoke check passing and a successful production 
 - Open **File → Print / PDF**.
 - Check Clean, Matra cells, and Graph paper; Color and Printer B&W; and each typeface.
 - Confirm Graph Paper is composed of real, equal matra cells plus real empty trailing cells; it must not be a repeating background image behind independently positioned notation.
-- Confirm kan runs, approach slides, four-to-eight-slot matras, phrase-repeat endings, and repeat punctuation remain inside the cell that owns their matra. Dense subdivisions may wrap internally but must not claim a neighboring matra.
+- Confirm kan runs, approach slides, four-to-eight-slot matras, and phrase-repeat endings remain inside the cell that owns their matra. Dense subdivisions may wrap internally but must not claim a neighboring matra or touch the stronger vibhag boundary.
+- Print a line beginning with `||:` and ending with `:||`. Each repeat sign must have a protected edge gutter and remain visually separate from the first or last note, including a dense phrase-repeat ending such as `(Dm g -)x3`.
+- Confirm graph-paper section descriptions and written cues have a light neutral backing that masks grid lines behind the text and remains legible in Printer B&W.
 - Confirm a long composition uses every required page and no ornament or cell is cut at a page edge.
 - Open and cancel the browser print dialog twice; the preview must remain unchanged.
 - Close and reopen Export; the last-used page, typeface, grid, and ink choices must return.
