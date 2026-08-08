@@ -101,7 +101,7 @@ import {
   postVilambitCommand,
 } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
-import { applyBolCaptureKey, beginBolCapture } from '../engine/bol-capture.js';
+import { applyBolCaptureKey, beginBolCapture, beginBolCaptureAt } from '../engine/bol-capture.js';
 import './sargam.css';
 
 const STARTER = BAGESHRI_STARTER;
@@ -741,6 +741,34 @@ export default function App() {
     setBolCapture(result.cursor);
     setActiveLine(result.cursor.sourceLine);
     editorRef.current?.focus();
+  };
+
+  const doBeginGridBolCapture = (sourceLine, ordinal = 0) => {
+    const active = bolCaptureRef.current;
+    const lineNumber = Number(sourceLine);
+    const attackOrdinal = Math.max(0, Number(ordinal) || 0);
+    if (active && Number(active.sourceLine) === lineNumber) {
+      const nextCursor = active.pass > 1
+        ? { sourceLine: lineNumber, ordinal: attackOrdinal, pass: active.pass }
+        : { sourceLine: lineNumber, ordinal: attackOrdinal };
+      bolCaptureRef.current = nextCursor;
+      setBolCapture(nextCursor);
+      setBolMessage(`Selected attack ${attackOrdinal + 1} in source line ${lineNumber}.`);
+      setActiveLine(lineNumber);
+      return true;
+    }
+    const currentText = textRef.current;
+    const result = beginBolCaptureAt(currentText, lineNumber, attackOrdinal);
+    setBolMessage(result.message);
+    if (!result.ok) return false;
+    if (result.text !== currentText) {
+      textRef.current = result.text;
+      setText(result.text);
+    }
+    bolCaptureRef.current = result.cursor;
+    setBolCapture(result.cursor);
+    setActiveLine(result.cursor.sourceLine);
+    return true;
   };
 
   const doBolCaptureKey = (key, event) => {
@@ -2096,6 +2124,11 @@ export default function App() {
                 onChange={setText}
                 onCellFocus={selectGridWriterCell}
                 gridStyle={rhythmGridStyle}
+                bolCapture={bolCapture}
+                bolMessage={bolMessage}
+                onBolBegin={doBeginGridBolCapture}
+                onBolKey={doBolCaptureKey}
+                onBolEnd={doToggleBolCapture}
               />
             ) : (
               <EditorPane

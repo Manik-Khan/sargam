@@ -70,8 +70,8 @@ export const smokes = [
       const root = renderDocument(doc, { maxSystemEm: 18 });
       const group = root.querySelectorAll('.sr-line-group')[1];
       assert.ok(group.querySelectorAll('.sr-line-block').length > 1);
-      assert.equal(group.querySelectorAll('.sr-repeat-open').length, 1);
-      assert.equal(group.querySelectorAll('.sr-repeat-close').length, 1);
+      assert.equal(group.querySelectorAll('.sr-line-repeat-open').length, 1);
+      assert.equal(group.querySelectorAll('.sr-line-repeat-close').length, 1);
       assert.equal(group.querySelectorAll('.sr-return-cue').length, 1);
       assert.equal(group.querySelector('.sr-return-cue').textContent, 'gat');
     },

@@ -158,11 +158,15 @@ export const smokes = [
       assert.match(css, /\.app-export-graph-paper\s*\{[^}]*--sr-graph-cell-width:\s*2\.65em;[^}]*--sr-graph-cell-height:\s*5\.3em;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-graph-row\s*\{[^}]*grid-template-rows:\s*var\(--sr-graph-cell-height\) !important;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-graph-empty-cell,[\s\S]*?width:\s*var\(--sr-graph-cell-width\);/s);
-      assert.match(css, /\.app-export-graph-paper \.sr-has-repeat-open > \.sr-glyphs\s*\{\s*padding-inline-start:\s*0\.72em;/s);
-      assert.match(css, /\.app-export-graph-paper \.sr-has-repeat-close > \.sr-glyphs\s*\{\s*padding-inline-end:\s*0\.72em;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-line-repeat-marker\s*\{[^}]*font-size:\s*0\.82em;[^}]*font-weight:\s*700;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-line-repeat-open\s*\{[^}]*transform:\s*translateX\(-54%\);/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-line-repeat-close\s*\{[^}]*transform:\s*translateX\(54%\);/s);
       assert.match(css, /\.app-export-graph-paper \.sr-timed-slots\s*\{[^}]*max-width:\s*100%;[^}]*column-gap:\s*0\.04em;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-timed-slots\[data-written-slots="4"\]\s*\{\s*font-size:\s*0\.68em;/s);
       assert.match(css, /\.sr-graph-structure-label\s*\{[^}]*background:\s*var\(--sr-graph-label-bg\);[^}]*box-shadow:/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-has-bol-lane[\s\S]*?padding-bottom:\s*calc\(0\.08em \+ \(1\.08em \* var\(--sr-bol-pass-count, 1\)\)\);/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-bol\s*\{[^}]*width:\s*var\(--sr-graph-cell-width\);[^}]*border-top:\s*1px dashed/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-bol-slots\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--sr-bol-written-slots\), minmax\(0, 1fr\)\) !important;/s);
       assert.doesNotMatch(css, /\.app-export-graph-paper::before\s*\{[^}]*background-image:/s);
       assert.match(css, /\.app-rhythm-grid-paper\s*\{[^}]*background:\s*var\(--sr-paper-raised\);/s);
       assert.match(css, /\.app-grid-writer-paper \.app-grid-writer-scroll\s*\{\s*background:\s*var\(--sr-paper-raised\);/s);

@@ -69,7 +69,7 @@ export const smokes = [
     },
   },
   {
-    name: 'rhythm grid UI: graph repeats reserve protected edges inside their owning cells',
+    name: 'rhythm grid UI: graph repeats are independent markers on cell boundaries',
     fn() {
       const parsed = parseDocument('tal: rupak\n\nGat\n||: S R G :||');
       assert.equal(parsed.problems.length, 0);
@@ -78,11 +78,15 @@ export const smokes = [
         graphColumns: 7,
         maxSystemEm: 18.2,
       });
-      const cells = [...root.querySelectorAll('.sr-graph-row .sr-cell')];
-      assert.equal(cells[0]?.dataset.repeatOpen, 'true');
-      assert.equal(cells.at(-1)?.dataset.repeatClose, 'true');
-      assert.equal(cells[0]?.querySelector('.sr-repeat-open .sr-ch')?.textContent, '||:');
-      assert.equal(cells.at(-1)?.querySelector('.sr-repeat-close .sr-ch')?.textContent, ':||');
+      const row = root.querySelector('.sr-graph-row');
+      const cells = [...row.querySelectorAll('.sr-cell')];
+      const open = row.querySelector('.sr-line-repeat-open');
+      const close = row.querySelector('.sr-line-repeat-close');
+      assert.equal(open?.textContent, '||:');
+      assert.equal(close?.textContent, ':||');
+      assert.equal(open?.parentElement, row);
+      assert.equal(close?.parentElement, row);
+      assert.equal(cells.some((cell) => cell.contains(open) || cell.contains(close)), false);
     },
   },
   {
@@ -95,6 +99,28 @@ export const smokes = [
       assert.equal(selected?.getAttribute('aria-selected'), 'true');
       assert.equal(root.querySelectorAll('.sr-grid-selected').length, 1);
       assert.match(selected?.getAttribute('aria-label') || '', /tala matra 2, 2 subdivisions/);
+    },
+  },
+  {
+    name: 'rhythm grid UI: bols occupy a per-matra strip with exact attack targets',
+    fn() {
+      const parsed = parseDocument('tal: rupak\n\nGat\nS [R G]\n> da diri');
+      assert.equal(parsed.problems.length, 0);
+      const root = renderDocument(parsed.doc, {
+        graphPaper: true,
+        graphColumns: 7,
+        maxSystemEm: 18.2,
+      });
+      const cells = [...root.querySelectorAll('.sr-graph-row .sr-cell')];
+      assert.equal(cells[0].classList.contains('sr-has-bol-lane'), true);
+      assert.equal(cells[1].classList.contains('sr-has-bol-lane'), true);
+      assert.deepEqual(
+        [...root.querySelectorAll('[data-bol-attack-ordinal]')].map((slot) => slot.dataset.bolAttackOrdinal),
+        ['0', '1', '2']
+      );
+      assert.equal(root.querySelector('[data-bol-attack-ordinal="0"]').textContent, '|');
+      assert.equal(root.querySelector('[data-bol-attack-ordinal="1"]').textContent, 'V');
+      assert.equal(root.querySelector('[data-bol-attack-ordinal="2"]').textContent, '·');
     },
   },
   {

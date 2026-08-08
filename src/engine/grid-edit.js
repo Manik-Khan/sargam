@@ -7,6 +7,7 @@ import { parseDocument } from './parse.js';
 import { serializeGridCells, serializeGridLine } from './serialize.js';
 import { performedOffsetAt } from './performed-time.js';
 import { getTal, markerAtMatra, wrapMatra } from './tala.js';
+import { buildBolPlan } from './bol-lane.js';
 
 function musicLineAt(doc, sourceLine) {
   for (const section of doc?.sections || []) {
@@ -95,6 +96,26 @@ export function gridLines(doc) {
   for (const section of doc?.sections || []) {
     const tal = section.tal && section.tal !== 'free' ? getTal(section.tal) : null;
     for (const line of section.lines || []) {
+      const bolPlan = buildBolPlan(line);
+      const sourcePasses = line._bolPasses?.length
+        ? line._bolPasses
+        : (line.bols?.length ? [{ pass: 1, bols: line.bols }] : []);
+      const bolPasses = sourcePasses.map((lane) => ({
+        pass: Math.max(1, Number(lane.pass) || 1),
+        marks: (lane.bols || []).flatMap((bol) => {
+          const start = bolPlan.attackByRef.get(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`);
+          if (!start) return [];
+          const end = bol.endRef
+            ? bolPlan.attackByRef.get(`${bol.endRef.matraIndex}:${bol.endRef.eventIndex}`)
+            : null;
+          return [{
+            ordinal: start.ordinal,
+            toOrdinal: end?.ordinal ?? start.ordinal,
+            mark: bol.mark,
+            rate: Math.max(1, Number(bol.rate) || 1),
+          }];
+        }),
+      }));
       const cells = serializeGridCells(line, tal).map((cell) => {
         const cycleMatra = tal
           ? wrapMatra(tal, line.startMatra + performedOffsetAt(line, cell.matraIndex))
@@ -103,6 +124,13 @@ export function gridLines(doc) {
           ...cell,
           cycleMatra,
           marker: tal && cycleMatra != null ? markerAtMatra(tal, cycleMatra) : null,
+          attacks: bolPlan.attacks
+            .filter((attack) => attack.matraIndex === cell.matraIndex)
+            .map((attack) => ({
+              ordinal: attack.ordinal,
+              eventIndex: attack.eventIndex,
+              writtenSlots: attack.writtenSlots,
+            })),
         };
       });
       rows.push({
@@ -111,6 +139,7 @@ export function gridLines(doc) {
         startMatra: line.startMatra,
         tal,
         cells,
+        bolPasses,
       });
     }
   }

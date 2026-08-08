@@ -326,6 +326,11 @@ export function mountAnchorOverlays(root, marks = [], options = {}) {
       ordinal: Number(capture.ordinal),
     });
     cursorTarget?.classList.add('sr-bol-capture-cursor');
+    const bolTarget = root.querySelector(
+      `.sr-bol[data-source-line="${Number(capture.sourceLine)}"] ` +
+      `[data-bol-attack-ordinal="${Number(capture.ordinal)}"]`
+    );
+    bolTarget?.classList.add('sr-bol-capture-slot');
   }
   return () => {};
 }

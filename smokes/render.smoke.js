@@ -63,14 +63,15 @@ export const smokes = [
     },
   },
   {
-    name: 'render: sthayi row has 16 matra cells and repeat glyphs',
+    name: 'render: sthayi row has 16 matra cells and independent repeat markers',
     fn: () => {
       const root = renderCorpus();
       assert.equal(sthayiCells(root).length, 16);
       const row = root.querySelectorAll('.sr-section')[0].querySelector('.sr-row');
-      assert.ok(row.querySelector('.sr-repeat-open'));
-      assert.ok(row.querySelector('.sr-repeat-close'));
-      assert.match(row.querySelector('.sr-repeat-open').textContent, /\|\|:/);
+      assert.ok(row.querySelector('.sr-line-repeat-open'));
+      assert.ok(row.querySelector('.sr-line-repeat-close'));
+      assert.match(row.querySelector('.sr-line-repeat-open').textContent, /\|\|:/);
+      assert.equal(row.querySelector('.sr-cell .sr-line-repeat-marker'), null);
     },
   },
   {

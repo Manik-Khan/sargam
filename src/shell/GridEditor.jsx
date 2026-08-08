@@ -8,18 +8,59 @@ import {
   replaceGridCellToken,
 } from '../engine/grid-edit.js';
 
+const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
+const BOL_SHORTCUTS = new Set(['ArrowDown', 'ArrowUp', 'v', 'V', '^', 'c', 'C', 'Delete', 'Backspace', 'ArrowLeft', 'ArrowRight']);
+
 function withoutKey(object, key) {
   const next = { ...object };
   delete next[key];
   return next;
 }
 
-export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle = 'cells' }) {
+export default function GridEditor({
+  text,
+  doc,
+  onChange,
+  onCellFocus,
+  gridStyle = 'cells',
+  bolCapture = null,
+  bolMessage = '',
+  onBolBegin,
+  onBolKey,
+  onBolEnd,
+}) {
   const rows = useMemo(() => gridLines(doc), [doc]);
   const [drafts, setDrafts] = useState({});
   const [errors, setErrors] = useState({});
   const [addDrafts, setAddDrafts] = useState({});
   const [message, setMessage] = useState('Each box is one matra. Spaces inside a box become subdivisions.');
+  const [bolTarget, setBolTarget] = useState(null);
+
+  const firstAttack = rows.flatMap((row) => row.cells.flatMap((cell) => (
+    cell.attacks || []
+  ).map((attack) => ({ sourceLine: row.sourceLine, ordinal: attack.ordinal })))).at(0) || null;
+  const activeBolPass = Math.max(1, Number(bolCapture?.pass) || 1);
+
+  const beginSelectedBol = () => {
+    const target = bolTarget || firstAttack;
+    if (!target) {
+      setMessage('Add a note attack before starting Bol Capture.');
+      return;
+    }
+    onBolBegin?.(target.sourceLine, target.ordinal);
+  };
+
+  const chooseBolAttack = (sourceLine, ordinal) => {
+    const target = { sourceLine, ordinal };
+    setBolTarget(target);
+    onBolBegin?.(sourceLine, ordinal);
+  };
+
+  const handleBolShortcut = (event) => {
+    if (!bolCapture || !BOL_SHORTCUTS.has(event.key)) return;
+    event.preventDefault();
+    onBolKey?.(event.key, event);
+  };
 
   const editCell = (row, cell, value) => {
     const key = `${row.sourceLine}:${cell.matraIndex}`;
@@ -81,6 +122,36 @@ export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle
         <strong>Grid Write</strong>
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>
       </div>
+      <div className={`app-grid-bol-tools${bolCapture ? ' active' : ''}`} role="group" aria-label="Grid Bol Capture">
+        <button
+          type="button"
+          className={bolCapture ? 'active' : ''}
+          aria-pressed={Boolean(bolCapture)}
+          onClick={() => bolCapture ? onBolEnd?.() : beginSelectedBol()}
+        >{bolCapture ? 'End Bol Capture' : 'Bol Capture'}</button>
+        {bolCapture ? (
+          <>
+            <span className="app-grid-bol-pass">Pass</span>
+            {[1, 2].map((pass) => (
+              <button
+                type="button"
+                key={pass}
+                className={activeBolPass === pass ? 'active' : ''}
+                aria-pressed={activeBolPass === pass}
+                onClick={() => onBolKey?.(String(pass))}
+              >{pass}</button>
+            ))}
+            <button type="button" onClick={() => onBolKey?.('ArrowDown')}>| da</button>
+            <button type="button" onClick={() => onBolKey?.('ArrowUp')}>— ra</button>
+            <button type="button" onClick={() => onBolKey?.('v')}>V diri</button>
+            <button type="button" onClick={() => onBolKey?.('^')}>^ chikari</button>
+            <button type="button" onClick={() => onBolKey?.('Delete')}>Erase</button>
+          </>
+        ) : (
+          <span>Choose an attack dot below; its bol stays attached to that exact note inside the matra.</span>
+        )}
+        {bolCapture && <span className="app-grid-bol-status" role="status">{bolMessage}</span>}
+      </div>
       <div className="app-grid-writer-scroll">
         {rows.map((row) => {
           const showSection = row.sectionLabel !== previousSection;
@@ -100,8 +171,19 @@ export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle
                     const key = `${row.sourceLine}:${cell.matraIndex}`;
                     const value = Object.hasOwn(drafts, key) ? drafts[key] : cell.text;
                     const error = errors[key] || '';
+                    const rowPass = row.bolPasses.find((lane) => lane.pass === (
+                      Number(bolCapture?.sourceLine) === Number(row.sourceLine) ? activeBolPass : 1
+                    ));
+                    const bolByAttack = new Map((rowPass?.marks || []).map((mark) => [mark.ordinal, mark]));
+                    const coveredByDiri = new Map();
+                    for (const mark of rowPass?.marks || []) {
+                      if (mark.mark !== 'diri') continue;
+                      for (let ordinal = mark.ordinal + 1; ordinal <= mark.toOrdinal; ordinal++) {
+                        coveredByDiri.set(ordinal, mark.ordinal);
+                      }
+                    }
                     return (
-                      <label
+                      <div
                         className={`app-grid-write-cell${error ? ' is-invalid' : ''}`}
                         key={key}
                         title={error || `Source line ${row.sourceLine}, written matra ${cell.matraIndex + 1}`}
@@ -115,7 +197,11 @@ export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle
                           aria-label={`Line ${row.sourceLine}, written matra ${cell.matraIndex + 1}, cycle matra ${cell.cycleMatra ?? cell.matraIndex + 1}`}
                           aria-invalid={error ? 'true' : 'false'}
                           data-grid-cell="true"
-                          onFocus={() => onCellFocus?.(row.sourceLine, cell.matraIndex)}
+                          onFocus={() => {
+                            onCellFocus?.(row.sourceLine, cell.matraIndex);
+                            const attack = cell.attacks?.[0];
+                            if (attack) setBolTarget({ sourceLine: row.sourceLine, ordinal: attack.ordinal });
+                          }}
                           onChange={(event) => editCell(row, cell, event.target.value)}
                           onBlur={() => finishCell(row, cell, key)}
                           onKeyDown={(event) => {
@@ -133,7 +219,33 @@ export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle
                             setMessage('Draft reverted to the Markdown source.');
                           }}
                         />
-                      </label>
+                        {(cell.attacks?.length || 0) > 0 && (
+                          <span
+                            className={`app-grid-write-bols${Number(bolCapture?.sourceLine) === Number(row.sourceLine) ? ' is-capturing' : ''}`}
+                            style={{ '--grid-bol-slots': cell.attacks.length }}
+                            aria-label={`Bols for line ${row.sourceLine}, matra ${cell.matraIndex + 1}`}
+                          >
+                            {cell.attacks.map((attack) => {
+                              const bol = bolByAttack.get(attack.ordinal);
+                              const covered = coveredByDiri.has(attack.ordinal);
+                              const selected = Number(bolCapture?.sourceLine) === Number(row.sourceLine)
+                                && Number(bolCapture?.ordinal) === Number(attack.ordinal);
+                              return (
+                                <button
+                                  type="button"
+                                  key={attack.ordinal}
+                                  className={`app-grid-bol-slot${bol ? ' has-bol' : ''}${covered ? ' is-covered' : ''}${selected ? ' selected' : ''}`}
+                                  aria-pressed={selected}
+                                  aria-label={`Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, attack ${attack.ordinal + 1}${bol ? `, ${bol.mark}` : ', no bol'}`}
+                                  title={bol ? bol.mark : 'Choose this attack for Bol Capture'}
+                                  onClick={() => chooseBolAttack(row.sourceLine, attack.ordinal)}
+                                  onKeyDown={handleBolShortcut}
+                                >{bol ? BOL_SYMBOL[bol.mark] : covered ? '·' : '+'}</button>
+                              );
+                            })}
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                   <div className="app-grid-write-add">

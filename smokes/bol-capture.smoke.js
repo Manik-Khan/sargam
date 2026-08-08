@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   applyBolCaptureKey,
   beginBolCapture,
+  beginBolCaptureAt,
   bolCursorSelection,
   moveBolCursor,
   setBolAtCursor,
@@ -35,6 +36,16 @@ export const smokes = [
       assert.equal(result.ok, true);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 0 });
       assert.match(result.text, /S- SS SS SS\n> \.- \. \. \. \. \. \.\n/);
+    },
+  },
+  {
+    name: 'bol capture: Grid Write can begin on an exact attack without a text caret',
+    fn() {
+      const result = beginBolCaptureAt(source, 3, 4);
+      assert.equal(result.ok, true);
+      assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 4 });
+      assert.match(result.text, /S- SS SS SS\n> \.- \. \. \. \. \. \.\n/);
+      assert.match(result.message, /Attack 5 of 7/);
     },
   },
   {
@@ -187,6 +198,7 @@ export const smokes = [
       const editor = await fs.readFile(new URL('../src/shell/EditorPane.jsx', import.meta.url), 'utf8');
       const app = await fs.readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       const preview = await fs.readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
+      const gridEditor = await fs.readFile(new URL('../src/shell/GridEditor.jsx', import.meta.url), 'utf8');
       assert.match(editor, /Bol Capture: ON/);
       assert.match(editor, /BOL PASS/);
       assert.match(editor, /1–9 switch pass/);
@@ -195,7 +207,12 @@ export const smokes = [
       assert.match(editor, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/);
       assert.match(app, /applyBolCaptureKey/);
       assert.match(app, /textRef\.current/);
+      assert.match(app, /beginBolCaptureAt/);
       assert.match(preview, /bolCapture/);
+      assert.match(gridEditor, /Grid Bol Capture/);
+      assert.match(gridEditor, /app-grid-write-bols/);
+      assert.match(gridEditor, /onBolBegin/);
+      assert.match(gridEditor, /onBolKey/);
     },
   },
 ];
