@@ -14,7 +14,7 @@ function withoutKey(object, key) {
   return next;
 }
 
-export default function GridEditor({ text, doc, onChange, onCellFocus }) {
+export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle = 'cells' }) {
   const rows = useMemo(() => gridLines(doc), [doc]);
   const [drafts, setDrafts] = useState({});
   const [errors, setErrors] = useState({});
@@ -73,7 +73,10 @@ export default function GridEditor({ text, doc, onChange, onCellFocus }) {
 
   let previousSection = Symbol('first');
   return (
-    <div className="app-grid-writer" aria-label="Grid Write notation editor">
+    <div
+      className={`app-grid-writer${gridStyle === 'paper' ? ' app-grid-writer-paper' : ''}`}
+      aria-label="Grid Write notation editor"
+    >
       <div className="app-grid-writer-help">
         <strong>Grid Write</strong>
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>

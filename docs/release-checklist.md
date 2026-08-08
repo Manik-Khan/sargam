@@ -20,6 +20,7 @@ The command must end with every smoke check passing and a successful production 
 - Switch to **Grid Write**. Change a note, enter a spaced subdivision such as `S R`, add a hold or rest, and append one matra. Confirm the Markdown-backed score and playback duration update immediately.
 - Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
 - Switch between Text Write and Grid Write and reload once. Confirm the chosen writing surface persists and headings or attachment lines remain unchanged.
+- Toggle the grid look between **Cells** and **Paper**. Confirm Paper fills the unused score and editor surface continuously, the choice survives reload, and a kan such as `{m}g` remains legible without touching the tala coordinate.
 - Resize the score/editor divider and confirm neither surface jumps to another line.
 
 ## Playback
@@ -33,7 +34,7 @@ The command must end with every smoke check passing and a successful production 
 ## Print and PDF
 
 - Open **File → Print / PDF**.
-- Check Clean and Matra cells, Color and Printer B&W, and each typeface.
+- Check Clean, Matra cells, and Graph paper; Color and Printer B&W; and each typeface.
 - Confirm a long composition uses every required page and no ornament or cell is cut at a page edge.
 - Open and cancel the browser print dialog twice; the preview must remain unchanged.
 - Close and reopen Export; the last-used page, typeface, grid, and ink choices must return.

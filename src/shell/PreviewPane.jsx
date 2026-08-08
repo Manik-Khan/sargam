@@ -51,6 +51,7 @@ export default function PreviewPane({
   selectedAudioLinkId = null,
   onActivateAudioLink,
   rhythmGrid = false,
+  rhythmGridStyle = 'cells',
   gridSelection = null,
   onGridSelection,
   followEditing = true,
@@ -202,7 +203,7 @@ export default function PreviewPane({
 
   return (
     <div
-      className={`app-preview${anchorTool ? ' app-preview-anchoring' : ''}${rhythmGrid ? ' app-rhythm-grid' : ''}`}
+      className={`app-preview${anchorTool ? ' app-preview-anchoring' : ''}${rhythmGrid ? ' app-rhythm-grid' : ''}${rhythmGrid && rhythmGridStyle === 'paper' ? ' app-rhythm-grid-paper' : ''}`}
       role={rhythmGrid ? 'grid' : undefined}
       aria-label={rhythmGrid ? 'Graph-paper matra grid' : undefined}
       ref={mount}

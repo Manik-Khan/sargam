@@ -42,6 +42,8 @@ export default function CommandBar({
   anchorMessage,
   rhythmGrid = false,
   onRhythmGrid,
+  rhythmGridStyle = 'cells',
+  onRhythmGridStyle,
 }) {
   const [customMeter, setCustomMeter] = useState(anchorMeter || '');
   const chooseMeter = (value) => {
@@ -100,6 +102,23 @@ export default function CommandBar({
             title="Use every matra as a numbered graph-paper cell, with subdivisions inside it"
             onClick={() => onRhythmGrid?.(!rhythmGrid)}
           >Graph Grid</button>
+          {rhythmGrid && (
+            <div className="cmd-grid-style" role="group" aria-label="Grid appearance">
+              <span>Look</span>
+              <button
+                type="button"
+                className={`cmd-btn${rhythmGridStyle === 'cells' ? ' active' : ''}`}
+                aria-pressed={rhythmGridStyle === 'cells'}
+                onClick={() => onRhythmGridStyle?.('cells')}
+              >Cells</button>
+              <button
+                type="button"
+                className={`cmd-btn${rhythmGridStyle === 'paper' ? ' active' : ''}`}
+                aria-pressed={rhythmGridStyle === 'paper'}
+                onClick={() => onRhythmGridStyle?.('paper')}
+              >Paper</button>
+            </div>
+          )}
           {anchorTool && <button type="button" className="cmd-btn" onClick={() => onAnchorTool?.(null)}>Done</button>}
         </div>
       </div>

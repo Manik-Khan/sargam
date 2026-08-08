@@ -2083,6 +2083,16 @@
 .cmd-anchor-label { font-size: 0.72rem; opacity: 0.75; }
 .cmd-anchor-tool.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
 .cmd-rhythm-grid.active { background: var(--sr-accent); color: var(--sr-paper-raised); }
+.cmd-grid-style {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 0.35rem;
+  border-left: 1px solid var(--sr-line);
+}
+.cmd-grid-style > span { color: var(--sr-ink-soft); font-size: 0.68rem; }
+.cmd-grid-style .cmd-btn { padding-inline: 6px; }
+.cmd-grid-style .cmd-btn.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
 .cmd-anchor-tool span { font-size: 0.68rem; opacity: 0.78; }
 .app-preview-anchoring .sr-anchor-target, .app-preview-anchoring .sr-boundary-target { cursor: crosshair; }
 .app-preview-anchoring .sr-anchor-target:hover, .sr-anchor-gesture-start { border-radius: 0.22em; background: color-mix(in srgb, currentColor 16%, transparent); }
@@ -2162,21 +2172,22 @@
   display: inline-grid;
   justify-items: center;
   min-width: 0.9em;
-  padding-top: 0.38em;
+  padding-top: 0.2em;
+  padding-inline-start: 0.28em;
 }
 .app-rhythm-grid .sr-ornament-graces,
 .app-export-grid .sr-ornament-graces {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% - 0.3em);
+  right: calc(50% + 0.14em);
+  bottom: 0.76em;
   display: inline-flex;
   gap: 0.05em;
   white-space: nowrap;
-  transform: translateX(-50%);
+  transform: none;
 }
 .app-rhythm-grid .sr-ornament-graces .sr-grace,
 .app-export-grid .sr-ornament-graces .sr-grace {
-  font-size: 0.48em;
+  font-size: 0.58em;
   transform: none;
 }
 .app-rhythm-grid .sr-slot + .sr-slot,
@@ -2192,6 +2203,49 @@
   border-color: var(--sr-accent);
   background: color-mix(in srgb, var(--sr-accent) 15%, var(--sr-paper-raised));
   box-shadow: inset 0 0 0 1px var(--sr-accent), 0 0 0 2px color-mix(in srgb, var(--sr-accent) 24%, transparent);
+}
+
+/* Optional continuous graph-paper surface. Matra boundaries remain musical,
+   while the page behind them becomes one uninterrupted writing field. */
+.app-rhythm-grid-paper,
+.app-grid-writer-paper .app-grid-writer-scroll,
+.app-export-grid-paper .app-export-paper {
+  --sr-graph-minor: color-mix(in srgb, var(--sr-accent) 12%, transparent);
+  --sr-graph-major: color-mix(in srgb, var(--sr-accent) 21%, transparent);
+  background-color: var(--sr-paper-raised);
+  background-image:
+    linear-gradient(to right, var(--sr-graph-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--sr-graph-major) 1px, transparent 1px),
+    linear-gradient(to right, var(--sr-graph-minor) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--sr-graph-minor) 1px, transparent 1px);
+  background-size: 4.8rem 4.8rem, 4.8rem 4.8rem, 1.2rem 1.2rem, 1.2rem 1.2rem;
+}
+.app-export-grid-paper .app-export-paper {
+  background-color: var(--sr-export-paper, #fff);
+}
+.app-rhythm-grid-paper .sr-cell,
+.app-rhythm-grid-paper .sr-cell:has(.sr-marker:not(:empty)),
+.app-export-grid-paper .sr-cell,
+.app-export-grid-paper .sr-export .sr-cell:has(.sr-sustain),
+.app-grid-writer-paper .app-grid-write-cell,
+.app-grid-writer-paper .app-grid-write-add {
+  background-color: color-mix(in srgb, var(--sr-paper-raised) 62%, transparent);
+}
+.app-rhythm-grid-paper .sr-source-active {
+  background-color: color-mix(in srgb, var(--sr-accent) 5%, transparent);
+}
+@media print {
+  .app-export-grid-paper .app-export-paper {
+    background-color: transparent !important;
+    background-image:
+      linear-gradient(to right, var(--sr-graph-major) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--sr-graph-major) 1px, transparent 1px),
+      linear-gradient(to right, var(--sr-graph-minor) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--sr-graph-minor) 1px, transparent 1px) !important;
+    background-size: 4.8rem 4.8rem, 4.8rem 4.8rem, 1.2rem 1.2rem, 1.2rem 1.2rem !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
 .sr-rhythm-grid-layer {
   position: absolute;

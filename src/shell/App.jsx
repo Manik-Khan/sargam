@@ -185,6 +185,9 @@ export default function App() {
   const [rhythmGrid, setRhythmGrid] = useState(() =>
     store.getPref('rhythmGrid', false) === true
   );
+  const [rhythmGridStyle, setRhythmGridStyle] = useState(() =>
+    store.getPref('rhythmGridStyle', 'cells') === 'paper' ? 'paper' : 'cells'
+  );
   const [writeMode, setWriteMode] = useState(() =>
     store.getPref('writeMode', 'text') === 'grid' ? 'grid' : 'text'
   );
@@ -1804,6 +1807,12 @@ export default function App() {
     store.setPref('rhythmGrid', value);
   };
 
+  const changeRhythmGridStyle = (value) => {
+    const next = value === 'paper' ? 'paper' : 'cells';
+    setRhythmGridStyle(next);
+    store.setPref('rhythmGridStyle', next);
+  };
+
   const changeWriteMode = (value) => {
     const next = value === 'grid' ? 'grid' : 'text';
     setWriteMode(next);
@@ -2023,6 +2032,7 @@ export default function App() {
             selectedAudioLinkId={selectedAudioLinkId}
             onActivateAudioLink={activateAudioLink}
             rhythmGrid={rhythmGrid}
+            rhythmGridStyle={rhythmGridStyle}
             gridSelection={gridSelection}
             onGridSelection={setGridSelection}
             followEditing={followEditing}
@@ -2076,6 +2086,8 @@ export default function App() {
             anchorMessage={anchorMessage}
             rhythmGrid={rhythmGrid}
             onRhythmGrid={changeRhythmGrid}
+            rhythmGridStyle={rhythmGridStyle}
+            onRhythmGridStyle={changeRhythmGridStyle}
           />
             {writeMode === 'grid' ? (
               <GridEditor
@@ -2083,6 +2095,7 @@ export default function App() {
                 doc={doc}
                 onChange={setText}
                 onCellFocus={selectGridWriterCell}
+                gridStyle={rhythmGridStyle}
               />
             ) : (
               <EditorPane

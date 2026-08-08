@@ -30,6 +30,7 @@ const EXPORT_FONTS = [
 const EXPORT_GRIDS = [
   { value: 'clean', label: 'Clean' },
   { value: 'matra', label: 'Matra cells' },
+  { value: 'paper', label: 'Graph paper' },
 ];
 
 const EXPORT_INKS = [
@@ -233,7 +234,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
 
   return (
     <div
-      className={`app-export${gridStyle === 'matra' ? ' app-export-grid' : ''}${inkStyle === 'mono' ? ' app-export-monochrome' : ''}`}
+      className={`app-export${gridStyle !== 'clean' ? ' app-export-grid' : ''}${gridStyle === 'paper' ? ' app-export-grid-paper' : ''}${inkStyle === 'mono' ? ' app-export-monochrome' : ''}`}
       style={{ '--sr-export-paper': paperColor, '--sr-export-font': fontFamily }}
     >
       <div className="app-export-bar">

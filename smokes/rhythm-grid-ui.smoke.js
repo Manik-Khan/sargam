@@ -52,10 +52,19 @@ export const smokes = [
 
       const app = await readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       const preview = await readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
+      const commandBar = await readFile(new URL('../src/shell/CommandBar.jsx', import.meta.url), 'utf8');
+      const gridEditor = await readFile(new URL('../src/shell/GridEditor.jsx', import.meta.url), 'utf8');
       assert.match(app, /getPref\('rhythmGrid', false\)/);
       assert.match(app, /setPref\('rhythmGrid', value\)/);
+      assert.match(app, /getPref\('rhythmGridStyle', 'cells'\)/);
+      assert.match(app, /setPref\('rhythmGridStyle', next\)/);
       assert.match(preview, /onGridSelection\?\.\(rhythmGridIdentity\(cell\)\)/);
       assert.match(preview, /aria-label=\{rhythmGrid \? 'Graph-paper matra grid'/);
+      assert.match(preview, /app-rhythm-grid-paper/);
+      assert.match(commandBar, /aria-label="Grid appearance"/);
+      assert.match(commandBar, />Cells<\/button>/);
+      assert.match(commandBar, />Paper<\/button>/);
+      assert.match(gridEditor, /app-grid-writer-paper/);
     },
   },
 ];

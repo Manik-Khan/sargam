@@ -10,6 +10,7 @@ Manik is the musical and product authority. Never invent raga, tala, bol, orname
 
 - **Graph Grid** is the existing Rhythm Grid developed into a clearer working surface: every rendered matra is a fixed graph-paper cell, carries its tala-matra coordinate and subdivision count, and retains a visible selected-cell state while its Markdown source line remains authoritative.
 - **Grid Write** is the companion direct editor. It exposes one input box per written matra, rewrites only the corresponding Markdown music line, updates the score and playback model immediately, keeps invalid/incomplete drafts out of the source, and supports adding a matra to an existing line. Text Write remains available for headings, attachment lines, and broader structural edits.
+- Grid users can persist either **Cells** (the original blank-paper boxes) or **Paper** (a continuous fine graph-paper field) across both the rendered score and Grid Write. PDF export separately offers Clean, Matra cells, and Graph paper. Compact kan graces sit upper-left of their destination rather than colliding with tala coordinates.
 - The graph-grid preference and the PDF page, typeface, grid, and ink choices persist locally.
 - `docs/release-checklist.md` is now the repeatable writing, playback, print, and restoration acceptance gate.
 - Stale numbered copies and committed Finder metadata were removed. Do not restore them.
