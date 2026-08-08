@@ -51,6 +51,8 @@ export default function PreviewPane({
   selectedAudioLinkId = null,
   onActivateAudioLink,
   rhythmGrid = false,
+  gridSelection = null,
+  onGridSelection,
   followEditing = true,
   followPlayback = true,
 }) {
@@ -60,7 +62,6 @@ export default function PreviewPane({
   const activeCursorRef = useRef(activeCursor);
   activeCursorRef.current = activeCursor;
   const [maxSystemEm, setMaxSystemEm] = useState(56);
-  const [gridSelection, setGridSelection] = useState(null);
 
   useLayoutEffect(() => {
     if (!mount.current) return;
@@ -195,7 +196,7 @@ export default function PreviewPane({
     if (!blockEl) return;
     const sourceLine = Number(blockEl.getAttribute('data-source-line'));
     const matraIndex = cell ? Number(cell.getAttribute('data-matra')) : 0;
-    if (rhythmGrid && cell) setGridSelection(rhythmGridIdentity(cell));
+    if (rhythmGrid && cell) onGridSelection?.(rhythmGridIdentity(cell));
     onSeek(sourceLine, Number.isFinite(matraIndex) ? matraIndex : 0);
   };
 

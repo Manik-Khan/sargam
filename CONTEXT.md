@@ -1,6 +1,6 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-08-07, after the graph-grid and release-stabilization pass. The July 30 product rulings below remain binding.
+**Updated:** 2026-08-07, after the direct Grid Write and release-stabilization pass. The July 30 product rulings below remain binding.
 
 **What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with `SARGAM_NEXT_SESSION_CONTEXT_2026-07-30_PRINT_PLAYER_CHECKPOINT.md`, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
@@ -9,11 +9,12 @@ Manik is the musical and product authority. Never invent raga, tala, bol, orname
 ## August 7 stabilization note
 
 - **Graph Grid** is the existing Rhythm Grid developed into a clearer working surface: every rendered matra is a fixed graph-paper cell, carries its tala-matra coordinate and subdivision count, and retains a visible selected-cell state while its Markdown source line remains authoritative.
+- **Grid Write** is the companion direct editor. It exposes one input box per written matra, rewrites only the corresponding Markdown music line, updates the score and playback model immediately, keeps invalid/incomplete drafts out of the source, and supports adding a matra to an existing line. Text Write remains available for headings, attachment lines, and broader structural edits.
 - The graph-grid preference and the PDF page, typeface, grid, and ink choices persist locally.
 - `docs/release-checklist.md` is now the repeatable writing, playback, print, and restoration acceptance gate.
 - Stale numbered copies and committed Finder metadata were removed. Do not restore them.
-- Verification at this checkpoint: **560 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
-- The next notation increment may map a selected matra to an exact Markdown token range, but it must be built from an explicit parser source map rather than guessing at spaces or ornaments.
+- Verification at this checkpoint: **567 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
+- Any future richer direct manipulation—deleting or reordering cells, creating whole lines, or editing attachment lanes—must continue to use parser-backed source identities rather than guessing at spaces or ornaments.
 
 ## Authoritative current state — 2026-07-30
 

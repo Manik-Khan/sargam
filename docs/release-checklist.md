@@ -17,6 +17,9 @@ The command must end with every smoke check passing and a successful production 
 - Confirm the active score line remains at the same visual height while the notation reflows.
 - Click a rendered matra and confirm its Markdown source line is selected and centered.
 - Turn **Graph Grid** on. Confirm each matra has one cell, its tala-matra coordinate is visible, subdivisions stay inside the cell, and the selected cell remains highlighted after an edit.
+- Switch to **Grid Write**. Change a note, enter a spaced subdivision such as `S R`, add a hold or rest, and append one matra. Confirm the Markdown-backed score and playback duration update immediately.
+- Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
+- Switch between Text Write and Grid Write and reload once. Confirm the chosen writing surface persists and headings or attachment lines remain unchanged.
 - Resize the score/editor divider and confirm neither surface jumps to another line.
 
 ## Playback

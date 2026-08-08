@@ -84,6 +84,7 @@ import DictateBar from './DictateBar.jsx';
 import CommandBar from './CommandBar.jsx';
 import Legend from './Legend.jsx';
 import EditorPane from './EditorPane.jsx';
+import GridEditor from './GridEditor.jsx';
 import PreviewPane from './PreviewPane.jsx';
 import Toolbar from './Toolbar.jsx';
 import WorkspaceRail from './WorkspaceRail.jsx';
@@ -184,6 +185,10 @@ export default function App() {
   const [rhythmGrid, setRhythmGrid] = useState(() =>
     store.getPref('rhythmGrid', false) === true
   );
+  const [writeMode, setWriteMode] = useState(() =>
+    store.getPref('writeMode', 'text') === 'grid' ? 'grid' : 'text'
+  );
+  const [gridSelection, setGridSelection] = useState(null);
   const [selectedMarkId, setSelectedMarkId] = useState(null);
   const [bolCapture, setBolCapture] = useState(null);
   const [bolMessage, setBolMessage] = useState('');
@@ -1799,6 +1804,19 @@ export default function App() {
     store.setPref('rhythmGrid', value);
   };
 
+  const changeWriteMode = (value) => {
+    const next = value === 'grid' ? 'grid' : 'text';
+    setWriteMode(next);
+    store.setPref('writeMode', next);
+    if (next === 'grid' && !rhythmGrid) changeRhythmGrid(true);
+  };
+
+  const selectGridWriterCell = (sourceLine, matraIndex) => {
+    setActiveLine(sourceLine);
+    setGridSelection({ sourceLine, matraIndex });
+    setPosition(timeFor(schedule, sourceLine, matraIndex));
+  };
+
   return (
     <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
       {showExport && (
@@ -2005,6 +2023,8 @@ export default function App() {
             selectedAudioLinkId={selectedAudioLinkId}
             onActivateAudioLink={activateAudioLink}
             rhythmGrid={rhythmGrid}
+            gridSelection={gridSelection}
+            onGridSelection={setGridSelection}
             followEditing={followEditing}
             followPlayback={followPlayback}
           
@@ -2031,6 +2051,20 @@ export default function App() {
             <span aria-hidden="true" />
           </button>
           <div className="app-editor-col">
+            <div className="app-write-mode" role="group" aria-label="Notation writing mode">
+              <button
+                type="button"
+                className={writeMode === 'text' ? 'active' : ''}
+                aria-pressed={writeMode === 'text'}
+                onClick={() => changeWriteMode('text')}
+              >Text Write</button>
+              <button
+                type="button"
+                className={writeMode === 'grid' ? 'active' : ''}
+                aria-pressed={writeMode === 'grid'}
+                onClick={() => changeWriteMode('grid')}
+              >Grid Write</button>
+            </div>
             <CommandBar
             onApply={doCommand}
             anchorTool={anchorTool}
@@ -2043,18 +2077,27 @@ export default function App() {
             rhythmGrid={rhythmGrid}
             onRhythmGrid={changeRhythmGrid}
           />
-            <EditorPane
-              text={text}
-              onChange={setText}
-              onCursorLine={syncSourceLineFromEditor}
-              onCursorPos={setCursorPos}
-              onBeforeEdit={doEditorBeforeEdit}
-              bolCapture={bolCapture}
-              bolMessage={bolMessage}
-              onToggleBolCapture={doToggleBolCapture}
-              onBolCaptureKey={doBolCaptureKey}
-              editorRef={editorRef}
-            />
+            {writeMode === 'grid' ? (
+              <GridEditor
+                text={text}
+                doc={doc}
+                onChange={setText}
+                onCellFocus={selectGridWriterCell}
+              />
+            ) : (
+              <EditorPane
+                text={text}
+                onChange={setText}
+                onCursorLine={syncSourceLineFromEditor}
+                onCursorPos={setCursorPos}
+                onBeforeEdit={doEditorBeforeEdit}
+                bolCapture={bolCapture}
+                bolMessage={bolMessage}
+                onToggleBolCapture={doToggleBolCapture}
+                onBolCaptureKey={doBolCaptureKey}
+                editorRef={editorRef}
+              />
+            )}
           </div>
         </div>
         <aside className="workspace-quote" aria-label="Listening note">

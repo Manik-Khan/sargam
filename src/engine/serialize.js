@@ -83,7 +83,7 @@ export function serializeDocument(doc) {
 // Music lines
 // ---------------------------------------------------------------------------
 
-function serializeMusicLine(line, tal) {
+export function serializeMusicLine(line, tal) {
   // 1. Token items, each covering a matra range (holds cover several).
   const items = [];
   let k = 0;
@@ -97,6 +97,42 @@ function serializeMusicLine(line, tal) {
       k++;
     }
   }
+
+  decorateMusicItems(line, items);
+  return assembleMusicItems(line, tal, items);
+}
+
+/**
+ * One editable graph-paper token per written matra. Unlike the canonical text
+ * serializer this deliberately expands `_` into its individual held beats so
+ * every visible cell has one independently editable source value.
+ */
+export function serializeGridCells(line, tal) {
+  const items = line.matras.map((_, matraIndex) => ({
+    text: matraToken(line, matraIndex),
+    from: matraIndex,
+    to: matraIndex,
+  }));
+  decorateMusicItems(line, items);
+  return items.map((item, matraIndex) => ({
+    matraIndex,
+    text: item.text,
+    joinNext: item.joinNext || ' ',
+  }));
+}
+
+/** Reassemble one music source line from graph-paper cells. */
+export function serializeGridLine(line, tal, cells) {
+  const items = (cells || []).map((cell, matraIndex) => ({
+    text: String(cell?.text ?? '').trim(),
+    from: matraIndex,
+    to: matraIndex,
+    joinNext: cell?.joinNext || ' ',
+  }));
+  return assembleMusicItems(line, tal, items);
+}
+
+function decorateMusicItems(line, items) {
 
   // 2. Cross-matra meend: trailing ~ on the from matra's token.
   for (const span of line.spans) {
@@ -138,7 +174,9 @@ function serializeMusicLine(line, tal) {
     items[ai].text = '[[' + items[ai].text;
     items[bi].text = items[bi].text + ']]';
   }
+}
 
+function assembleMusicItems(line, tal, items) {
   // 6. Assemble with derived bars and an explicit |1 first-ending boundary.
   const parts = [];
   for (let i = 0; i < items.length; i++) {

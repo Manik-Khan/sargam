@@ -931,6 +931,144 @@
 /* ---- M4: command bar + legend (M, 2026-07-16) ---- */
 .app-editor-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .app-editor-col .app-editor { flex: 1; min-height: 0; height: auto; width: 100%; }
+.app-write-mode {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--sr-line);
+  background: color-mix(in srgb, var(--sr-paper-raised) 92%, var(--sr-accent));
+}
+.app-write-mode button {
+  border: 1px solid var(--sr-line);
+  border-radius: 4px;
+  padding: 4px 9px;
+  background: transparent;
+  color: var(--sr-ink);
+  font: 700 11px/1.2 ui-sans-serif, system-ui, sans-serif;
+}
+.app-write-mode button.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
+
+.app-grid-writer {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--sr-paper-raised);
+}
+.app-grid-writer-help {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--sr-line);
+  color: var(--sr-ink-soft);
+  font: 11px/1.35 ui-sans-serif, system-ui, sans-serif;
+}
+.app-grid-writer-help strong { color: var(--sr-ink); font-size: 12px; }
+.app-grid-writer-help code { color: var(--sr-ink); font-size: 11px; }
+.app-grid-writer-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 11px 12px 56px; }
+.app-grid-writer-section {
+  margin: 12px 0 5px;
+  color: var(--sr-ink-soft);
+  font: 800 11px/1.2 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.app-grid-writer-section:first-child { margin-top: 0; }
+.app-grid-writer-line {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.app-grid-writer-line-label {
+  display: flex;
+  flex-direction: column;
+  padding-top: 5px;
+  color: var(--sr-ink-soft);
+  font: 700 10px/1.25 ui-sans-serif, system-ui, sans-serif;
+}
+.app-grid-writer-line-label small { font-weight: 500; opacity: 0.72; }
+.app-grid-writer-cells { display: flex; min-width: 0; flex-wrap: wrap; align-items: stretch; gap: 0; }
+.app-grid-write-cell {
+  position: relative;
+  display: flex;
+  width: 5.1rem;
+  min-height: 4.35rem;
+  flex-direction: column;
+  margin: 0 -1px -1px 0;
+  border: 1px solid color-mix(in srgb, var(--sr-accent) 42%, var(--sr-line));
+  background: color-mix(in srgb, var(--sr-accent) 4%, transparent);
+}
+.app-grid-write-coordinate {
+  display: flex;
+  min-height: 1.2rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 5px 1px;
+  color: var(--sr-accent);
+  font: 800 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.app-grid-write-coordinate i { color: var(--sr-ink-soft); font-style: normal; opacity: 0.72; }
+.app-grid-write-cell input {
+  width: 100%;
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  padding: 5px 4px 8px;
+  background: transparent;
+  color: var(--sr-ink);
+  font: 17px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+}
+.app-grid-write-cell:focus-within {
+  z-index: 3;
+  border-color: var(--sr-accent);
+  background: color-mix(in srgb, var(--sr-accent) 14%, var(--sr-paper-raised));
+  box-shadow: inset 0 0 0 1px var(--sr-accent), 0 0 0 2px color-mix(in srgb, var(--sr-accent) 24%, transparent);
+}
+.app-grid-write-cell.is-invalid {
+  z-index: 2;
+  border-color: var(--sr-alert);
+  background: color-mix(in srgb, var(--sr-alert) 8%, var(--sr-paper-raised));
+}
+.app-grid-write-add {
+  display: grid;
+  width: 5.8rem;
+  min-height: 4.35rem;
+  grid-template-rows: 1fr auto;
+  border: 1px dashed color-mix(in srgb, var(--sr-accent) 46%, var(--sr-line));
+  background: color-mix(in srgb, var(--sr-accent) 3%, transparent);
+}
+.app-grid-write-add input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 5px;
+  background: transparent;
+  color: var(--sr-ink);
+  font: 14px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+}
+.app-grid-write-add button {
+  border: 0;
+  border-top: 1px dashed var(--sr-line);
+  padding: 4px;
+  background: transparent;
+  color: var(--sr-accent);
+  font: 800 10px/1.2 ui-sans-serif, system-ui, sans-serif;
+}
+.app-grid-writer-message {
+  flex: 0 0 auto;
+  min-height: 1.8rem;
+  padding: 6px 10px;
+  border-top: 1px solid var(--sr-line);
+  color: var(--sr-ink-soft);
+  font: 11px/1.3 ui-sans-serif, system-ui, sans-serif;
+}
+.app-grid-writer-empty { padding: 18px; color: var(--sr-ink-soft); font-size: 13px; }
 .cmdbar {
   display: flex; gap: 4px; flex-wrap: wrap;
   padding: 5px 8px;

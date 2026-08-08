@@ -54,7 +54,7 @@ export const smokes = [
       const preview = await readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
       assert.match(app, /getPref\('rhythmGrid', false\)/);
       assert.match(app, /setPref\('rhythmGrid', value\)/);
-      assert.match(preview, /setGridSelection\(rhythmGridIdentity\(cell\)\)/);
+      assert.match(preview, /onGridSelection\?\.\(rhythmGridIdentity\(cell\)\)/);
       assert.match(preview, /aria-label=\{rhythmGrid \? 'Graph-paper matra grid'/);
     },
   },
