@@ -106,6 +106,8 @@ export const smokes = [
       assert.match(source, /SCORE_GUTTER_EM = 2/);
       assert.match(source, /const score = el\.querySelector\('\.sr-export'\) \|\| el;/);
       assert.match(source, /const fontSize = Number\.parseFloat\(scoreStyle\.fontSize\) \|\| 15;/);
+      assert.match(source, /querySelector\('\.sr-paper-tail'\)/);
+      assert.match(source, /tailRect\?\.left \?\? rowRect\.right/);
       assert.match(source, /aria-label="PDF page color"/);
       assert.match(source, /aria-label="PDF typeface"/);
       assert.match(source, /aria-label="PDF notation grid"/);
@@ -151,12 +153,14 @@ export const smokes = [
       assert.match(css, /grid-template-columns:\s*repeat\(var\(--sr-written-slots\), minmax\(0, 1fr\)\) !important;/);
       assert.match(css, /\.app-export-grid \.sr-ornament-graces\s*\{[^}]*position:\s*absolute;/s);
       assert.match(css, /\.app-rhythm-grid \.sr-ornament-graces,[\s\S]*?right:\s*calc\(50% \+ 0\.14em\);[\s\S]*?bottom:\s*0\.76em;/s);
-      assert.match(css, /\.app-rhythm-grid-paper,[\s\S]*?background-image:[\s\S]*?linear-gradient/s);
-      assert.match(css, /\.app-export-grid-paper \.app-export-paper/);
+      assert.match(css, /\.app-rhythm-grid-paper \.sr-paper-tail,[\s\S]*?background-image:\s*linear-gradient/s);
+      assert.match(css, /--sr-paper-tail:\s*minmax\(0, 1fr\)/);
+      assert.match(css, /\.app-grid-writer-paper \.app-grid-writer-cells\s*\{[^}]*background-image:/s);
       assert.match(css, /\.app-export\.app-export-monochrome\s*\{[^}]*--sr-ink:\s*#080808;[^}]*--sr-dim:\s*#363636;[^}]*--sr-cool:\s*#252525;/s);
       assert.match(css, /\.app-export-monochrome \.sr-sustain \.sr-ch::after\s*\{[^}]*border-top-width:\s*1\.7px;/s);
       assert.match(render, /--sr-written-slots/);
       assert.match(render, /sr-ornament-graces/);
+      assert.match(render, /sr-paper-tail/);
       assert.match(css, /\.sr-export \.sr-line-group\s*\{[^}]*break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.app-root\.is-exporting\s*\{[^}]*display:\s*block !important;[^}]*height:\s*auto !important;[^}]*overflow:\s*visible !important;/s);
       assert.match(css, /\.app-export-scroll\s*\{[^}]*display:\s*block !important;[^}]*overflow:\s*visible !important;/s);

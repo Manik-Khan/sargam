@@ -224,6 +224,12 @@ function renderLineBlock(line, tal, ctx) {
   if (line.passthrough.length > 0) {
     for (let i = 0; i < line.passthrough.length; i++) cols.push('max-content');
   }
+  const contentColumnCount = cols.length;
+  // Paper mode turns the otherwise blank remainder of a system into empty
+  // matra-sized boxes. The zero-width tail is inert in every other view;
+  // CSS gives it the remaining row width only on the Paper surface.
+  cols.push('var(--sr-paper-tail, 0px)');
+  const paperTailCol = cols.length;
   row.style.gridTemplateColumns = cols.join(' ');
 
   // --- over-arc lane (grid row 1)
@@ -334,13 +340,19 @@ function renderLineBlock(line, tal, ctx) {
   }
 
   // --- passthrough: dimmed literal text (spec: diagnostics render in place)
-  let ptCol = cols.length - line.passthrough.length + 1;
+  let ptCol = contentColumnCount - line.passthrough.length + 1;
   for (const pt of line.passthrough) {
     const el = h('div', 'sr-passthrough sr-dim', pt.text);
     el.style.gridRow = '2';
     el.style.gridColumn = String(ptCol++);
     row.appendChild(el);
   }
+
+  const paperTail = h('div', 'sr-paper-tail');
+  paperTail.setAttribute('aria-hidden', 'true');
+  paperTail.style.gridRow = '2';
+  paperTail.style.gridColumn = String(paperTailCol);
+  row.appendChild(paperTail);
 
   // --- lyric row (grid row 3)
   for (const lyr of line.lyrics) {

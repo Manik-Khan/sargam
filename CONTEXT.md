@@ -10,11 +10,11 @@ Manik is the musical and product authority. Never invent raga, tala, bol, orname
 
 - **Graph Grid** is the existing Rhythm Grid developed into a clearer working surface: every rendered matra is a fixed graph-paper cell, carries its tala-matra coordinate and subdivision count, and retains a visible selected-cell state while its Markdown source line remains authoritative.
 - **Grid Write** is the companion direct editor. It exposes one input box per written matra, rewrites only the corresponding Markdown music line, updates the score and playback model immediately, keeps invalid/incomplete drafts out of the source, and supports adding a matra to an existing line. Text Write remains available for headings, attachment lines, and broader structural edits.
-- Grid users can persist either **Cells** (the original blank-paper boxes) or **Paper** (a continuous fine graph-paper field) across both the rendered score and Grid Write. PDF export separately offers Clean, Matra cells, and Graph paper. Compact kan graces sit upper-left of their destination rather than colliding with tala coordinates.
+- Grid users can persist either **Cells** (only written matras are boxed) or **Paper** (each musical row continues through unused width with empty matra-sized boxes; those boxes are the graph paper) across both the rendered score and Grid Write. PDF export separately offers Clean, Matra cells, and Graph paper. Compact kan graces sit upper-left of their destination, and tala markers remain inset in the cell's upper-left coordinate lane instead of following delayed attacks into vibhag dividers.
 - The graph-grid preference and the PDF page, typeface, grid, and ink choices persist locally.
 - `docs/release-checklist.md` is now the repeatable writing, playback, print, and restoration acceptance gate.
 - Stale numbered copies and committed Finder metadata were removed. Do not restore them.
-- Verification at this checkpoint: **567 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
+- Verification at this checkpoint: **568 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
 - Any future richer direct manipulation—deleting or reordering cells, creating whole lines, or editing attachment lanes—must continue to use parser-backed source identities rather than guessing at spaces or ornaments.
 
 ## Authoritative current state — 2026-07-30

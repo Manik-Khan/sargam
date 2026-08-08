@@ -2135,6 +2135,15 @@
   font: 700 0.58em/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   pointer-events: none;
 }
+.app-rhythm-grid .sr-marker,
+.app-export-grid .sr-marker {
+  width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+  padding-inline: 0.28em;
+  text-align: left;
+  transform: none !important;
+}
 .app-rhythm-grid .sr-cell:has(.sr-marker:not(:empty)) {
   background: color-mix(in srgb, var(--sr-accent) 8%, transparent);
 }
@@ -2205,47 +2214,56 @@
   box-shadow: inset 0 0 0 1px var(--sr-accent), 0 0 0 2px color-mix(in srgb, var(--sr-accent) 24%, transparent);
 }
 
-/* Optional continuous graph-paper surface. Matra boundaries remain musical,
-   while the page behind them becomes one uninterrupted writing field. */
-.app-rhythm-grid-paper,
-.app-grid-writer-paper .app-grid-writer-scroll,
-.app-export-grid-paper .app-export-paper {
-  --sr-graph-minor: color-mix(in srgb, var(--sr-accent) 12%, transparent);
-  --sr-graph-major: color-mix(in srgb, var(--sr-accent) 21%, transparent);
-  background-color: var(--sr-paper-raised);
-  background-image:
-    linear-gradient(to right, var(--sr-graph-major) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--sr-graph-major) 1px, transparent 1px),
-    linear-gradient(to right, var(--sr-graph-minor) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--sr-graph-minor) 1px, transparent 1px);
-  background-size: 4.8rem 4.8rem, 4.8rem 4.8rem, 1.2rem 1.2rem, 1.2rem 1.2rem;
+/* In Paper mode the matra boxes are the graph paper. Existing cells become
+   transparent members of one continuous row; a flexible visual-only tail
+   continues the same cell boundaries through the unused system width. */
+.sr-paper-tail { min-width: 0; align-self: stretch; pointer-events: none; }
+.app-rhythm-grid-paper .sr-row,
+.app-export-grid-paper .sr-row {
+  --sr-paper-tail: minmax(0, 1fr);
+  width: 100%;
 }
-.app-export-grid-paper .app-export-paper {
-  background-color: var(--sr-export-paper, #fff);
+.app-rhythm-grid-paper .sr-paper-tail,
+.app-export-grid-paper .sr-paper-tail {
+  --sr-paper-cell-width: 3.15em;
+  min-height: 5.25em;
+  border-block: 1px solid color-mix(in srgb, var(--sr-accent) 34%, transparent);
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--sr-accent) 34%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: var(--sr-paper-cell-width) 100%;
+}
+.app-export-grid-paper .sr-paper-tail {
+  --sr-paper-cell-width: 2.65em;
+  min-height: 4.25em;
 }
 .app-rhythm-grid-paper .sr-cell,
 .app-rhythm-grid-paper .sr-cell:has(.sr-marker:not(:empty)),
 .app-export-grid-paper .sr-cell,
-.app-export-grid-paper .sr-export .sr-cell:has(.sr-sustain),
-.app-grid-writer-paper .app-grid-write-cell,
-.app-grid-writer-paper .app-grid-write-add {
-  background-color: color-mix(in srgb, var(--sr-paper-raised) 62%, transparent);
+.app-export-grid-paper .sr-export .sr-cell:has(.sr-sustain) {
+  background-color: transparent;
 }
 .app-rhythm-grid-paper .sr-source-active {
   background-color: color-mix(in srgb, var(--sr-accent) 5%, transparent);
 }
-@media print {
-  .app-export-grid-paper .app-export-paper {
-    background-color: transparent !important;
-    background-image:
-      linear-gradient(to right, var(--sr-graph-major) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--sr-graph-major) 1px, transparent 1px),
-      linear-gradient(to right, var(--sr-graph-minor) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--sr-graph-minor) 1px, transparent 1px) !important;
-    background-size: 4.8rem 4.8rem, 4.8rem 4.8rem, 1.2rem 1.2rem, 1.2rem 1.2rem !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+.app-grid-writer-paper .app-grid-writer-scroll { background: var(--sr-paper-raised); }
+.app-grid-writer-paper .app-grid-writer-cells {
+  min-height: 4.35rem;
+  align-content: flex-start;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--sr-accent) 42%, var(--sr-line)) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--sr-accent) 42%, var(--sr-line)) 1px, transparent 1px);
+  background-size: 5.1rem 4.35rem;
+}
+.app-grid-writer-paper .app-grid-write-cell,
+.app-grid-writer-paper .app-grid-write-add {
+  width: 5.1rem;
+  min-height: 4.35rem;
+  margin: 0;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--sr-paper-raised) 74%, transparent);
 }
 .sr-rhythm-grid-layer {
   position: absolute;

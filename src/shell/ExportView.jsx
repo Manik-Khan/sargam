@@ -79,6 +79,7 @@ function measureLine(line, group) {
 
   const rowRect = row.getBoundingClientRect();
   const rects = cells.map((cell) => cell.getBoundingClientRect());
+  const tailRect = group?.querySelector('.sr-paper-tail')?.getBoundingClientRect();
   const fontSize = Number.parseFloat(getComputedStyle(row).fontSize) || 16;
 
   if (rowRect.width <= 0 || rects.some((rect) => rect.width <= 0)) return null;
@@ -91,7 +92,7 @@ function measureLine(line, group) {
   return {
     widths,
     prefixEm: Math.max(0, (rects[0].left - rowRect.left) / fontSize),
-    suffixEm: Math.max(0, (rowRect.right - rects.at(-1).right) / fontSize),
+    suffixEm: Math.max(0, ((tailRect?.left ?? rowRect.right) - rects.at(-1).right) / fontSize),
   };
 }
 

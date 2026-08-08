@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { parseDocument } from '../src/engine/parse.js';
 import { renderDocument } from '../src/engine/render.js';
+import { alignTalaMarkers } from '../src/shell/anchor-overlay.js';
 import {
   decorateRhythmGrid,
   rhythmGridIdentity,
@@ -25,9 +26,24 @@ export const smokes = [
   {
     name: 'rhythm grid UI: every cell carries tala and subdivision coordinates',
     fn() {
-      const cells = [...gridCorpus().querySelectorAll('.sr-cell')];
+      const root = gridCorpus();
+      const cells = [...root.querySelectorAll('.sr-cell')];
       assert.deepEqual(cells.map((cell) => cell.dataset.cycleMatra), ['1', '2', '3']);
       assert.deepEqual(cells.map((cell) => cell.dataset.gridSubdivisions), ['1', '2', '1']);
+      assert.equal(root.querySelectorAll('.sr-paper-tail').length, 1);
+    },
+  },
+  {
+    name: 'rhythm grid UI: tala markers stay in their coordinate lane instead of colliding with dividers',
+    fn() {
+      const root = gridCorpus();
+      root.classList.add('app-rhythm-grid');
+      const marker = root.querySelector('.sr-marker:not(:empty)');
+      marker.style.setProperty('--sr-marker-shift', '99px');
+      marker.classList.add('sr-marker-on-boundary');
+      alignTalaMarkers(root);
+      assert.equal(marker.style.getPropertyValue('--sr-marker-shift'), '');
+      assert.equal(marker.classList.contains('sr-marker-on-boundary'), false);
     },
   },
   {

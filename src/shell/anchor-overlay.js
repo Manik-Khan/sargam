@@ -76,11 +76,19 @@ function findTarget(root, endpoint) {
 }
 
 export function alignTalaMarkers(root) {
+  const fixedGridMarkers = Boolean(
+    root?.matches?.('.app-rhythm-grid, .app-export-grid') ||
+    root?.closest?.('.app-rhythm-grid, .app-export-grid')
+  );
   for (const cell of root.querySelectorAll('.sr-cell')) {
     const marker = cell.querySelector(':scope > .sr-marker');
     if (!marker || !marker.textContent.trim()) continue;
     marker.style.removeProperty('--sr-marker-shift');
     marker.classList.remove('sr-marker-on-boundary');
+    // In a grid, the tala mark labels the complete matra box. Keep it in the
+    // cell's upper-left coordinate lane instead of chasing a delayed attack
+    // toward a vibhag divider (for example the reported squeezed green 2s).
+    if (fixedGridMarkers) continue;
     const firstTimedSlot = cell.querySelector('.sr-timed-slots > .sr-slot');
     const attack = firstTimedSlot?.querySelector('.sr-note:not(.sr-grace)') ? firstTimedSlot : null;
     const cellRect = cell.getBoundingClientRect();

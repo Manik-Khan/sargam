@@ -20,7 +20,8 @@ The command must end with every smoke check passing and a successful production 
 - Switch to **Grid Write**. Change a note, enter a spaced subdivision such as `S R`, add a hold or rest, and append one matra. Confirm the Markdown-backed score and playback duration update immediately.
 - Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
 - Switch between Text Write and Grid Write and reload once. Confirm the chosen writing surface persists and headings or attachment lines remain unchanged.
-- Toggle the grid look between **Cells** and **Paper**. Confirm Paper fills the unused score and editor surface continuously, the choice survives reload, and a kan such as `{m}g` remains legible without touching the tala coordinate.
+- Toggle the grid look between **Cells** and **Paper**. Confirm Paper continues each musical row through unused width with empty matra-sized boxes (no smaller background grid), the choice survives reload, and a kan such as `{m}g` remains legible.
+- On lines with delayed attacks or leading holds, confirm `0`, `1`, `2`, `3`, and `+` tala markers remain inset at the upper-left of their cells and never overlap a vibhag divider, repeat sign, octave dot, or ornament.
 - Resize the score/editor divider and confirm neither surface jumps to another line.
 
 ## Playback
