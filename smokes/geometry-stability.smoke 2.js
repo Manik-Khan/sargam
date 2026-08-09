@@ -67,25 +67,19 @@ export const smokes = [
     },
   },
   {
-    name: 'geometry stability: repeats receive structural columns outside the matra grid',
+    name: 'geometry stability: repeats share note height outside an unchanged grid',
     fn() {
       const root = renderDocument(parsed('---\ntal: jhaptal\n---\n\nGat\n@1 ||: S R G m :||\n@1 S R G m'));
       const groups = [...root.querySelectorAll('.sr-line-group')];
       const repeatedRow = groups[0].querySelector('.sr-row');
       const plainRow = groups[1].querySelector('.sr-row');
       const cells = [...groups[0].querySelectorAll('.sr-cell')];
-      const open = groups[0].querySelector('.sr-line-repeat-open');
-      const close = groups[0].querySelector('.sr-line-repeat-close');
-      assert.equal(open.parentElement, repeatedRow);
-      assert.equal(close.parentElement, repeatedRow);
-      assert.equal(cells[0].contains(open), false);
-      assert.equal(cells.at(-1).contains(close), false);
-      assert.equal(open.dataset.repeatBoundary, 'open');
-      assert.equal(close.dataset.repeatBoundary, 'close');
-      assert.notEqual(repeatedRow.style.gridTemplateColumns, plainRow.style.gridTemplateColumns);
-      assert.equal(open.style.gridColumn, '1');
-      assert.equal(cells[0].style.gridColumn, '2');
-      assert.equal(Number(close.style.gridColumn) > Number(cells.at(-1).style.gridColumn), true);
+      const open = groups[0].querySelector('.sr-repeat-open');
+      const close = groups[0].querySelector('.sr-repeat-close');
+      assert.equal(open.parentElement, cells[0].querySelector(':scope > .sr-glyphs'));
+      assert.equal(close.parentElement, cells.at(-1).querySelector(':scope > .sr-glyphs'));
+      assert.ok(open.classList.contains('sr-ev') && close.classList.contains('sr-ev'));
+      assert.equal(repeatedRow.style.gridTemplateColumns, plainRow.style.gridTemplateColumns);
     },
   },
 ];

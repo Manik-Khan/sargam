@@ -206,48 +206,6 @@ export function bolCursorSelection(text, cursor) {
   return { from: at, to: at };
 }
 
-function beginBolCaptureOnSourceLine(text, sourceLine, ordinal = 0) {
-  const info = attacksForLine(text, sourceLine);
-  if (info.error || info.attacks.length === 0) {
-    return {
-      ok: false,
-      text,
-      cursor: null,
-      message: info.error
-        ? `Bol Capture cannot use this line: ${info.error}`
-        : 'Place the text cursor on a music line before starting Bol Capture.',
-    };
-  }
-
-  const migrated = migrateBolAnchors(text, sourceLine);
-  if (!migrated.ok) return { ...migrated, cursor: null };
-  const lane = structuralLane(migrated.text, sourceLine);
-  if (!lane) return { ok: false, text: migrated.text, cursor: null, message: 'The active music line no longer exists.' };
-  const formatted = formatBolLane(lane.musicLine, lane.parsed.assignments, lane.parsed.coveredBy);
-  const ready = writeBolLane(migrated.text, sourceLine, formatted.text);
-  if (!ready.ok) return { ...ready, cursor: null };
-  const safeOrdinal = Math.max(0, Math.min(info.attacks.length - 1, Number(ordinal) || 0));
-  const cursor = { sourceLine, ordinal: safeOrdinal };
-  return {
-    ok: true,
-    text: ready.text,
-    cursor,
-    selection: bolCursorSelection(ready.text, cursor),
-    message: migrated.count
-      ? `Bol Capture ready. Moved ${migrated.count} existing bol mark${migrated.count === 1 ? '' : 's'} into the editable > line.`
-      : `Bol Capture ready on the editable > line. ${captureStatus(info.attacks.length, safeOrdinal)}`,
-  };
-}
-
-/** Begin capture from a graph/grid attack without relying on a text caret. */
-export function beginBolCaptureAt(text, sourceLine, ordinal = 0) {
-  const lineNumber = Number(sourceLine);
-  if (!Number.isInteger(lineNumber) || lineNumber < 1) {
-    return { ok: false, text, cursor: null, message: 'Choose a notation attack before starting Bol Capture.' };
-  }
-  return beginBolCaptureOnSourceLine(text, lineNumber, ordinal);
-}
-
 export function beginBolCapture(text, position) {
   const line = sourceLineAtPosition(text, position);
   let sourceLine = line.sourceLine;
@@ -274,7 +232,24 @@ export function beginBolCapture(text, position) {
         : 'Place the text cursor on a music line before starting Bol Capture.',
     };
   }
-  return beginBolCaptureOnSourceLine(text, sourceLine, 0);
+
+  const migrated = migrateBolAnchors(text, sourceLine);
+  if (!migrated.ok) return { ...migrated, cursor: null };
+  const lane = structuralLane(migrated.text, sourceLine);
+  if (!lane) return { ok: false, text: migrated.text, cursor: null, message: 'The active music line no longer exists.' };
+  const formatted = formatBolLane(lane.musicLine, lane.parsed.assignments, lane.parsed.coveredBy);
+  const ready = writeBolLane(migrated.text, sourceLine, formatted.text);
+  if (!ready.ok) return { ...ready, cursor: null };
+  const cursor = { sourceLine, ordinal: 0 };
+  return {
+    ok: true,
+    text: ready.text,
+    cursor,
+    selection: bolCursorSelection(ready.text, cursor),
+    message: migrated.count
+      ? `Bol Capture ready. Moved ${migrated.count} existing bol mark${migrated.count === 1 ? '' : 's'} into the editable > line.`
+      : `Bol Capture ready on the editable > line. ${captureStatus(info.attacks.length, 0)}`,
+  };
 }
 
 function rangesOverlap(aFrom, aTo, bFrom, bTo) {
@@ -380,54 +355,6 @@ export function setBolAtCursor(text, cursor, kind) {
     cursor: nextCursor,
     selection: bolCursorSelection(written.text, nextCursor),
     message: `${kind === 'diri' ? 'Diri' : kind} written to bol pass ${pass}. ${captureStatus(info.attacks.length, nextOrdinal)}`,
-  };
-}
-
-/** Apply a bol directly from a grid cell menu. This deliberately has no
- * capture lifecycle: the clicked attack is the complete selection. */
-export function setBolAtAttack(text, sourceLine, ordinal, kind, pass = 1) {
-  const ready = beginBolCaptureAt(text, sourceLine, ordinal);
-  if (!ready.ok) return ready;
-  const targetPass = Math.max(1, Number(pass) || 1);
-  let nextText = ready.text;
-  if (targetPass > 1) {
-    const switched = switchBolPass(nextText, ready.cursor, targetPass);
-    if (!switched.ok) return switched;
-    nextText = switched.text;
-  }
-  const cursor = targetPass > 1
-    ? { sourceLine: Number(sourceLine), ordinal: Number(ordinal), pass: targetPass }
-    : { sourceLine: Number(sourceLine), ordinal: Number(ordinal) };
-  const written = setBolAtCursor(nextText, cursor, kind);
-  if (!written.ok) return written;
-  return {
-    ...written,
-    message: `${kind === 'diri' ? 'Diri' : kind} attached to note ${Number(ordinal) + 1} on source line ${Number(sourceLine)}.`,
-  };
-}
-
-/** Remove the bol attached to one clicked grid attack without entering
- * capture mode. */
-export function removeBolAtAttack(text, sourceLine, ordinal, pass = 1) {
-  const ready = beginBolCaptureAt(text, sourceLine, ordinal);
-  if (!ready.ok) return ready;
-  const targetPass = Math.max(1, Number(pass) || 1);
-  let nextText = ready.text;
-  if (targetPass > 1) {
-    const switched = switchBolPass(nextText, ready.cursor, targetPass);
-    if (!switched.ok) return switched;
-    nextText = switched.text;
-  }
-  const cursor = targetPass > 1
-    ? { sourceLine: Number(sourceLine), ordinal: Number(ordinal), pass: targetPass }
-    : { sourceLine: Number(sourceLine), ordinal: Number(ordinal) };
-  const removed = removeBolAtCursor(nextText, cursor);
-  if (!removed.ok) return removed;
-  return {
-    ...removed,
-    message: removed.message.startsWith('No bol')
-      ? removed.message
-      : `Bol removed from note ${Number(ordinal) + 1} on source line ${Number(sourceLine)}.`,
   };
 }
 

@@ -101,12 +101,7 @@ import {
   postVilambitCommand,
 } from './vilambit-bridge.js';
 import { BAGESHRI_STARTER } from '../examples/bageshri.js';
-import {
-  applyBolCaptureKey,
-  beginBolCapture,
-  removeBolAtAttack,
-  setBolAtAttack,
-} from '../engine/bol-capture.js';
+import { applyBolCaptureKey, beginBolCapture } from '../engine/bol-capture.js';
 import './sargam.css';
 
 const STARTER = BAGESHRI_STARTER;
@@ -746,24 +741,6 @@ export default function App() {
     setBolCapture(result.cursor);
     setActiveLine(result.cursor.sourceLine);
     editorRef.current?.focus();
-  };
-
-  const doApplyGridBol = ({ sourceLine, ordinal, kind }) => {
-    const currentText = textRef.current;
-    const result = kind
-      ? setBolAtAttack(currentText, sourceLine, ordinal, kind)
-      : removeBolAtAttack(currentText, sourceLine, ordinal);
-    setBolMessage(result.message);
-    if (!result.ok) return false;
-    if (result.text !== currentText) {
-      textRef.current = result.text;
-      setText(result.text);
-    }
-    bolCaptureRef.current = null;
-    setBolCapture(null);
-    setActiveLine(Number(sourceLine));
-    setSelectedMarkId(null);
-    return true;
   };
 
   const doBolCaptureKey = (key, event) => {
@@ -2119,8 +2096,6 @@ export default function App() {
                 onChange={setText}
                 onCellFocus={selectGridWriterCell}
                 gridStyle={rhythmGridStyle}
-                bolMessage={bolMessage}
-                onBolApply={doApplyGridBol}
               />
             ) : (
               <EditorPane

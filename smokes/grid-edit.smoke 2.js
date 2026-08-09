@@ -85,24 +85,6 @@ export const smokes = [
     },
   },
   {
-    name: 'grid write: each matra exposes its exact note attacks and attached bol pass',
-    fn() {
-      const rows = gridLines(parseDocument(SOURCE).doc);
-      const row = rows[0];
-      assert.deepEqual(row.cells.map((cell) => cell.attacks.map((attack) => attack.ordinal)), [
-        [0], [1], [2], [3], [4], [], [],
-      ]);
-      assert.equal(row.bolPasses[0].pass, 1);
-      assert.deepEqual(row.bolPasses[0].marks.map((mark) => mark.mark), ['da', 'ra', 'da', 'diri']);
-      assert.deepEqual(row.bolPasses[0].marks.at(-1), {
-        ordinal: 3,
-        toOrdinal: 4,
-        mark: 'diri',
-        rate: 1,
-      });
-    },
-  },
-  {
     name: 'grid write: shell exposes persistent Text Write and Grid Write modes',
     async fn() {
       const app = await readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
@@ -114,9 +96,6 @@ export const smokes = [
       assert.match(editor, /replaceGridCellToken/);
       assert.match(editor, /appendGridCellToken/);
       assert.match(editor, /One box = one matra/);
-      assert.match(editor, /beneath a note adds its bol/);
-      assert.match(editor, /app-grid-bol-menu/);
-      assert.match(editor, /kind: 'diri', label: 'diri'/);
     },
   },
 ];

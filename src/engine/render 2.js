@@ -20,7 +20,6 @@ import { DEFAULT_SA } from './schedule.js';
 import { planLineSystems } from './layout.js';
 import { buildLineGeometry } from './notation-geometry.js';
 import { performedOffsetAt } from './performed-time.js';
-import { buildBolPlan } from './bol-lane.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -226,13 +225,8 @@ function renderLineBlock(line, tal, ctx) {
   const colOf = []; // grid column (1-based) of each matra cell
   const showRepeatOpen = line.repeatOpen ?? line.lineRepeat;
   const showRepeatClose = line.repeatClose ?? line.lineRepeat;
-  // Repeats are structural markers, not rhythmic contents. Give each visible
-  // repeat its own column so it can never cover or shrink a note cell.
-  let repeatOpenCol = null;
-  if (showRepeatOpen) {
-    cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : 'max-content');
-    repeatOpenCol = cols.length;
-  }
+  // SARGAM_REPEAT_GUTTERS_2026_07_20 — repeat punctuation is placed in equal outside
+  // gutters and never creates a grid track or shifts matra columns.
   for (let k = 0; k < line.matras.length; k++) {
     colOf[k] = cols.length + 1;
     cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : tal ? 'minmax(2.6em, max-content)' : 'max-content');
@@ -240,11 +234,7 @@ function renderLineBlock(line, tal, ctx) {
       cols.push('max-content'); // barline column
     }
   }
-  let repeatCloseCol = null;
-  if (showRepeatClose) {
-    cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : 'max-content');
-    repeatCloseCol = cols.length;
-  }
+  const repeatCloseCol = showRepeatClose ? 0 : null; // sentinel; no grid track
   let returnCueCol = null;
   if (line.returnCue) {
     cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : 'max-content');
@@ -363,13 +353,13 @@ function renderLineBlock(line, tal, ctx) {
     }
   }
 
-  // Line repeats live in dedicated structural columns outside the first and
-  // last matras. They remain full-size siblings and cannot obscure notation.
-  if (showRepeatOpen && repeatOpenCol !== null && renderedCells.length) {
-    appendLineRepeatMarker(row, 'open', repeatOpenCol);
-  }
+  // Repeat punctuation belongs to the notation's outside gutters, but it
+  // shares the exact glyph height of the first/last written note. Attaching it
+  // to those glyph boxes keeps repeated and plain lines on the same metric
+  // origin without compressing or lowering ||: / :|| in Export and print.
+  if (showRepeatOpen && renderedCells.length) attachRepeatGlyph(renderedCells[0], 'open');
   if (showRepeatClose && repeatCloseCol !== null && renderedCells.length) {
-    appendLineRepeatMarker(row, 'close', repeatCloseCol);
+    attachRepeatGlyph(renderedCells.at(-1), 'close');
   }
 
   // --- terminal return cue: visible instruction, zero rhythmic time.
@@ -422,8 +412,6 @@ function renderLineBlock(line, tal, ctx) {
   // '-', point strokes sit beneath their exact attack, and Diri spans the two
   // successive attacks it consumes.
   const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
-  const bolPlan = buildBolPlan(line);
-  const bolAttackOffset = Math.max(0, Number(line._attackOffset) || 0);
   const bolPasses = line._bolPasses?.length
     ? line._bolPasses
     : (line._bolLane || line.bols?.length)
@@ -434,9 +422,6 @@ function renderLineBlock(line, tal, ctx) {
     if (colOf[mi] === undefined) continue;
     const el = h('div', 'sr-bol');
     el.setAttribute('data-matra', String(mi));
-    el.setAttribute('data-source-line', String(line.sourceLine));
-    el.setAttribute('data-bol-passes', String(bolPasses.length));
-    el.style.setProperty('--sr-bol-pass-count', String(bolPasses.length));
     el.style.gridRow = '4';
     el.style.gridColumn = String(colOf[mi]);
     const slots = [];
@@ -444,16 +429,10 @@ function renderLineBlock(line, tal, ctx) {
     for (let eventIndex = 0; eventIndex < line.matras[mi].events.length; eventIndex++) {
       const event = line.matras[mi].events[eventIndex];
       if (event.grace) continue;
-      const attack = bolPlan.attackByRef.get(`${mi}:${eventIndex}`);
       firstSlotOfEvent.set(eventIndex, slots.length);
       const count = Math.max(1, Number(event.writtenSlots) || 1);
       for (let partIndex = 0; partIndex < count; partIndex++) {
-        slots.push({
-          event,
-          eventIndex,
-          partIndex,
-          attackOrdinal: attack ? bolAttackOffset + attack.ordinal : null,
-        });
+        slots.push({ event, eventIndex, partIndex });
       }
     }
     for (const passLane of bolPasses) {
@@ -465,8 +444,6 @@ function renderLineBlock(line, tal, ctx) {
         passRow.appendChild(h('span', 'sr-bol-pass-label', String(pass)));
       }
       const grid = h('span', 'sr-bol-slots');
-      grid.setAttribute('data-written-slots', String(Math.max(1, slots.length)));
-      grid.style.setProperty('--sr-bol-written-slots', String(Math.max(1, slots.length)));
       grid.style.gridTemplateColumns = slots.length
         ? slots
             .map((slot) => slot.event?.approachSlide && slot.partIndex === 0
@@ -502,23 +479,10 @@ function renderLineBlock(line, tal, ctx) {
           mark.style.gridColumn = Number.isInteger(endSlot)
             ? `${slotIndex + 1} / ${endSlot + 2}`
             : String(slotIndex + 1);
-          if (Number.isInteger(slot.attackOrdinal)) {
-            mark.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
-          }
           grid.appendChild(mark);
-        } else if (coveredEvents.has(slot.eventIndex)) {
-          const covered = h('span', 'sr-bol-slot sr-bol-covered', '·');
-          covered.style.gridColumn = String(slotIndex + 1);
-          if (Number.isInteger(slot.attackOrdinal)) {
-            covered.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
-          }
-          grid.appendChild(covered);
-        } else {
+        } else if (!coveredEvents.has(slot.eventIndex)) {
           const blank = h('span', 'sr-bol-slot sr-bol-blank', '');
           blank.style.gridColumn = String(slotIndex + 1);
-          if (Number.isInteger(slot.attackOrdinal)) {
-            blank.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
-          }
           grid.appendChild(blank);
         }
       }
@@ -537,8 +501,6 @@ function renderLineBlock(line, tal, ctx) {
       passRow.appendChild(layout);
       el.appendChild(passRow);
     }
-    renderedCells[mi]?.classList.add('sr-has-bol-lane');
-    renderedCells[mi]?.style.setProperty('--sr-bol-pass-count', String(bolPasses.length));
     row.appendChild(el);
   }
 
@@ -624,11 +586,6 @@ function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
     returnCue: systemIndex === systemCount - 1 ? line.returnCue : null,
     passthrough: systemIndex === systemCount - 1 ? line.passthrough : [],
     _matraOffset: from,
-    _attackOffset: line.matras
-      .slice(0, from)
-      .flatMap((matra) => matra.events || [])
-      .filter((event) => event.type === 'note' && !event.grace)
-      .length,
     _isLastSystem: systemIndex === systemCount - 1,
   };
   Object.defineProperty(sliced, '_bars', {
@@ -947,17 +904,23 @@ function renderEvent(e, ctx, microHold = false) {
   return ev;
 }
 
-function appendLineRepeatMarker(row, kind, column) {
-  const marker = h(
-    'span',
-    `sr-line-repeat-marker sr-line-repeat-${kind}`,
-    kind === 'open' ? '||:' : ':||'
-  );
-  marker.setAttribute('aria-label', kind === 'open' ? 'Repeat begins' : 'Repeat ends');
-  marker.setAttribute('data-repeat-boundary', kind);
-  marker.style.gridRow = '2';
-  marker.style.gridColumn = String(column);
-  row.appendChild(marker);
+function repeatGlyph(kind) {
+  const ev = h('span', `sr-ev sr-repeat-${kind}`);
+  ev.setAttribute('aria-hidden', 'true');
+  ev.appendChild(h('span', 'sr-dots sr-dots-above'));
+  ev.appendChild(h('span', 'sr-ch', kind === 'open' ? '||:' : ':||'));
+  ev.appendChild(h('span', 'sr-dots sr-dots-below'));
+  return ev;
+}
+
+function attachRepeatGlyph(cell, kind) {
+  const glyphs = cell?.querySelector(':scope > .sr-glyphs');
+  if (glyphs) {
+    glyphs.appendChild(repeatGlyph(kind));
+    cell.classList.add(`sr-has-repeat-${kind}`);
+    cell.setAttribute(`data-repeat-${kind}`, 'true');
+    cell.setAttribute('data-grid-span', String(Math.max(2, Number(cell.dataset.gridSpan) || 1)));
+  }
 }
 
 // ---------------------------------------------------------------------------

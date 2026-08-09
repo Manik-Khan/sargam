@@ -2,11 +2,8 @@ import assert from 'node:assert/strict';
 import {
   applyBolCaptureKey,
   beginBolCapture,
-  beginBolCaptureAt,
   bolCursorSelection,
   moveBolCursor,
-  removeBolAtAttack,
-  setBolAtAttack,
   setBolAtCursor,
   switchBolPass,
 } from '../src/engine/bol-capture.js';
@@ -38,32 +35,6 @@ export const smokes = [
       assert.equal(result.ok, true);
       assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 0 });
       assert.match(result.text, /S- SS SS SS\n> \.- \. \. \. \. \. \.\n/);
-    },
-  },
-  {
-    name: 'bol capture: Grid Write can begin on an exact attack without a text caret',
-    fn() {
-      const result = beginBolCaptureAt(source, 3, 4);
-      assert.equal(result.ok, true);
-      assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 4 });
-      assert.match(result.text, /S- SS SS SS\n> \.- \. \. \. \. \. \.\n/);
-      assert.match(result.message, /Attack 5 of 7/);
-    },
-  },
-  {
-    name: 'bol menu: Grid Write applies and removes a bol at the clicked attack without capture state',
-    fn() {
-      const added = setBolAtAttack(source, 3, 4, 'chikari');
-      assert.equal(added.ok, true);
-      assert.match(added.message, /attached to note 5/);
-      let line = parseDocument(added.text).doc.sections[0].lines[0];
-      assert.equal(line._bolPasses[0].bols[0].mark, 'chikari');
-      assert.deepEqual(line._bolPasses[0].bols[0].ref, { matraIndex: 2, eventIndex: 1 });
-      const removed = removeBolAtAttack(added.text, 3, 4);
-      assert.equal(removed.ok, true);
-      assert.match(removed.message, /removed from note 5/);
-      line = parseDocument(removed.text).doc.sections[0].lines[0];
-      assert.equal(line._bolPasses[0].bols.length, 0);
     },
   },
   {
@@ -210,13 +181,12 @@ export const smokes = [
     },
   },
   {
-    name: 'bol capture: Text Write keeps keyboard capture while Grid Write exposes direct plus menus',
+    name: 'bol capture: EditorPane exposes mode, keyboard gestures, and preview cursor seams',
     async fn() {
       const fs = await import('node:fs/promises');
       const editor = await fs.readFile(new URL('../src/shell/EditorPane.jsx', import.meta.url), 'utf8');
       const app = await fs.readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       const preview = await fs.readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
-      const gridEditor = await fs.readFile(new URL('../src/shell/GridEditor.jsx', import.meta.url), 'utf8');
       assert.match(editor, /Bol Capture: ON/);
       assert.match(editor, /BOL PASS/);
       assert.match(editor, /1–9 switch pass/);
@@ -225,14 +195,7 @@ export const smokes = [
       assert.match(editor, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/);
       assert.match(app, /applyBolCaptureKey/);
       assert.match(app, /textRef\.current/);
-      assert.match(app, /setBolAtAttack/);
-      assert.match(app, /removeBolAtAttack/);
       assert.match(preview, /bolCapture/);
-      assert.match(gridEditor, /app-grid-write-bols/);
-      assert.match(gridEditor, /app-grid-bol-menu/);
-      assert.match(gridEditor, /onBolApply/);
-      assert.match(gridEditor, /beneath a note adds its bol/);
-      assert.doesNotMatch(gridEditor, /Grid Bol Capture/);
     },
   },
 ];

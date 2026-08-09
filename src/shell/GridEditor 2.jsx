@@ -8,56 +8,18 @@ import {
   replaceGridCellToken,
 } from '../engine/grid-edit.js';
 
-const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
-const BOL_OPTIONS = [
-  { kind: 'da', label: 'da' },
-  { kind: 'ra', label: 'ra' },
-  { kind: 'diri', label: 'diri' },
-  { kind: 'chikari', label: 'chikari' },
-];
-
 function withoutKey(object, key) {
   const next = { ...object };
   delete next[key];
   return next;
 }
 
-export default function GridEditor({
-  text,
-  doc,
-  onChange,
-  onCellFocus,
-  gridStyle = 'cells',
-  bolMessage = '',
-  onBolApply,
-}) {
+export default function GridEditor({ text, doc, onChange, onCellFocus, gridStyle = 'cells' }) {
   const rows = useMemo(() => gridLines(doc), [doc]);
   const [drafts, setDrafts] = useState({});
   const [errors, setErrors] = useState({});
   const [addDrafts, setAddDrafts] = useState({});
   const [message, setMessage] = useState('Each box is one matra. Spaces inside a box become subdivisions.');
-  const [bolMenu, setBolMenu] = useState(null);
-
-  const chooseBolAttack = (sourceLine, matraIndex, ordinal) => {
-    const target = { sourceLine, matraIndex, ordinal };
-    setBolMenu((current) => (
-      current?.sourceLine === sourceLine && current?.ordinal === ordinal ? null : target
-    ));
-  };
-
-  const applyBol = (kind) => {
-    if (!bolMenu) return;
-    const ok = onBolApply?.({
-      sourceLine: bolMenu.sourceLine,
-      ordinal: bolMenu.ordinal,
-      kind,
-    });
-    if (ok === false) return;
-    setMessage(kind
-      ? `${kind === 'diri' ? 'Diri' : kind} attached to this note.`
-      : 'Bol removed from this note.');
-    setBolMenu(null);
-  };
 
   const editCell = (row, cell, value) => {
     const key = `${row.sourceLine}:${cell.matraIndex}`;
@@ -118,7 +80,6 @@ export default function GridEditor({
       <div className="app-grid-writer-help">
         <strong>Grid Write</strong>
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>
-        <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol</span>
       </div>
       <div className="app-grid-writer-scroll">
         {rows.map((row) => {
@@ -139,17 +100,8 @@ export default function GridEditor({
                     const key = `${row.sourceLine}:${cell.matraIndex}`;
                     const value = Object.hasOwn(drafts, key) ? drafts[key] : cell.text;
                     const error = errors[key] || '';
-                    const rowPass = row.bolPasses.find((lane) => lane.pass === 1);
-                    const bolByAttack = new Map((rowPass?.marks || []).map((mark) => [mark.ordinal, mark]));
-                    const coveredByDiri = new Map();
-                    for (const mark of rowPass?.marks || []) {
-                      if (mark.mark !== 'diri') continue;
-                      for (let ordinal = mark.ordinal + 1; ordinal <= mark.toOrdinal; ordinal++) {
-                        coveredByDiri.set(ordinal, mark.ordinal);
-                      }
-                    }
                     return (
-                      <div
+                      <label
                         className={`app-grid-write-cell${error ? ' is-invalid' : ''}`}
                         key={key}
                         title={error || `Source line ${row.sourceLine}, written matra ${cell.matraIndex + 1}`}
@@ -163,9 +115,7 @@ export default function GridEditor({
                           aria-label={`Line ${row.sourceLine}, written matra ${cell.matraIndex + 1}, cycle matra ${cell.cycleMatra ?? cell.matraIndex + 1}`}
                           aria-invalid={error ? 'true' : 'false'}
                           data-grid-cell="true"
-                          onFocus={() => {
-                            onCellFocus?.(row.sourceLine, cell.matraIndex);
-                          }}
+                          onFocus={() => onCellFocus?.(row.sourceLine, cell.matraIndex)}
                           onChange={(event) => editCell(row, cell, event.target.value)}
                           onBlur={() => finishCell(row, cell, key)}
                           onKeyDown={(event) => {
@@ -183,67 +133,7 @@ export default function GridEditor({
                             setMessage('Draft reverted to the Markdown source.');
                           }}
                         />
-                        {(cell.attacks?.length || 0) > 0 && (
-                          <span
-                            className="app-grid-write-bols"
-                            style={{ '--grid-bol-slots': cell.attacks.length }}
-                            aria-label={`Bols for line ${row.sourceLine}, matra ${cell.matraIndex + 1}`}
-                          >
-                            {cell.attacks.map((attack) => {
-                              const bol = bolByAttack.get(attack.ordinal);
-                              const covered = coveredByDiri.has(attack.ordinal);
-                              const selected = Number(bolMenu?.sourceLine) === Number(row.sourceLine)
-                                && Number(bolMenu?.ordinal) === Number(attack.ordinal);
-                              return (
-                                <button
-                                  type="button"
-                                  key={attack.ordinal}
-                                  className={`app-grid-bol-slot${bol ? ' has-bol' : ''}${covered ? ' is-covered' : ''}${selected ? ' selected' : ''}`}
-                                  aria-pressed={selected}
-                                  aria-label={`Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, attack ${attack.ordinal + 1}${bol ? `, ${bol.mark}` : ', no bol'}`}
-                                  title={bol ? `Change ${bol.mark}` : 'Add a bol to this note'}
-                                  onClick={() => chooseBolAttack(row.sourceLine, cell.matraIndex, attack.ordinal)}
-                                >{bol ? BOL_SYMBOL[bol.mark] : covered ? '·' : '+'}</button>
-                              );
-                            })}
-                          </span>
-                        )}
-                        {Number(bolMenu?.sourceLine) === Number(row.sourceLine)
-                          && Number(bolMenu?.matraIndex) === Number(cell.matraIndex) && (
-                          <div
-                            className="app-grid-bol-menu"
-                            role="menu"
-                            aria-label={`Choose a bol for matra ${cell.matraIndex + 1}`}
-                            onKeyDown={(event) => {
-                              if (event.key !== 'Escape') return;
-                              event.preventDefault();
-                              setBolMenu(null);
-                            }}
-                          >
-                            <div className="app-grid-bol-menu-head">
-                              <strong>Bol</strong>
-                              <span>note {cell.attacks.findIndex((attack) => attack.ordinal === bolMenu.ordinal) + 1}</span>
-                              <button type="button" aria-label="Close bol menu" onClick={() => setBolMenu(null)}>×</button>
-                            </div>
-                            <div className="app-grid-bol-menu-options">
-                              {BOL_OPTIONS.map((option) => (
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  key={option.kind}
-                                  onClick={() => applyBol(option.kind)}
-                                >
-                                  <b>{BOL_SYMBOL[option.kind]}</b>
-                                  <span>{option.label}</span>
-                                </button>
-                              ))}
-                              <button type="button" role="menuitem" className="remove" onClick={() => applyBol(null)}>
-                                <b>×</b><span>remove</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      </label>
                     );
                   })}
                   <div className="app-grid-write-add">
@@ -269,7 +159,7 @@ export default function GridEditor({
           );
         })}
       </div>
-      <div className="app-grid-writer-message" role="status" aria-live="polite">{bolMessage || message}</div>
+      <div className="app-grid-writer-message" role="status" aria-live="polite">{message}</div>
     </div>
   );
 }

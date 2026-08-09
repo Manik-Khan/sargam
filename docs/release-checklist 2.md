@@ -21,7 +21,6 @@ The command must end with every smoke check passing and a successful production 
 - Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
 - Switch between Text Write and Grid Write and reload once. Confirm the chosen writing surface persists and headings or attachment lines remain unchanged.
 - Toggle the grid look between **Cells** and **Paper**. Confirm Paper continues each musical row through unused width with empty matra-sized boxes (no smaller background grid), the choice survives reload, and a kan such as `{m}g` remains legible.
-- In Grid Write, click the `+` beneath a note attack. Confirm a local da/ra/diri/chikari menu opens; choose one bol and verify the menu closes, the ordinary editable `>` lane changes, and the bol appears in the matching rendered cell strip. Reopen that note's symbol and remove it. Diri must span its exact attacks without changing the notes.
 - On lines with delayed attacks or leading holds, confirm `0`, `1`, `2`, `3`, and `+` tala markers remain inset at the upper-left of their cells and never overlap a vibhag divider, repeat sign, octave dot, or ornament.
 - Resize the score/editor divider and confirm neither surface jumps to another line.
 
@@ -39,8 +38,7 @@ The command must end with every smoke check passing and a successful production 
 - Check Clean, Matra cells, and Graph paper; Color and Printer B&W; and each typeface.
 - Confirm Graph Paper is composed of real, equal matra cells plus real empty trailing cells; it must not be a repeating background image behind independently positioned notation.
 - Confirm kan runs, approach slides, four-to-eight-slot matras, and phrase-repeat endings remain inside the cell that owns their matra. Dense subdivisions may wrap internally but must not claim a neighboring matra or touch the stronger vibhag boundary.
-- Print a line beginning with `||:` and ending with `:||`. Each repeat sign must occupy its own full-size, non-musical structural grid position outside the first/last note cells. It must not overlap, shrink, or obscure a note, including beside a dense phrase-repeat ending such as `(Dm g -)x3`.
-- Print a line with attached bols and confirm each matra's bol strip shares the cell's internal attack subdivisions without covering its notes or crossing a cell boundary.
+- Print a line beginning with `||:` and ending with `:||`. Each repeat sign must have a protected edge gutter and remain visually separate from the first or last note, including a dense phrase-repeat ending such as `(Dm g -)x3`.
 - Confirm graph-paper section descriptions and written cues have a light neutral backing that masks grid lines behind the text and remains legible in Printer B&W.
 - Confirm a long composition uses every required page and no ornament or cell is cut at a page edge.
 - Open and cancel the browser print dialog twice; the preview must remain unchanged.

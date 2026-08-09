@@ -82,5 +82,6 @@ test('continuity: source contracts include export anchor parity and stable marke
   assert.match(css, /\.sr-marker\s*\{[^}]*transition:\s*none/s);
   assert.match(css, /\.sr-repeat-open[\s\S]*position:\s*absolute/);
   assert.doesNotMatch(render, /if\s*\(showRepeatOpen\)\s*cols\.push/);
-  assert.doesNotMatch(render, /if\s*\(showRepeatClose\)[\s\S]{0,100}cols\.push/);
+  assert.match(render, /Repeats are structural markers, not rhythmic contents/);
+  assert.match(render, /if\s*\(showRepeatClose\)[\s\S]{0,100}cols\.push/);
 });
