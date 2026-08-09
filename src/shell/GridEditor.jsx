@@ -7,6 +7,7 @@ import {
   appendGridCellToken,
   gridLines,
   replaceGridCellToken,
+  setGridFirstEnding,
 } from '../engine/grid-edit.js';
 import { centeredElementScrollTop } from './editor-nav.js';
 
@@ -59,6 +60,7 @@ export default function GridEditor({
   const [addDrafts, setAddDrafts] = useState({});
   const [message, setMessage] = useState('Each box is one matra. Spaces inside a box become subdivisions.');
   const [bolMenu, setBolMenu] = useState(null);
+  const [endingPickerLine, setEndingPickerLine] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -160,6 +162,31 @@ export default function GridEditor({
     onChange?.(result.text);
   };
 
+  const placeFirstEnding = (row, matraIndex) => {
+    const result = setGridFirstEnding(text, row.sourceLine, matraIndex);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    onCellFocus?.(row.sourceLine, matraIndex);
+    setEndingPickerLine(null);
+    setMessage(row.hasFollowingNotation
+      ? `First ending now begins at written matra ${matraIndex + 1}. The next notation line is labelled as the second ending.`
+      : `First ending now begins at written matra ${matraIndex + 1}. Add the second-ending phrase as the next notation line.`);
+    onChange?.(result.text);
+  };
+
+  const removeFirstEnding = (row) => {
+    const result = setGridFirstEnding(text, row.sourceLine, null);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    setEndingPickerLine(null);
+    setMessage('Alternate-ending marker removed; both lines are ordinary notation again.');
+    onChange?.(result.text);
+  };
+
   const copyBolLanes = async (row, rowIndex) => {
     const lines = String(text ?? '').split('\n');
     const nextSourceLine = rows[rowIndex + 1]?.sourceLine ?? (lines.length + 1);
@@ -211,10 +238,36 @@ export default function GridEditor({
               {showSection && row.sectionLabel && (
                 <div className="app-grid-writer-section">{row.sectionLabel}</div>
               )}
-              <div className="app-grid-writer-line" data-source-line={row.sourceLine}>
+              <div
+                className={`app-grid-writer-line${row.alternateEndingRole ? ` has-${row.alternateEndingRole}-ending` : ''}${Number(endingPickerLine) === Number(row.sourceLine) ? ' is-placing-ending' : ''}`}
+                data-source-line={row.sourceLine}
+              >
                 <div className="app-grid-writer-line-label">
                   <span>Line {row.sourceLine}</span>
                   {row.tal && <small>{row.tal.name}</small>}
+                  {row.alternateEndingRole === 'second' && (
+                    <span className="app-grid-ending-line-label">2nd ending</span>
+                  )}
+                  {row.lineRepeat && (
+                    <button
+                      type="button"
+                      className={Number(endingPickerLine) === Number(row.sourceLine) ? 'active' : ''}
+                      aria-pressed={Number(endingPickerLine) === Number(row.sourceLine)}
+                      onClick={() => {
+                        setEndingPickerLine((current) => (
+                          Number(current) === Number(row.sourceLine) ? null : row.sourceLine
+                        ));
+                        setMessage('Choose the first matra that changes on the first pass.');
+                      }}
+                    >
+                      {Number(endingPickerLine) === Number(row.sourceLine)
+                        ? 'Cancel ending'
+                        : Number.isInteger(row.firstEndingFrom) ? 'Move 1st ending' : 'Add 1st ending'}
+                    </button>
+                  )}
+                  {row.lineRepeat && Number.isInteger(row.firstEndingFrom) && (
+                    <button type="button" className="remove" onClick={() => removeFirstEnding(row)}>Remove ending</button>
+                  )}
                   {row.bolPasses.length > 0 && (
                     <button type="button" onClick={() => copyBolLanes(row, rowIndex)}>Copy bols</button>
                   )}
@@ -226,6 +279,12 @@ export default function GridEditor({
                     const error = errors[key] || '';
                     const selected = Number(activeSelection?.sourceLine) === Number(row.sourceLine)
                       && Number(activeSelection?.matraIndex) === Number(cell.matraIndex);
+                    const placingEnding = Number(endingPickerLine) === Number(row.sourceLine);
+                    const firstEndingCell = row.alternateEndingRole === 'first'
+                      && cell.matraIndex >= row.firstEndingFrom;
+                    const secondEndingCell = row.alternateEndingRole === 'second';
+                    const endingStart = (firstEndingCell && cell.matraIndex === row.firstEndingFrom)
+                      || (secondEndingCell && cell.matraIndex === 0);
                     const rowPass = row.bolPasses.find((lane) => lane.pass === 1);
                     const bolByAttack = new Map((rowPass?.marks || []).map((mark) => [mark.ordinal, mark]));
                     const coveredByDiri = new Map();
@@ -237,12 +296,35 @@ export default function GridEditor({
                     }
                     return (
                       <div
-                        className={`app-grid-write-cell${error ? ' is-invalid' : ''}${selected ? ' is-selected' : ''}`}
+                        className={`app-grid-write-cell${error ? ' is-invalid' : ''}${selected ? ' is-selected' : ''}${firstEndingCell ? ' is-first-ending' : ''}${secondEndingCell ? ' is-second-ending' : ''}${endingStart ? ' is-ending-start' : ''}`}
                         key={key}
                         data-source-line={row.sourceLine}
                         data-matra-index={cell.matraIndex}
                         title={error || `Source line ${row.sourceLine}, written matra ${cell.matraIndex + 1}`}
                       >
+                        {placingEnding && cell.matraIndex > 0 && (
+                          <button
+                            type="button"
+                            className={`app-grid-ending-marker${cell.matraIndex === row.firstEndingFrom ? ' active' : ''}`}
+                            aria-label={`Start the first ending at written matra ${cell.matraIndex + 1}`}
+                            onClick={() => placeFirstEnding(row, cell.matraIndex)}
+                          >{cell.matraIndex === row.firstEndingFrom ? '1st ending' : 'Start here'}</button>
+                        )}
+                        {!placingEnding && endingStart && (
+                          row.alternateEndingRole === 'first' ? (
+                            <button
+                              type="button"
+                              className="app-grid-ending-marker active"
+                              aria-label="Move the first-ending marker"
+                              onClick={() => {
+                                setEndingPickerLine(row.sourceLine);
+                                setMessage('Choose the first matra that changes on the first pass.');
+                              }}
+                            >1st ending</button>
+                          ) : (
+                            <span className="app-grid-ending-marker active second">2nd ending</span>
+                          )
+                        )}
                         <span className="app-grid-write-coordinate">
                           <b>{cell.marker || ''}</b>
                           <i>{cell.cycleMatra ?? cell.matraIndex + 1}</i>

@@ -91,11 +91,43 @@ export function appendGridCellToken(text, sourceLine, value) {
   return validateGridResult(nextText, sourceLine, found.line.matras.length + 1);
 }
 
+/** Add, move, or remove the first-ending boundary without exposing `|1`. */
+export function setGridFirstEnding(text, sourceLine, matraIndex) {
+  const parsed = parseDocument(String(text ?? ''));
+  const found = musicLineAt(parsed.doc, sourceLine);
+  if (!found) return { ok: false, message: 'Choose a rendered notation line first.' };
+  if (!found.line.lineRepeat) {
+    return { ok: false, message: 'A first ending can only be added to a repeated line.' };
+  }
+
+  const index = matraIndex == null ? null : Number(matraIndex);
+  if (index !== null && (
+    !Number.isInteger(index) ||
+    index <= 0 ||
+    index >= found.line.matras.length
+  )) {
+    return {
+      ok: false,
+      message: 'Choose the first changed matra after at least one shared matra.',
+    };
+  }
+
+  const cells = serializeGridCells(found.line, found.tal);
+  const changedLine = { ...found.line, firstEndingFrom: index };
+  const nextLine = serializeGridLine(changedLine, found.tal, cells);
+  const nextText = replaceSourceLine(text, sourceLine, nextLine);
+  if (nextText === null) return { ok: false, message: 'The source line could not be updated.' };
+  return validateGridResult(nextText, sourceLine, found.line.matras.length);
+}
+
 export function gridLines(doc) {
   const rows = [];
   for (const section of doc?.sections || []) {
     const tal = section.tal && section.tal !== 'free' ? getTal(section.tal) : null;
-    for (const line of section.lines || []) {
+    const sectionLines = section.lines || [];
+    for (let lineIndex = 0; lineIndex < sectionLines.length; lineIndex++) {
+      const line = sectionLines[lineIndex];
+      const previous = sectionLines[lineIndex - 1];
       const bolPlan = buildBolPlan(line);
       const sourcePasses = line._bolPasses?.length
         ? line._bolPasses
@@ -140,6 +172,15 @@ export function gridLines(doc) {
         tal,
         cells,
         bolPasses,
+        lineRepeat: Boolean(line.lineRepeat),
+        firstEndingFrom: Number.isInteger(line.firstEndingFrom) ? line.firstEndingFrom : null,
+        alternateEndingRole: Number.isInteger(line.firstEndingFrom)
+          ? 'first'
+          : (previous?.lineRepeat && Number.isInteger(previous?.firstEndingFrom) ? 'second' : null),
+        alternateEndingSourceLine: previous?.lineRepeat && Number.isInteger(previous?.firstEndingFrom)
+          ? previous.sourceLine
+          : null,
+        hasFollowingNotation: Boolean(sectionLines[lineIndex + 1]),
       });
     }
   }

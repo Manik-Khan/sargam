@@ -37,6 +37,7 @@ The command must end with every smoke check passing and a successful production 
 - Confirm editing stops stale playback instead of continuing against changed notation.
 - Test line and section looping, then turn looping off.
 - Write a repeated common phrase with `|1` before its first ending and place the second ending on the following notation line. Confirm **1st time** and **2nd time** brackets begin at one aligned divergence after the shared cells, the first ending's `:||` remains a separate structural position, and playback performs common + first ending, then common + second ending without duplicating the common phrase in source.
+- In Grid Write, use **Add 1st ending** on a repeated line. Confirm placement mode offers **Start here** on every valid boundary, choosing the first changed matra adds the same `|1` source marker, and the first and following rows are visibly labelled **1st ending** and **2nd ending**. Move the boundary, then remove it, and confirm both Text Write and the rendered score update immediately.
 - With playback following enabled, confirm only the score pane scrolls.
 
 ## Print and PDF

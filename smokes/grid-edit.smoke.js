@@ -8,6 +8,7 @@ import {
   gridLines,
   normalizeGridCellToken,
   replaceGridCellToken,
+  setGridFirstEnding,
 } from '../src/engine/grid-edit.js';
 import { parseDocument } from '../src/engine/parse.js';
 
@@ -85,6 +86,37 @@ export const smokes = [
     },
   },
   {
+    name: 'grid write: a visual first-ending marker adds, moves, and removes |1',
+    fn() {
+      const source = 'tal: rupak\n\nGat\n||: S R G m P D n :||\nS R G\n';
+      const added = setGridFirstEnding(source, 4, 4);
+      assert.equal(added.ok, true, added.message);
+      assert.match(added.text, /^\|\|: S R G \| m \|1 P \| D n :\|\|$/m);
+      assert.equal(parseDocument(added.text).doc.sections[0].lines[0].firstEndingFrom, 4);
+
+      const moved = setGridFirstEnding(added.text, 4, 5);
+      assert.equal(moved.ok, true, moved.message);
+      assert.match(moved.text, /\|1 D n :\|\|/);
+
+      const removed = setGridFirstEnding(moved.text, 4, null);
+      assert.equal(removed.ok, true, removed.message);
+      assert.doesNotMatch(removed.text, /\|1/);
+      assert.equal(parseDocument(removed.text).doc.sections[0].lines[0].firstEndingFrom, null);
+    },
+  },
+  {
+    name: 'grid write: first and second ending rows are exposed to the editor',
+    fn() {
+      const source = 'tal: rupak\n\nGat\n||: S R G m |1 P D n :||\n@5 S R G\n';
+      const rows = gridLines(parseDocument(source).doc);
+      assert.equal(rows[0].lineRepeat, true);
+      assert.equal(rows[0].firstEndingFrom, 4);
+      assert.equal(rows[0].alternateEndingRole, 'first');
+      assert.equal(rows[1].alternateEndingRole, 'second');
+      assert.equal(rows[1].alternateEndingSourceLine, 4);
+    },
+  },
+  {
     name: 'grid write: each matra exposes its exact note attacks and attached bol pass',
     fn() {
       const rows = gridLines(parseDocument(SOURCE).doc);
@@ -120,6 +152,10 @@ export const smokes = [
       assert.match(editor, /bolMenuPosition[\s\S]*?position: 'fixed'/);
       assert.match(editor, /copyBolLanes[\s\S]*?navigator\.clipboard\.writeText[\s\S]*?>Copy bols</);
       assert.match(editor, /kind: 'diri', label: 'diri · 2 strokes'/);
+      assert.match(editor, /Add 1st ending/);
+      assert.match(editor, /Start here/);
+      assert.match(editor, /2nd ending/);
+      assert.match(editor, /setGridFirstEnding/);
     },
   },
 ];
