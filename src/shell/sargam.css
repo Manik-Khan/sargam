@@ -2513,6 +2513,7 @@
 .app-rhythm-grid-paper {
   --sr-graph-cell-width: 3.15em;
   --sr-graph-cell-height: 5.25em;
+  --sr-graph-label-height: 1.85em;
   --sr-graph-line: color-mix(in srgb, var(--sr-accent) 36%, var(--sr-line));
   --sr-graph-label-bg: color-mix(in srgb, var(--sr-accent) 9%, var(--sr-paper-raised));
   background: var(--sr-paper-raised);
@@ -2520,6 +2521,7 @@
 .app-export-graph-paper {
   --sr-graph-cell-width: 2.65em;
   --sr-graph-cell-height: 5.3em;
+  --sr-graph-label-height: 1.65em;
   --sr-graph-line: color-mix(in srgb, var(--sr-accent) 30%, #aeb8ae);
   --sr-graph-label-bg: color-mix(in srgb, var(--sr-ink) 7%, var(--sr-export-paper, #fff));
 }
@@ -2553,7 +2555,7 @@
 .app-rhythm-grid-paper .sr-graph-structure-row,
 .app-export-graph-paper .sr-graph-structure-row {
   display: grid;
-  grid-auto-rows: var(--sr-graph-cell-height);
+  grid-auto-rows: minmax(var(--sr-graph-label-height), auto);
   width: max-content;
   background: color-mix(in srgb, var(--sr-graph-label-bg) 58%, transparent);
   box-shadow: inset -1px 0 var(--sr-graph-line), inset 0 -1px var(--sr-graph-line);
@@ -2838,26 +2840,30 @@
 .app-export-graph-paper .sr-graph-structure-cell {
   position: relative;
   overflow: visible;
+  height: auto;
+  min-height: var(--sr-graph-label-height);
 }
 .sr-graph-structure-label {
-  position: absolute;
-  left: 0.35em;
-  top: 50%;
+  position: relative;
+  grid-row: 1;
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: start;
   z-index: 2;
   width: max-content;
-  max-width: calc(var(--sr-graph-cell-width) * var(--sr-graph-label-columns, 12));
+  max-width: calc(100% - 0.7em);
   box-sizing: border-box;
-  padding: 0.32em 0.55em;
+  margin-left: 0.35em;
+  padding: 0.18em 0.48em;
   border-radius: 2px;
   background: var(--sr-graph-label-bg);
   box-shadow: 0 0 0 0.16em var(--sr-graph-label-bg);
   color: var(--sr-ink-soft);
-  font-size: 0.76em;
+  font-size: 0.7em;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.035em;
+  text-transform: none;
   white-space: normal;
-  transform: translateY(-50%);
 }
 .app-rhythm-grid-paper .sr-return-cue,
 .app-export-graph-paper .sr-return-cue,

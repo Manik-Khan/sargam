@@ -195,14 +195,21 @@ function renderSection(section, sectionIndex, opts) {
 function renderGraphStructureRow(label, ctx) {
   const columns = Math.max(1, Number(ctx.graphColumns) || 1);
   const row = h('div', 'sr-graph-structure-row');
+  row.setAttribute('aria-label', String(label));
   row.setAttribute('data-graph-columns', String(columns));
   row.style.gridTemplateColumns = `repeat(${columns}, var(--sr-graph-cell-width))`;
   for (let column = 0; column < columns; column++) {
     const cell = h('div', 'sr-graph-structure-cell');
-    cell.setAttribute('aria-hidden', column === 0 ? 'false' : 'true');
-    if (column === 0) cell.appendChild(h('span', 'sr-graph-structure-label', label));
+    cell.setAttribute('aria-hidden', 'true');
+    // The prose label spans the same explicit columns. Pin every background
+    // cell to its own track so CSS Grid overlays the two layers instead of
+    // auto-placing the cells into new columns beyond the paper edge.
+    cell.style.gridColumn = String(column + 1);
     row.appendChild(cell);
   }
+  // Prose is not a matra. Keep the graph columns behind it, but let the label
+  // occupy one compact inter-row strip instead of masquerading as a full beat.
+  row.appendChild(h('span', 'sr-graph-structure-label', label));
   return row;
 }
 
@@ -220,7 +227,10 @@ function renderLine(line, tal, ctx) {
   group.setAttribute('data-section-index', String(ctx.sectionIndex));
   group.setAttribute('data-line-index', String(ctx.lineIndex));
   const geometry = buildLineGeometry(line);
-  const ranges = planLineSystems(line, tal, { maxEm: ctx.maxSystemEm });
+  const ranges = planLineSystems(line, tal, {
+    maxEm: ctx.maxSystemEm,
+    graphColumns: ctx.graphPaper ? ctx.graphColumns : null,
+  });
   ranges.forEach((range, systemIndex) => {
     const systemLine = sliceLineForSystem(line, tal, range.from, range.to, systemIndex, ranges.length);
     const block = renderLineBlock(systemLine, tal, { ...ctx, geometry });
@@ -311,7 +321,10 @@ function alternateEndingLayout(first, second, tal, ctx) {
     prefix.firstEndingFrom = null;
     prefix.returnCue = null;
     prefix.passthrough = [];
-    prefixRanges = planLineSystems(prefix, tal, { maxEm });
+    prefixRanges = planLineSystems(prefix, tal, {
+      maxEm,
+      graphColumns: ctx.graphPaper ? ctx.graphColumns : null,
+    });
   }
   return { prefixRanges, finalFrom, commonEm };
 }

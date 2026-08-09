@@ -39,6 +39,34 @@ export const smokes = [
     },
   },
   {
+    name: 'systems: Graph Paper plans dense music by real matra cells, not glyph estimates',
+    fn() {
+      const source = `tal: jhaptal\n\n${Array(10).fill('SSSS').join(' ')}\n`;
+      const { doc } = parseDocument(source);
+      const line = doc.sections[0].lines[0];
+      assert.deepEqual(
+        planLineSystems(line, getTal('jhaptal'), { maxEm: 26, graphColumns: 10 }),
+        [{ from: 0, to: 9, reason: 'fits' }]
+      );
+      assert.ok(
+        planLineSystems(line, getTal('jhaptal'), { maxEm: 26 }).length > 1,
+        'ordinary notation still reserves extra width for dense matras'
+      );
+    },
+  },
+  {
+    name: 'systems: Graph Paper counts repeat punctuation as structural cells',
+    fn() {
+      const { doc } = parseDocument(`tal: jhaptal\n\n||: ${Array(10).fill('S').join(' ')} :||\n`);
+      const line = doc.sections[0].lines[0];
+      assert.deepEqual(
+        planLineSystems(line, getTal('jhaptal'), { graphColumns: 12 }),
+        [{ from: 0, to: 9, reason: 'fits' }]
+      );
+      assert.ok(planLineSystems(line, getTal('jhaptal'), { graphColumns: 11 }).length > 1);
+    },
+  },
+  {
     name: 'systems: rendered folds retain original absolute matra indices',
     fn() {
       const { doc } = parseDocument('tal: rupak\n\nS R g m P d n S R g m P d n\n');

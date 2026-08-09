@@ -155,16 +155,34 @@ function planRupakAtSam(line, tal, widths, widthAfter, prefixEm, suffixEm, maxEm
  * Plan contiguous inclusive matra ranges for a visual system.
  * @returns {{from:number,to:number,reason:string}[]}
  */
-export function planLineSystems(line, tal, { maxEm = Infinity } = {}) {
+export function planLineSystems(line, tal, { maxEm = Infinity, graphColumns = null } = {}) {
   const count = line?.matras?.length || 0;
   if (count === 0) return [{ from: 0, to: -1, reason: 'empty' }];
+  const graphLimit = Number.isFinite(Number(graphColumns)) && Number(graphColumns) > 0
+    ? Math.max(1, Math.floor(Number(graphColumns)))
+    : null;
+  if (graphLimit !== null) maxEm = graphLimit;
   if (!Number.isFinite(maxEm) || maxEm <= 0) return [{ from: 0, to: count - 1, reason: 'unbounded' }];
 
-  const measured = measuredLineLayouts.get(line);
-  const widths = measured?.widths || line.matras.map(estimateMatraEm);
-  const prefixEm = measured ? measured.prefixEm : line.lineRepeat ? 1.1 : 0;
-  const suffixEm = measured ? measured.suffixEm : fixedEdgeEm(line);
-  const widthAfter = measured
+  // Graph Paper is already the layout model: one written matra is exactly one
+  // column and repeat/cue glyphs are independent structural columns. Do not
+  // charge a dense matra several estimated em here; doing so folds a ten-cell
+  // line after five cells and leaves most of the visible paper empty.
+  const measured = graphLimit === null ? measuredLineLayouts.get(line) : null;
+  const widths = graphLimit !== null
+    ? line.matras.map(() => 1)
+    : measured?.widths || line.matras.map(estimateMatraEm);
+  const graphRepeatOpen = Boolean(line.repeatOpen ?? line.lineRepeat);
+  const graphRepeatClose = Boolean(line.repeatClose ?? line.lineRepeat);
+  const prefixEm = graphLimit !== null
+    ? (graphRepeatOpen ? 1 : 0)
+    : measured ? measured.prefixEm : line.lineRepeat ? 1.1 : 0;
+  const suffixEm = graphLimit !== null
+    ? (graphRepeatClose ? 1 : 0) + (line.returnCue ? 1 : 0) + (line.passthrough?.length || 0)
+    : measured ? measured.suffixEm : fixedEdgeEm(line);
+  const widthAfter = graphLimit !== null
+    ? () => 1
+    : measured
     ? (i) => widths[i]
     : (i) =>
         widths[i] +

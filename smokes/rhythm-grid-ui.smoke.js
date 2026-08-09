@@ -62,6 +62,14 @@ export const smokes = [
       assert.equal(row?.querySelectorAll('.sr-graph-empty-cell').length, 4);
       assert.equal(row?.querySelectorAll('.sr-paper-tail').length, 0);
       assert.equal(root.querySelectorAll('.sr-graph-structure-cell').length, 7);
+      const structureRow = root.querySelector('.sr-graph-structure-row');
+      assert.equal(structureRow?.getAttribute('aria-label'), 'Gat');
+      assert.equal(structureRow?.querySelector(':scope > .sr-graph-structure-label')?.textContent, 'Gat');
+      assert.equal(structureRow?.querySelector('.sr-graph-structure-cell .sr-graph-structure-label'), null);
+      assert.deepEqual(
+        [...structureRow.querySelectorAll('.sr-graph-structure-cell')].map((cell) => cell.style.gridColumn),
+        ['1', '2', '3', '4', '5', '6', '7']
+      );
       assert.deepEqual(
         [...row.querySelectorAll('.sr-cell')].map((cell) => cell.style.gridColumn),
         ['1', '2', '3']
@@ -163,6 +171,16 @@ export const smokes = [
         [...root.querySelectorAll('.sr-cell')].map((cell) => cell.dataset.gridSpan),
         ['2', '2']
       );
+    },
+  },
+  {
+    name: 'rhythm grid UI: prose uses a compact strip between full matra rows',
+    async fn() {
+      const css = await readFile(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
+      assert.match(css, /--sr-graph-label-height:\s*1\.85em/);
+      assert.match(css, /--sr-graph-label-height:\s*1\.65em/);
+      assert.match(css, /grid-auto-rows:\s*minmax\(var\(--sr-graph-label-height\), auto\)/);
+      assert.match(css, /\.sr-graph-structure-label\s*\{[^}]*grid-column:\s*1 \/ -1;[^}]*text-transform:\s*none;/s);
     },
   },
 ];
