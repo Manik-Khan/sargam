@@ -65,7 +65,35 @@ export default function PracticeBar({
   const sourceName = player.source?.name || 'No recording loaded';
   const loopText = player.loop.ready
     ? `Loop ${formatVilambitTime(player.loop.a)}–${formatVilambitTime(player.loop.b)}${player.loop.on ? '' : ' (off)'}`
+    : player.loop.a != null
+      ? `A ${formatVilambitTime(player.loop.a)} · set B`
+      : player.loop.b != null
+        ? `B ${formatVilambitTime(player.loop.b)} · set A`
     : 'Loop not set';
+
+  const setLoopPoint = (point) => {
+    const at = Math.min(player.duration, Math.max(0, player.position));
+    if (point === 'A') {
+      // A begins a fresh selection so a stale B cannot silently create an
+      // unexpected backwards range. B completes and enables that selection.
+      send('set-loop', { a: at, b: null, on: false });
+      return;
+    }
+    send('set-loop', {
+      a: player.loop.a,
+      b: at,
+      on: player.loop.a != null,
+    });
+  };
+
+  const toggleLoop = () => {
+    if (!player.loop.ready) return;
+    send('set-loop', {
+      a: player.loop.a,
+      b: player.loop.b,
+      on: !player.loop.on,
+    });
+  };
 
   return (
     <div className="app-practice-bar" aria-label="Sargam Music recording controls">
@@ -85,6 +113,46 @@ export default function PracticeBar({
         </button>
         <button type="button" disabled={!loaded} onClick={() => send('skip', { deltaSeconds: 5 })}>
           +5s
+        </button>
+      </div>
+      <div className="app-practice-loop-controls" role="group" aria-label="Recording A–B loop controls">
+        <button
+          type="button"
+          className={player.loop.a != null ? 'is-set' : ''}
+          disabled={!loaded}
+          title="Set loop start A at the current recording position"
+          onClick={() => setLoopPoint('A')}
+        >
+          A
+        </button>
+        <button
+          type="button"
+          className={player.loop.b != null ? 'is-set' : ''}
+          disabled={!loaded}
+          title="Set loop end B at the current recording position"
+          onClick={() => setLoopPoint('B')}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          className="app-practice-loop-toggle"
+          disabled={!loaded || !player.loop.ready}
+          aria-pressed={player.loop.on}
+          title={player.loop.on ? 'Turn the recording loop off' : 'Turn the recording loop on'}
+          onClick={toggleLoop}
+        >
+          Loop
+        </button>
+        <button
+          type="button"
+          className="app-practice-loop-clear"
+          disabled={!loaded || (player.loop.a == null && player.loop.b == null)}
+          aria-label="Clear recording loop points"
+          title="Clear A and B loop points"
+          onClick={() => send('clear-loop')}
+        >
+          ×
         </button>
       </div>
       <span className={'app-practice-loop' + (player.loop.on ? ' is-on' : '')}>{loopText}</span>

@@ -98,6 +98,9 @@ export const smokes = [
         payload: { requestId: 'bad', startTime: 1, endTime: 2 },
       }), null);
       assert.equal(makeVilambitCommand('extract-loop', { requestId: 'r', a: 1, b: 2 }).type, 'extract-loop');
+      assert.deepEqual(makeVilambitCommand('set-loop', { a: 42, b: null, on: false }).payload, {
+        a: 42, b: null, on: false,
+      });
       assert.equal(makeVilambitCommand('apply-workspace', { lastPosition: 42 }).type, 'apply-workspace');
       assert.equal(makeVilambitCommand('open-file').type, 'open-file');
     },
@@ -197,16 +200,25 @@ export const smokes = [
     async fn() {
       const app = await read('../src/shell/App.jsx');
       const bar = await read('../src/shell/PracticeBar.jsx');
+      const playerApp = await read('../public/vilambit/vilambit-app.js');
       assert.match(app, /import PracticeBar from ['"]\.\/PracticeBar\.jsx['"]/);
       assert.match(app, /const vilambitRef = useRef\(null\)/);
       assert.match(app, /<PracticeBar\s+frameRef=\{vilambitRef\}/);
       assert.match(app, /<iframe[\s\S]*?ref=\{vilambitRef\}[\s\S]*?src=["']sargam-player\/["']/);
       assert.match(bar, /−5s/);
       assert.match(bar, /\+5s/);
+      assert.match(bar, /Recording A–B loop controls/);
+      assert.match(bar, /setLoopPoint\('A'\)/);
+      assert.match(bar, /setLoopPoint\('B'\)/);
+      assert.match(bar, /aria-pressed=\{player\.loop\.on\}/);
+      assert.match(bar, /send\('clear-loop'\)/);
       assert.match(bar, /Open Music/);
       assert.match(bar, /onClipExtracted/);
       assert.match(bar, /Extract Clip/);
       assert.doesNotMatch(bar, /AudioContext|createMediaElementSource|decodeAudioData/);
+      assert.match(playerApp, /function bridgeOptionalNumber/);
+      assert.match(playerApp, /bridgeOptionalNumber\(payload, 'a'\)/);
+      assert.match(playerApp, /bridgeOptionalNumber\(payload, 'b'\)/);
     },
   },
 ];

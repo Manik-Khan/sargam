@@ -2293,6 +2293,32 @@
   display: flex;
   gap: 4px;
 }
+.app-practice-loop-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--sr-line);
+  border-radius: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.app-practice-bar .app-practice-loop-controls button {
+  min-width: 28px;
+  border: 0;
+  border-right: 1px solid var(--sr-line);
+  border-radius: 0;
+  padding-inline: 7px;
+}
+.app-practice-bar .app-practice-loop-controls button:last-child { border-right: 0; }
+.app-practice-bar .app-practice-loop-controls button.is-set {
+  color: var(--sr-accent);
+  background: color-mix(in srgb, var(--sr-accent) 7%, var(--sr-paper));
+  font-weight: 750;
+}
+.app-practice-bar .app-practice-loop-controls .app-practice-loop-clear {
+  min-width: 24px;
+  padding-inline: 5px;
+}
 .app-practice-bar button {
   min-height: 28px;
   padding: 3px 9px;
@@ -3339,6 +3365,8 @@
 .app-workspace-controls .app-practice-time { min-width: 82px; font-size: 11px; }
 .app-workspace-controls .app-practice-loop { font-size: 10px; }
 .app-workspace-controls .app-practice-bar button { min-height: 27px; padding: 3px 7px; }
+.app-workspace-controls .app-practice-loop-controls button { padding-inline: 6px; }
+.app-workspace-controls .app-practice-loop-controls .app-practice-loop-clear { padding-inline: 4px; }
 .app-workspace-controls .app-practice-open { margin-left: 0; }
 
 .app-practice-more-menu {
@@ -3427,6 +3455,7 @@
   .tp-settings-menu { position: fixed; top: 106px; right: 10px; left: 10px; width: auto; }
   .app-workspace-controls .app-practice-time,
   .app-workspace-controls .app-practice-source { display: none; }
+  .app-workspace-controls .app-practice-loop { display: none; }
 }
 
 @media print {

@@ -2848,6 +2848,14 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
     return value;
   }
 
+  function bridgeOptionalNumber(payload, key){
+    const raw = payload && payload[key];
+    if (raw == null) return null;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) throw new TypeError(`Vilambit command requires numeric ${key}.`);
+    return value;
+  }
+
   async function bridgeRunCommand(type, payload){
     if (type === 'request-state') return;
     if (type === 'open-file') {
@@ -2908,8 +2916,8 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
     }
     if (type === 'set-loop') {
       const loop = Core.normalizeLoop(
-        bridgeNumber(payload, 'a'),
-        bridgeNumber(payload, 'b'),
+        bridgeOptionalNumber(payload, 'a'),
+        bridgeOptionalNumber(payload, 'b'),
         state.duration,
       );
       state.loopA = loop.loopA;
