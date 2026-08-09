@@ -151,7 +151,7 @@ export const smokes = [
       assert.equal(span.style.gridColumn, '1 / 3');
       assert.equal(
         span.querySelector('path').getAttribute('d'),
-        'M37.5,18 L75,18 M52.5,3 L56.25,15 L60,3'
+        'M37.5,19 L75,19 M50.25,2 L56.25,17 L62.25,2'
       );
       assert.equal(root.querySelectorAll('.sr-bol-cross-span').length, 1);
       assert.equal(root.querySelectorAll('.sr-bol-mark.sr-bol-diri').length, 0);

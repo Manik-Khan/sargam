@@ -461,6 +461,23 @@ export function createPlayer(env) {
     return playCurrentPluck(ev, at);
   }
 
+  // Chikari is its own short upper-Sa string, not a replacement for the
+  // written melody note. Keep its voice consistently sweet and restrained
+  // even when the user has selected a sustained melody instrument.
+  function playChikari(ev, at) {
+    if (!ctx.createBuffer || !ctx.createBufferSource) {
+      return playNeutralTone({ ...ev, grace: true }, at);
+    }
+    const tone = {
+      ...toneByVoice.pluck,
+      brightness: 0.46,
+      velocity: 0.62,
+      attack: 0.04,
+      release: 0.12,
+    };
+    return playBufferNote(ev, at, pluckBuffer(ev.freq, tone), tone, { baseLevel: 0.42 });
+  }
+
   // ---- tanpura support ----
 
   const DRONE_STEP_S = 0.72;
@@ -563,6 +580,7 @@ export function createPlayer(env) {
       const at = Math.max(schedTime(ev), ctx.currentTime);
       if (loop && ev.t >= loop.to) break; // handled by the loop wrap below
       if (ev.kind === 'note') playNote(ev, at);
+      else if (ev.kind === 'chikari') playChikari(ev, at);
       else if (ev.kind === 'tick') playTick(ev, at);
       else if (ev.kind === 'cursor') dispatchCursorAt(ev, at);
       nextIndex++;

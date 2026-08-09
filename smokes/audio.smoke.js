@@ -138,6 +138,17 @@ export const smokes = [
     },
   },
   {
+    name: 'audio: a gap chikari realizes as a short audible upper-Sa pluck',
+    fn() {
+      const { ctx, player } = make('tal: tintal\ntempo: 60\n\n-S\n> ^da\n');
+      player.setTalaSound('off');
+      player.play();
+      assert.equal(ctx._started.length, 1, 'chikari sounds before the later melody note');
+      close(ctx._started[0].at, 0);
+      assert.equal(ctx._started[0].kind, 'buffer');
+    },
+  },
+  {
     name: 'audio: the pump schedules later events as the clock advances',
     fn() {
       const { ctx, timers, player } = make(SRC);

@@ -76,6 +76,7 @@ const GRACE_CAP = 1 / 2;
  * @returns {{events: object[], duration: number, lineStarts: object[], saFreq: number, saMidi: number}}
  *   events (sorted by t):
  *     {kind:'note',  t, dur, ch, semitone, octave, freq, grace?, glideFrom?}
+ *     {kind:'chikari', t, dur, ch:'S', octave:1, freq, gap?}
  *     {kind:'tick',  t, accent: 'sam'|'khali'|'vibhag'|'plain', cycleMatra, tal}
  *     {kind:'cursor',t, sectionIndex, lineIndex, matraIndex, sourceLine}
  *   lineStarts: [{sectionIndex, lineIndex, sourceLine, t}]
@@ -150,10 +151,15 @@ export function scheduleDocument(doc, opts = {}) {
     const isFree = section.tal === 'free';
     const tal = isFree ? null : getTal(section.tal);
     const bolByRef = new Map();
+    const gapChikarisByRef = new Map();
     for (const bol of line.bols || []) {
-      // Gap chikari is real written rhythm, but it is not a melody-note bol.
-      // Keep it out of the note map until a dedicated chikari sound is chosen.
-      if (bol.gap) continue;
+      if (bol.gap) {
+        if (bol.mark === 'chikari') {
+          const key = `${bol.ref.matraIndex}:${bol.ref.eventIndex}`;
+          gapChikarisByRef.set(key, [...(gapChikarisByRef.get(key) || []), bol]);
+        }
+        continue;
+      }
       if (bol.mark === 'diri' && bol.endRef) {
         bolByRef.set(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`, { ...bol, spanIndex: 0, spanCount: 2 });
         bolByRef.set(`${bol.endRef.matraIndex}:${bol.endRef.eventIndex}`, {
@@ -166,6 +172,33 @@ export function scheduleDocument(doc, opts = {}) {
         bolByRef.set(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`, bol);
       }
     }
+
+    const addChikari = (at, availableDur, bol, gap = false) => {
+      events.push({
+        kind: 'chikari',
+        t: at,
+        dur: Math.min(0.14, Math.max(0.025, availableDur * 0.42)),
+        ch: 'S',
+        semitone: 0,
+        octave: 1,
+        freq: degreeFreq(sa, 0, 1),
+        bol: 'chikari',
+        gap,
+        sourceLine: line.sourceLine,
+        matraIndex: bol?.ref?.matraIndex,
+        eventIndex: bol?.ref?.eventIndex,
+        ...(Number.isInteger(bol?.partIndex) ? { partIndex: bol.partIndex } : {}),
+      });
+    };
+    const addGapChikaris = (matraIndex, eventIndex, event, at, dur) => {
+      const bols = gapChikarisByRef.get(`${matraIndex}:${eventIndex}`) || [];
+      const parts = Math.max(1, Number(event?.writtenSlots) || 1);
+      const partDur = dur / parts;
+      for (const bol of bols) {
+        const partIndex = Math.min(parts - 1, Math.max(0, Number(bol.partIndex) || 0));
+        addChikari(at + partDur * partIndex, partDur, bol, true);
+      }
+    };
 
     if (recordLineStart) {
       lineStarts.push({ sectionIndex, lineIndex, sourceLine: line.sourceLine, t });
@@ -243,7 +276,9 @@ export function scheduleDocument(doc, opts = {}) {
 
         // Whole-matra sustain: extend whatever is ringing.
         if (evs.length === 1 && evs[0].type === 'sustain') {
-          if (ringing) ringing.dur += spm * (evs[0].dur.num / evs[0].dur.den);
+          const sustainDur = spm * (evs[0].dur.num / evs[0].dur.den);
+          addGapChikaris(matraIndex, 0, evs[0], matraStart, sustainDur);
+          if (ringing) ringing.dur += sustainDur;
           t = matraStart + spm;
           return;
         }
@@ -309,8 +344,10 @@ export function scheduleDocument(doc, opts = {}) {
             dur -= graceTotal; // the destination pays for its graces
             graceTotal = 0;
           }
+          addGapChikaris(matraIndex, eventIndex, e, cursor, dur);
           if (e.type === 'note') {
             const bol = bolByRef.get(`${matraIndex}:${eventIndex}`);
+            if (bol?.mark === 'chikari') addChikari(cursor, dur, bol);
             const strokeCount = bol?.mark === 'diri' && !Number.isInteger(bol.spanIndex)
               ? Math.max(2, Number(bol.rate) || 2)
               : 1;

@@ -429,7 +429,7 @@ export const smokes = [
       assert.equal(span.dataset.toAttackOrdinal, '1');
       assert.equal(
         span.querySelector('path').getAttribute('d'),
-        'M25,18 L75,18 M46,3 L50,15 L54,3'
+        'M25,19 L75,19 M42.5,2 L50,17 L57.5,2'
       );
       assert.equal(root.querySelectorAll('.sr-bol-cross-span').length, 1);
       assert.equal(root.querySelectorAll('.sr-bol-diri-span-start, .sr-bol-diri-span-end').length, 0);

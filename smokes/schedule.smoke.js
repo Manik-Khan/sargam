@@ -12,6 +12,7 @@ const close = (a, b, msg) =>
 
 const sched = (src, opts) => scheduleDocument(parseDocument(src).doc, opts);
 const notes = (s) => s.events.filter((e) => e.kind === 'note');
+const chikaris = (s) => s.events.filter((e) => e.kind === 'chikari');
 const ticks = (s) => s.events.filter((e) => e.kind === 'tick');
 const cursors = (s) => s.events.filter((e) => e.kind === 'cursor');
 
@@ -127,6 +128,23 @@ export const smokes = [
       assert.deepEqual(ns.map((note) => note.strokeCount), [undefined, undefined]);
       close(ns[0].t, 0);
       close(ns[1].t, 1);
+    },
+  },
+  {
+    name: 'timing: gap and note chikari add short upper Sa plucks without replacing melody',
+    fn() {
+      const s = sched('tal: tintal\ntempo: 60\nsa: A3\n\n-S S\n> ^da chikari\n');
+      const cs = chikaris(s);
+      assert.equal(cs.length, 2);
+      assert.deepEqual(cs.map((event) => event.gap), [true, false]);
+      assert.deepEqual(cs.map((event) => event.octave), [1, 1]);
+      cs.forEach((event) => {
+        close(event.freq, 440);
+        assert.ok(event.dur <= 0.14 && event.dur >= 0.025);
+      });
+      close(cs[0].t, 0);
+      close(cs[1].t, 1);
+      assert.equal(notes(s).length, 2, 'the two written melody notes remain present');
     },
   },
   {

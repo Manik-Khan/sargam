@@ -1357,10 +1357,10 @@ function underarcSvg() {
  * itself does not stretch wider just because the notes are farther apart. */
 function diriCrossSvg(fromX, toX) {
   const middle = (fromX + toX) / 2;
-  const halfWidth = Math.min(4, Math.max(2.5, (toX - fromX) * 0.1));
+  const halfWidth = Math.min(8, Math.max(6, (toX - fromX) * 0.15));
   return svgEl(
     'sr-bol-cross-svg',
-    `M${fromX},18 L${toX},18 M${middle - halfWidth},3 L${middle},15 L${middle + halfWidth},3`
+    `M${fromX},19 L${toX},19 M${middle - halfWidth},2 L${middle},17 L${middle + halfWidth},2`
   );
 }
 
