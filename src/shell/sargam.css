@@ -2233,6 +2233,44 @@
   align-self: stretch;
   border-radius: 0;
 }
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-cell.sr-has-bol-lane,
+.app-export-grid .sr-cell.sr-has-bol-lane {
+  padding-bottom: calc(0.12em + (1.05em * var(--sr-bol-pass-count, 1)));
+}
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol,
+.app-export-grid .sr-bol {
+  z-index: 3;
+  grid-row: 2 !important;
+  align-self: end;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(1.05em * var(--sr-bol-pass-count, 1));
+  justify-content: flex-end;
+  padding: 0.06em 0.12em 0.08em;
+  border-top: 1px dashed color-mix(in srgb, var(--sr-accent) 38%, transparent);
+  background: color-mix(in srgb, var(--sr-accent) 5%, var(--sr-paper-raised));
+  overflow: hidden;
+}
+.app-rhythm-grid .sr-bol-phrase-spacer,
+.app-export-grid .sr-bol-phrase-spacer,
+.app-export-graph-paper .sr-bol-phrase-spacer { display: none; }
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol-pass,
+.app-export-grid .sr-bol-pass,
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol-layout,
+.app-export-grid .sr-bol-layout,
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol-slots,
+.app-export-grid .sr-bol-slots {
+  width: 100%;
+  min-width: 0;
+}
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol-slots,
+.app-export-grid .sr-bol-slots {
+  grid-template-columns: repeat(var(--sr-bol-written-slots), minmax(0, 1fr)) !important;
+  column-gap: 0.02em;
+}
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol-slot,
+.app-export-grid .sr-bol-slot { min-width: 0; font-size: 0.7em; }
 .app-rhythm-grid .sr-cell[data-grid-span="2"] {
   width: 4.35em;
   min-width: 4.35em;

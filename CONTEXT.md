@@ -1,6 +1,6 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-08-08, after the direct Grid Write bol-menu and repeat-layout pass. The July 30 product rulings below remain binding.
+**Updated:** 2026-08-08, after the per-note Diri, legacy-bol migration, and dense-cell legibility pass. The July 30 product rulings below remain binding except where this checkpoint explicitly supersedes them.
 
 **What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with `SARGAM_NEXT_SESSION_CONTEXT_2026-07-30_PRINT_PLAYER_CHECKPOINT.md`, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
@@ -9,12 +9,12 @@ Manik is the musical and product authority. Never invent raga, tala, bol, orname
 ## August 7 stabilization note
 
 - **Graph Grid** is the existing Rhythm Grid developed into a clearer working surface: every rendered matra carries its tala-matra coordinate and subdivision count, and retains a visible selected-cell state while its Markdown source line remains authoritative.
-- **Grid Write** is the companion direct editor. It exposes one input box per written matra, rewrites only the corresponding Markdown music line, updates the score and playback model immediately, keeps invalid/incomplete drafts out of the source, and supports adding a matra to an existing line. A `+` beneath every real note attack opens a local da/ra/diri/chikari menu; choosing once writes the ordinary editable `>` attachment lane at that exact note and closes the menu. There is no Grid Write capture mode or cursor to advance. Text Write retains its keyboard Bol Capture workflow and remains available for headings, attachment lines, and broader structural edits.
+- **Grid Write** is the companion direct editor. It exposes one input box per written matra, rewrites only the corresponding Markdown music line, updates the score and playback model immediately, keeps invalid/incomplete drafts out of the source, and supports adding a matra to an existing line. A `+` beneath every real note attack opens a local da/ra/diri/chikari menu; choosing once writes the ordinary editable `>` attachment lane at that exact note and closes the menu. Diri belongs to that one note and schedules two equal strokes inside the note's own duration; four notes with four Diris therefore sound as eight strikes in one matra. Entering Grid Write migrates older score-side bol anchors into these editable lanes, and complete pre-change two-attack Diri lanes remain readable without shifting later bols. There is no Grid Write capture mode or cursor to advance. Text Write retains its keyboard Bol Capture workflow and remains available for headings, attachment lines, and broader structural edits.
 - Grid users can persist either **Cells** (only written matras are boxed) or **Graph Paper** (an actual matrix in which every written cell is exactly one matra and trailing empty columns are real cell elements) across both the rendered score and Grid Write. PDF export separately offers Clean, Matra cells, and the same real-cell Graph Paper matrix. Subdivisions, kan/approach ornaments, and repeat endings remain inside their owning matra; five-to-eight-slot beats wrap internally rather than taking neighboring cells. Four-note cells use compact internal tracks with a safety inset from vibhag dividers. Line repeats `||:` / `:||` occupy their own non-musical structural grid positions before/after the repeated matras; they never share, shrink, or cover a note cell. Graph-paper structure labels and written cues use a restrained printer-safe tint so grid lines do not run through prose. Rendered bol lanes occupy a small per-matra strip whose subdivisions share the note attack grid. The view changes without changing Markdown, timing, or playback math. Tala markers remain inset in their upper-left coordinate lane instead of following delayed attacks into vibhag dividers.
 - The graph-grid preference and the PDF page, typeface, grid, and ink choices persist locally.
 - `docs/release-checklist.md` is now the repeatable writing, playback, print, and restoration acceptance gate.
 - Stale numbered copies and committed Finder metadata were removed. Do not restore them.
-- Verification at this checkpoint: **575 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
+- Verification at this checkpoint: **578 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
 - Any future richer direct manipulation—deleting or reordering cells, creating whole lines, or editing attachment lanes—must continue to use parser-backed source identities rather than guessing at spaces or ornaments.
 
 ## Authoritative current state — 2026-07-30
@@ -140,7 +140,7 @@ Preserve:
 
 Do not casually reopen:
 
-- Diri as a two-consecutive-attack `V`;
+- Diri as a per-note `V` that doubles that note into two equal strokes. This supersedes the older two-consecutive-attack interpretation;
 - meter spans as the accepted mirrored bracket;
 - repeated local approaches and their independent arcs;
 - repeat signs outside the metric note grid;

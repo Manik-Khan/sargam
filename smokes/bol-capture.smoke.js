@@ -4,6 +4,7 @@ import {
   beginBolCapture,
   beginBolCaptureAt,
   bolCursorSelection,
+  migrateAllBolAnchors,
   moveBolCursor,
   removeBolAtAttack,
   setBolAtAttack,
@@ -103,25 +104,25 @@ export const smokes = [
     },
   },
   {
-    name: 'bol capture: diri writes an explicit two-attack span and advances by two',
+    name: 'bol capture: diri doubles one note and advances by one attack',
     fn() {
       const result = setBolAtCursor(source, { sourceLine: 3, ordinal: 4 }, 'diri');
       assert.equal(result.ok, true);
-      assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 6 });
-      assert.match(result.text, /> \.- \. \. \. diri \./);
+      assert.deepEqual(result.cursor, { sourceLine: 3, ordinal: 5 });
+      assert.match(result.text, /> \.- \. \. \. diri \. \./);
       const parsed = parseDocument(result.text);
       assert.deepEqual(parsed.doc.sections[0].lines[0].bols.map((bol) => bol.mark), ['diri']);
+      assert.equal(parsed.doc.sections[0].lines[0].bols[0].rate, 2);
       assert.deepEqual(parseAnchorDocument(result.text).marks, []);
     },
   },
   {
-    name: 'bol capture: entering a correction replaces an overlapping diri',
+    name: 'bol capture: a neighboring bol does not erase a per-note diri',
     fn() {
       const diri = setBolAtCursor(source, { sourceLine: 3, ordinal: 2 }, 'diri');
       const corrected = setBolAtCursor(diri.text, { sourceLine: 3, ordinal: 3 }, 'da');
       assert.equal(corrected.ok, true);
-      assert.match(corrected.text, /> \.- \. \. da \. \. \./);
-      assert.doesNotMatch(corrected.text, /diri/);
+      assert.match(corrected.text, /> \.- \. diri da \. \. \./);
     },
   },
   {
@@ -141,6 +142,31 @@ export const smokes = [
       assert.match(result.text, /S- SS SS SS\n> da- \. \. \. \. \. \.\n/);
       assert.deepEqual(parseAnchorDocument(result.text).marks, []);
       assert.match(result.message, /Moved 1 existing bol mark/);
+    },
+  },
+  {
+    name: 'bol migration: Grid Write upgrades all old anchors to editable per-note lanes',
+    fn() {
+      const oldSource = 'tal: tintal\n\nS R g m\n';
+      const withDa = addAnchorMark(oldSource, {
+        kind: 'da',
+        start: { anchorKind: 'attack', sourceLine: 3, ordinal: 0, time: '0', note: 'S' },
+      });
+      const withDiri = addAnchorMark(withDa.text, {
+        kind: 'diri',
+        start: { anchorKind: 'attack', sourceLine: 3, ordinal: 1, time: '1', note: 'R' },
+        end: { anchorKind: 'attack', sourceLine: 3, ordinal: 2, time: '2', note: 'g' },
+      });
+      assert.equal(withDiri.ok, true);
+      const migrated = migrateAllBolAnchors(withDiri.text);
+      assert.equal(migrated.ok, true);
+      assert.equal(migrated.count, 2);
+      assert.match(migrated.text, /S R g m\n> da diri \. \.\n/);
+      assert.deepEqual(parseAnchorDocument(migrated.text).marks, []);
+      assert.deepEqual(
+        parseDocument(migrated.text).doc.sections[0].lines[0].bols.map((bol) => ({ mark: bol.mark, rate: bol.rate })),
+        [{ mark: 'da', rate: undefined }, { mark: 'diri', rate: 2 }]
+      );
     },
   },
   {
@@ -171,28 +197,25 @@ export const smokes = [
       let result = beginBolCapture(music, music.indexOf('@10'));
       assert.equal(result.ok, true);
       assert.match(result.text, /> \. \. \(\.--\. \. \. \. \.\)x2 \.-\. \.\n/);
-      for (const kind of ['da', 'da', 'da', 'da', 'ra', 'da', 'diri']) {
+      for (const kind of ['da', 'da', 'da', 'da', 'ra', 'da', 'diri', 'diri']) {
         result = setBolAtCursor(result.text, result.cursor, kind);
         assert.equal(result.ok, true);
       }
       assert.match(
         result.text,
-        /> da da \(da--da ra da diri\)x2 \.-\. \.\n/
+        /> da da \(da--da ra da diri diri\)x2 \.-\. \.\n/
       );
       const parsed = parseDocument(result.text);
       assert.deepEqual(parsed.problems, []);
       assert.deepEqual(
         parsed.doc.sections[0].lines[0].bols.map((bol) => bol.mark),
-        ['da', 'da', 'da', 'da', 'ra', 'da', 'diri']
+        ['da', 'da', 'da', 'da', 'ra', 'da', 'diri', 'diri']
       );
-      assert.deepEqual(parsed.doc.sections[0].lines[0].bols.at(-1).endRef, {
-        matraIndex: 2,
-        eventIndex: 3,
-      });
+      assert.equal(parsed.doc.sections[0].lines[0].bols.at(-1).rate, 2);
     },
   },
   {
-    name: 'bol capture: a numbered second pass writes one fast diri per attack',
+    name: 'bol capture: four per-note diris make eight strikes in one four-note matra',
     fn() {
       const music = 'tal: tintal\n\n(S--S SSSS)x2\n';
       const started = beginBolCapture(music, music.indexOf('('));

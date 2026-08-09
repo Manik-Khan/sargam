@@ -99,6 +99,22 @@ export const smokes = [
     },
   },
   {
+    name: 'timing: four per-note Diris make eight evenly timed strikes inside one matra',
+    fn() {
+      const s = sched('tal: tintal\ntempo: 60\n\nSSSS\n> diri diri diri diri\n');
+      const ns = notes(s);
+      assert.equal(ns.length, 8);
+      ns.forEach((note, index) => {
+        close(note.t, index / 8);
+        close(note.dur, 1 / 8);
+        assert.equal(note.bol, 'diri');
+        assert.equal(note.strokeCount, 2);
+        assert.equal(note.strokeIndex, index % 2);
+      });
+      close(s.duration, 1);
+    },
+  },
+  {
     name: 'timing: whole-matra sustains extend the previous note across matras',
     fn() {
       const s = sched('tal: tintal\ntempo: 60\n\nS - - m\n');

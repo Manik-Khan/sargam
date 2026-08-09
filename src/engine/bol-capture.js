@@ -12,7 +12,7 @@ import { parseDocument } from './parse.js';
 import {
   BOL_KINDS,
   formatBolLane,
-  parseBolLane,
+  parseBolLaneCompatible,
 } from './bol-lane.js';
 
 const INSERT_KEYS = new Map([
@@ -103,7 +103,7 @@ function structuralLane(text, sourceLine, pass = 1) {
   const musicLine = musicLineForSource(text, sourceLine);
   if (!musicLine) return null;
   const found = findBolLane(text, sourceLine, pass);
-  const parsed = parseBolLane(found.body, musicLine, { diriAttacks: pass > 1 ? 1 : 2 });
+  const parsed = parseBolLaneCompatible(found.body, musicLine);
   return { musicLine, found, parsed };
 }
 
@@ -173,13 +173,39 @@ function migrateBolAnchors(text, sourceLine) {
   const coveredBy = [...lane.parsed.coveredBy];
   for (const mark of migrated) {
     assignments[mark.from] = mark.kind;
-    if (mark.kind === 'diri') {
-      for (let i = mark.from + 1; i <= mark.to; i++) coveredBy[i] = mark.from;
-    }
   }
   const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
   const written = writeBolLane(withoutAnchors, sourceLine, formatted.text);
   return { ...written, count: migrated.length };
+}
+
+/** Move every legacy score-side da/ra/diri/chikari mark into the ordinary
+ * per-note `>` lanes. Grid Write calls this once on entry so old bols do not
+ * remain as detached overlays that the new cell editor cannot manage. */
+export function migrateAllBolAnchors(text) {
+  const metadata = parseAnchorMetadata(text);
+  if (metadata.problems.length) {
+    return { ok: false, text, count: 0, message: metadata.problems[0].msg };
+  }
+  const sourceLines = [...new Set(metadata.marks
+    .map((mark) => bolAnchorRange(mark)?.sourceLine)
+    .filter(Number.isInteger))].sort((a, b) => a - b);
+  let nextText = text;
+  let count = 0;
+  for (const sourceLine of sourceLines) {
+    const migrated = migrateBolAnchors(nextText, sourceLine);
+    if (!migrated.ok) return { ...migrated, text: nextText, count };
+    nextText = migrated.text;
+    count += migrated.count;
+  }
+  return {
+    ok: true,
+    text: nextText,
+    count,
+    message: count
+      ? `Moved ${count} previous bol mark${count === 1 ? '' : 's'} into the editable matra cells.`
+      : 'No previous score-side bols need migration.',
+  };
 }
 
 export function bolCursorSelection(text, cursor) {
@@ -195,7 +221,7 @@ export function bolCursorSelection(text, cursor) {
   const body = line.slice(bodyOffset);
   const musicLine = musicLineForSource(text, sourceLine);
   if (!musicLine) return null;
-  const parsed = parseBolLane(body, musicLine, { diriAttacks: pass > 1 ? 1 : 2 });
+  const parsed = parseBolLaneCompatible(body, musicLine);
   const range = parsed.ranges[ordinal];
   if (range) {
     const leading = body.length - body.trimStart().length;
@@ -350,10 +376,7 @@ export function setBolAtCursor(text, cursor, kind) {
   if (!Number.isInteger(ordinal) || ordinal < 0 || ordinal >= info.attacks.length) {
     return { ok: false, text, message: 'This phrase is complete. Move left to correct it.' };
   }
-  const span = kind === 'diri' && pass === 1 ? 2 : 1;
-  if (ordinal + span > info.attacks.length) {
-    return { ok: false, text, message: 'Diri needs two consecutive attacks; only one remains.' };
-  }
+  const span = 1;
 
   const lane = structuralLane(text, sourceLine, pass);
   if (!lane) return { ok: false, text, message: 'The active music line no longer exists.' };
@@ -366,7 +389,6 @@ export function setBolAtCursor(text, cursor, kind) {
   const assignments = cleared.assignments;
   const coveredBy = cleared.coveredBy;
   assignments[ordinal] = kind;
-  if (kind === 'diri' && span === 2) coveredBy[ordinal + 1] = ordinal;
 
   const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
   const written = writeBolLane(text, sourceLine, formatted.text, { pass });
@@ -379,7 +401,7 @@ export function setBolAtCursor(text, cursor, kind) {
     ...written,
     cursor: nextCursor,
     selection: bolCursorSelection(written.text, nextCursor),
-    message: `${kind === 'diri' ? 'Diri' : kind} written to bol pass ${pass}. ${captureStatus(info.attacks.length, nextOrdinal)}`,
+    message: `${kind === 'diri' ? 'Diri (two strokes)' : kind} written to bol pass ${pass}. ${captureStatus(info.attacks.length, nextOrdinal)}`,
   };
 }
 

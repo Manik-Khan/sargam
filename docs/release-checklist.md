@@ -21,7 +21,9 @@ The command must end with every smoke check passing and a successful production 
 - Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
 - Switch between Text Write and Grid Write and reload once. Confirm the chosen writing surface persists and headings or attachment lines remain unchanged.
 - Toggle the grid look between **Cells** and **Paper**. Confirm Paper continues each musical row through unused width with empty matra-sized boxes (no smaller background grid), the choice survives reload, and a kan such as `{m}g` remains legible.
-- In Grid Write, click the `+` beneath a note attack. Confirm a local da/ra/diri/chikari menu opens; choose one bol and verify the menu closes, the ordinary editable `>` lane changes, and the bol appears in the matching rendered cell strip. Reopen that note's symbol and remove it. Diri must span its exact attacks without changing the notes.
+- In Grid Write, click the `+` beneath a note attack. Confirm a local da/ra/diri/chikari menu opens; choose one bol and verify the menu closes, the ordinary editable `>` lane changes, and the bol appears in the matching rendered cell strip. Reopen that note's symbol and remove it. Diri must remain under that one note without consuming or shifting its neighbor.
+- Write `SSSS` in one matra, attach Diri to all four notes, and play it at 60 BPM. Confirm four legible `V` marks remain inside the cell and eight evenly spaced strikes sound within that one-second matra.
+- Open a document containing older score-side bol marks and switch to Grid Write. Confirm they become editable `>` lanes automatically, disappear from the detached annotation overlay, and retain their note alignment. A structurally complete older two-attack Diri lane must not shift the bols that follow it.
 - On lines with delayed attacks or leading holds, confirm `0`, `1`, `2`, `3`, and `+` tala markers remain inset at the upper-left of their cells and never overlap a vibhag divider, repeat sign, octave dot, or ornament.
 - Resize the score/editor divider and confirm neither surface jumps to another line.
 

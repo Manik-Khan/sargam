@@ -2,8 +2,8 @@
 // rendering, and serialization.
 //
 // The music line owns rhythm. A bol lane mirrors its written hold slots and
-// phrase repeats, while bol words attach only to note attacks. Diri is one
-// authored word spanning two successive attacks.
+// phrase repeats, while bol words attach only to note attacks. Diri belongs
+// to one note attack and re-articulates that note twice inside its duration.
 
 export const BOL_KINDS = new Set(['da', 'ra', 'diri', 'chikari']);
 
@@ -98,7 +98,7 @@ function compareRepeats(plan, actual, problems) {
  * Older flat lanes remain readable because omitted hold markers are skipped
  * automatically; structural capture always writes the complete form.
  */
-export function parseBolLane(text, line, { diriAttacks = 2 } = {}) {
+export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
   const source = String(text ?? '').trim();
   const plan = buildBolPlan(line);
   const assignments = Array(plan.attacks.length).fill(null);
@@ -205,7 +205,46 @@ export function parseBolLane(text, line, { diriAttacks = 2 } = {}) {
   }
   compareRepeats(plan, repeats, problems);
 
-  return { plan, assignments, coveredBy, ranges, repeats, problems };
+  return {
+    plan,
+    assignments,
+    coveredBy,
+    ranges,
+    repeats,
+    problems,
+    consumedAttacks: Math.max(0, lastAttack + 1),
+  };
+}
+
+/** Read pre-August-8 lanes without shifting every bol after a legacy
+ * two-attack Diri. A complete old structural lane is normalized in memory to
+ * one fast Diri plus one explicit gap; the next Grid/Text edit serializes the
+ * unambiguous modern lane automatically. */
+export function parseBolLaneCompatible(text, line) {
+  const modern = parseBolLane(text, line, { diriAttacks: 1 });
+  if (!/(?:^|\s|\()diri(?:$|\s|\))/.test(String(text ?? ''))) return modern;
+
+  const legacy = parseBolLane(text, line, { diriAttacks: 2 });
+  const total = modern.plan.attacks.length;
+  const modernComplete = modern.consumedAttacks >= total;
+  const legacyComplete = legacy.consumedAttacks >= total;
+  const useLegacy = legacy.problems.length === 0 && (
+    modern.problems.length > 0 || (!modernComplete && legacyComplete)
+  );
+  if (!useLegacy) return modern;
+
+  const ranges = [...legacy.ranges];
+  for (let ordinal = 0; ordinal < legacy.coveredBy.length; ordinal++) {
+    if (legacy.coveredBy[ordinal] !== null && legacy.coveredBy[ordinal] !== undefined) {
+      ranges[ordinal] = null;
+    }
+  }
+  return {
+    ...legacy,
+    coveredBy: Array(total).fill(null),
+    ranges,
+    legacyDiri: true,
+  };
 }
 
 export function assignmentsFromBols(line, bols = line?.bols || []) {
@@ -216,9 +255,6 @@ export function assignmentsFromBols(line, bols = line?.bols || []) {
     const attack = plan.attackByRef.get(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`);
     if (!attack || !BOL_KINDS.has(bol.mark)) continue;
     assignments[attack.ordinal] = bol.mark;
-    if (bol.mark === 'diri' && bol.rate !== 2 && attack.ordinal + 1 < assignments.length) {
-      coveredBy[attack.ordinal + 1] = attack.ordinal;
-    }
   }
   return { plan, assignments, coveredBy };
 }

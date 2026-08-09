@@ -12,7 +12,7 @@ const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
 const BOL_OPTIONS = [
   { kind: 'da', label: 'da' },
   { kind: 'ra', label: 'ra' },
-  { kind: 'diri', label: 'diri' },
+  { kind: 'diri', label: 'diri · 2 strokes' },
   { kind: 'chikari', label: 'chikari' },
 ];
 
@@ -201,7 +201,9 @@ export default function GridEditor({
                                   className={`app-grid-bol-slot${bol ? ' has-bol' : ''}${covered ? ' is-covered' : ''}${selected ? ' selected' : ''}`}
                                   aria-pressed={selected}
                                   aria-label={`Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, attack ${attack.ordinal + 1}${bol ? `, ${bol.mark}` : ', no bol'}`}
-                                  title={bol ? `Change ${bol.mark}` : 'Add a bol to this note'}
+                                  title={bol
+                                    ? `Change ${bol.mark}${bol.mark === 'diri' ? ' · two strokes on this note' : ''}`
+                                    : 'Add a bol to this note'}
                                   onClick={() => chooseBolAttack(row.sourceLine, cell.matraIndex, attack.ordinal)}
                                 >{bol ? BOL_SYMBOL[bol.mark] : covered ? '·' : '+'}</button>
                               );

@@ -96,9 +96,9 @@ export const smokes = [
       assert.deepEqual(row.bolPasses[0].marks.map((mark) => mark.mark), ['da', 'ra', 'da', 'diri']);
       assert.deepEqual(row.bolPasses[0].marks.at(-1), {
         ordinal: 3,
-        toOrdinal: 4,
+        toOrdinal: 3,
         mark: 'diri',
-        rate: 1,
+        rate: 2,
       });
     },
   },
@@ -116,7 +116,7 @@ export const smokes = [
       assert.match(editor, /One box = one matra/);
       assert.match(editor, /beneath a note adds its bol/);
       assert.match(editor, /app-grid-bol-menu/);
-      assert.match(editor, /kind: 'diri', label: 'diri'/);
+      assert.match(editor, /kind: 'diri', label: 'diri · 2 strokes'/);
     },
   },
 ];

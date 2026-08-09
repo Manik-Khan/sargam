@@ -450,7 +450,7 @@ export const smokes = [
   {
     name: 'bols: words da ra diri attach per note event, including inside clusters',
     fn: () => {
-      const { doc, problems } = parseDocument('tal: tintal\n\nSR g m P d n\n> da ra da diri da ra\n');
+      const { doc, problems } = parseDocument('tal: tintal\n\nSR g m P d n\n> da ra da diri da ra da\n');
       assert.deepEqual(problems, []);
       const l = doc.sections[0].lines[0];
       assert.deepEqual(l.bols, [
@@ -460,10 +460,11 @@ export const smokes = [
         {
           ref: { matraIndex: 2, eventIndex: 0 },
           mark: 'diri',
-          endRef: { matraIndex: 3, eventIndex: 0 },
+          rate: 2,
         },
-        { ref: { matraIndex: 4, eventIndex: 0 }, mark: 'da' },
-        { ref: { matraIndex: 5, eventIndex: 0 }, mark: 'ra' },
+        { ref: { matraIndex: 3, eventIndex: 0 }, mark: 'da' },
+        { ref: { matraIndex: 4, eventIndex: 0 }, mark: 'ra' },
+        { ref: { matraIndex: 5, eventIndex: 0 }, mark: 'da' },
       ]);
     },
   },
@@ -489,7 +490,7 @@ export const smokes = [
         {
           ref: { matraIndex: 2, eventIndex: 0 },
           mark: 'diri',
-          endRef: { matraIndex: 3, eventIndex: 0 },
+          rate: 2,
         },
       ]);
     },
@@ -505,7 +506,7 @@ export const smokes = [
       assert.deepEqual(line.bols.at(-1), {
         ref: { matraIndex: 2, eventIndex: 2 },
         mark: 'diri',
-        endRef: { matraIndex: 2, eventIndex: 3 },
+        rate: 2,
       });
     },
   },

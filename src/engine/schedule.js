@@ -149,6 +149,10 @@ export function scheduleDocument(doc, opts = {}) {
     if (!line.matras || line.matras.length === 0) return;
     const isFree = section.tal === 'free';
     const tal = isFree ? null : getTal(section.tal);
+    const bolByRef = new Map((line.bols || []).map((bol) => [
+      `${bol.ref.matraIndex}:${bol.ref.eventIndex}`,
+      bol,
+    ]));
 
     if (recordLineStart) {
       lineStarts.push({ sectionIndex, lineIndex, sourceLine: line.sourceLine, t });
@@ -293,21 +297,38 @@ export function scheduleDocument(doc, opts = {}) {
             graceTotal = 0;
           }
           if (e.type === 'note') {
-            const ev = {
-              kind: 'note',
-              t: cursor,
-              dur,
-              ch: e.ch,
-              semitone: SEMITONES[e.ch],
-              octave: e.octave || 0,
-              freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
-            };
-            if (e.approachSlide) {
-            ev.glideFrom = degreeFreq(sa, SEMITONES[e.approachSlide.ch], e.approachSlide.octave || 0);
-          }
-          events.push(ev);
-            placed.set(`${matraIndex}:${eventIndex}`, ev);
-            ringing = ev;
+            const bol = bolByRef.get(`${matraIndex}:${eventIndex}`);
+            const strokeCount = bol?.mark === 'diri'
+              ? Math.max(2, Number(bol.rate) || 2)
+              : 1;
+            const strokeDur = dur / strokeCount;
+            let firstStroke = null;
+            let lastStroke = null;
+            for (let strokeIndex = 0; strokeIndex < strokeCount; strokeIndex++) {
+              const ev = {
+                kind: 'note',
+                t: cursor + strokeIndex * strokeDur,
+                dur: strokeDur,
+                ch: e.ch,
+                semitone: SEMITONES[e.ch],
+                octave: e.octave || 0,
+                freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
+                ...(bol ? { bol: bol.mark } : {}),
+                ...(strokeCount > 1 ? { strokeIndex, strokeCount } : {}),
+              };
+              if (e.approachSlide && strokeIndex === 0) {
+                ev.glideFrom = degreeFreq(
+                  sa,
+                  SEMITONES[e.approachSlide.ch],
+                  e.approachSlide.octave || 0
+                );
+              }
+              events.push(ev);
+              if (!firstStroke) firstStroke = ev;
+              lastStroke = ev;
+            }
+            placed.set(`${matraIndex}:${eventIndex}`, firstStroke);
+            ringing = lastStroke;
             cursor += dur;
           } else if (e.type === 'rest') {
             ringing = null;

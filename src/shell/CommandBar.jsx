@@ -27,7 +27,7 @@ const COMMANDS = [
 const TOOLS = [
   ['da', '|', 'Da — one attack'],
   ['ra', '—', 'Ra — one attack'],
-  ['diri', 'V', 'Diri — drag across two consecutive attacks'],
+  ['diri', 'V', 'Legacy Diri span — Grid Write + is the per-note double stroke'],
   ['chikari', '^', 'Chikari — one attack'],
 ];
 

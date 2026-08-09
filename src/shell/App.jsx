@@ -104,6 +104,7 @@ import { BAGESHRI_STARTER } from '../examples/bageshri.js';
 import {
   applyBolCaptureKey,
   beginBolCapture,
+  migrateAllBolAnchors,
   removeBolAtAttack,
   setBolAtAttack,
 } from '../engine/bol-capture.js';
@@ -1842,6 +1843,17 @@ export default function App() {
     store.setPref('writeMode', next);
     if (next === 'grid' && !rhythmGrid) changeRhythmGrid(true);
   };
+
+  useEffect(() => {
+    if (writeMode !== 'grid') return;
+    const currentText = textRef.current;
+    const migrated = migrateAllBolAnchors(currentText);
+    if (!migrated.ok || !migrated.count || migrated.text === currentText) return;
+    textRef.current = migrated.text;
+    setText(migrated.text);
+    setBolMessage(migrated.message);
+    setSelectedMarkId(null);
+  }, [writeMode]);
 
   const selectGridWriterCell = (sourceLine, matraIndex) => {
     setActiveLine(sourceLine);

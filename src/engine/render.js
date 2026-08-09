@@ -419,8 +419,8 @@ function renderLineBlock(line, tal, ctx) {
 
   // --- structural bol lane (grid row 4).
   // It mirrors each matra's written microbeat slots. A hold remains a short
-  // '-', point strokes sit beneath their exact attack, and Diri spans the two
-  // successive attacks it consumes.
+  // '-', point strokes sit beneath their exact attack, and each Diri remains
+  // in one note column while declaring two performed strokes.
   const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
   const bolPlan = buildBolPlan(line);
   const bolAttackOffset = Math.max(0, Number(line._attackOffset) || 0);
@@ -440,12 +440,10 @@ function renderLineBlock(line, tal, ctx) {
     el.style.gridRow = '4';
     el.style.gridColumn = String(colOf[mi]);
     const slots = [];
-    const firstSlotOfEvent = new Map();
     for (let eventIndex = 0; eventIndex < line.matras[mi].events.length; eventIndex++) {
       const event = line.matras[mi].events[eventIndex];
       if (event.grace) continue;
       const attack = bolPlan.attackByRef.get(`${mi}:${eventIndex}`);
-      firstSlotOfEvent.set(eventIndex, slots.length);
       const count = Math.max(1, Number(event.writtenSlots) || 1);
       for (let partIndex = 0; partIndex < count; partIndex++) {
         slots.push({
@@ -475,11 +473,6 @@ function renderLineBlock(line, tal, ctx) {
             .join(' ')
         : 'minmax(0.84em, max-content)';
       const bolAtEvent = new Map(group.map((bol) => [bol.ref.eventIndex, bol]));
-      const coveredEvents = new Set(
-        group
-          .filter((bol) => bol.mark === 'diri' && bol.endRef?.matraIndex === mi)
-          .map((bol) => bol.endRef.eventIndex)
-      );
       for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
         const slot = slots[slotIndex];
         if (slot.partIndex > 0) {
@@ -496,23 +489,16 @@ function renderLineBlock(line, tal, ctx) {
             'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark + rateClass,
             BOL_SYMBOL[bol.mark] ?? bol.mark
           );
-          const endSlot = bol.mark === 'diri' && bol.endRef?.matraIndex === mi
-            ? firstSlotOfEvent.get(bol.endRef.eventIndex)
-            : null;
-          mark.style.gridColumn = Number.isInteger(endSlot)
-            ? `${slotIndex + 1} / ${endSlot + 2}`
-            : String(slotIndex + 1);
+          mark.style.gridColumn = String(slotIndex + 1);
+          mark.setAttribute('data-bol-rate', String(Math.max(1, Number(bol.rate) || 1)));
+          if (bol.mark === 'diri') {
+            mark.setAttribute('aria-label', 'Diri: two strokes on this note');
+            mark.title = 'Diri · two strokes on this note';
+          }
           if (Number.isInteger(slot.attackOrdinal)) {
             mark.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
           }
           grid.appendChild(mark);
-        } else if (coveredEvents.has(slot.eventIndex)) {
-          const covered = h('span', 'sr-bol-slot sr-bol-covered', '·');
-          covered.style.gridColumn = String(slotIndex + 1);
-          if (Number.isInteger(slot.attackOrdinal)) {
-            covered.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
-          }
-          grid.appendChild(covered);
         } else {
           const blank = h('span', 'sr-bol-slot sr-bol-blank', '');
           blank.style.gridColumn = String(slotIndex + 1);
@@ -750,7 +736,10 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   if (longestGraceRun > 0 || hasLocalApproach || suffix || repeatLanding) {
     gridSpan = Math.max(gridSpan, 2);
   }
-  if (longestGraceRun >= 4 || (visualSlots.length >= 6 && (suffix || repeatLanding))) {
+  if (
+    longestGraceRun >= 4 ||
+    (visualSlots.length >= 4 && (suffix || repeatLanding))
+  ) {
     gridSpan = 3;
   }
   cell.setAttribute('data-grid-span', String(gridSpan));

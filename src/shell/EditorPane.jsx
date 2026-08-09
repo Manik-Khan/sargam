@@ -239,7 +239,7 @@ export default function EditorPane({
           aria-live={bolCapture ? 'polite' : undefined}
         >
           {bolCapture
-            ? `BOL PASS ${bolCapture.pass || 1} · 1–9 switch pass · holds/repeats mirror notes · ↓ da · ↑ ra · v diri · ^/c chikari · ←/→ move · Delete erase · Esc direct edit — ${bolMessage || ''}`
+            ? `BOL PASS ${bolCapture.pass || 1} · 1–9 switch pass · holds/repeats mirror notes · ↓ da · ↑ ra · v diri (2 strokes on this note) · ^/c chikari · ←/→ move · Delete erase · Esc direct edit — ${bolMessage || ''}`
             : (showStructure ? 'Generated anchors and audio links are editable.' : 'Generated anchors and audio links are folded.')}
         </span>
       </div>

@@ -72,7 +72,7 @@ export function fracToNumber(a) {
  * @property {Span[]} spans               — meend, krintan
  * @property {PhraseRepeat[]} phraseRepeats
  * @property {{matraIndex: number, text: string}[]} lyrics      — resolved per spec §3.7
- * @property {{ref: EventRef, mark: 'da'|'ra'|'diri'}[]} bols   — resolved per spec §3.8
+ * @property {{ref: EventRef, mark: 'da'|'ra'|'diri'|'chikari', rate?: number}[]} bols — one mark per note attack; Diri has rate 2
  * @property {{col: number, text: string}[]} passthrough        — unparsed fragments, rendered dim
  * @property {number} sourceLine
  *

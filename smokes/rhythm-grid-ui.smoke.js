@@ -124,7 +124,8 @@ export const smokes = [
       );
       assert.equal(root.querySelector('[data-bol-attack-ordinal="0"]').textContent, '|');
       assert.equal(root.querySelector('[data-bol-attack-ordinal="1"]').textContent, 'V');
-      assert.equal(root.querySelector('[data-bol-attack-ordinal="2"]').textContent, '·');
+      assert.equal(root.querySelector('[data-bol-attack-ordinal="1"]').dataset.bolRate, '2');
+      assert.equal(root.querySelector('[data-bol-attack-ordinal="2"]').textContent, '');
     },
   },
   {

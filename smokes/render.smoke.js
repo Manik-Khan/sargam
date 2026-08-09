@@ -341,7 +341,7 @@ export const smokes = [
   {
     name: "render: bols render as the handwriting's symbols — | for da, — for ra, V diri, ^ chikari",
     fn: () => {
-      const { doc } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra diri chikari da\n');
+      const { doc } = parseDocument('tal: tintal\n\nSR g m P d\n> da ra diri chikari da .\n');
       const root = renderDocument(doc);
       const row = root.querySelector('.sr-row');
       const bol0 = row.querySelector('.sr-bol[data-matra="0"]');
@@ -349,13 +349,13 @@ export const smokes = [
       const marks0 = [...bol0.querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
       assert.deepEqual(marks0, ['|', '—']); // da, ra on S and R
       const marks1 = [...row.querySelector('.sr-bol[data-matra="1"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
-      assert.deepEqual(marks1, ['V']); // diri spans g into m
-      const marks3 = [...row.querySelector('.sr-bol[data-matra="3"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
-      assert.deepEqual(marks3, ['^']); // chikari on P
+      assert.deepEqual(marks1, ['V']); // diri doubles g without consuming m
+      const marks2 = [...row.querySelector('.sr-bol[data-matra="2"]').querySelectorAll('.sr-bol-mark')].map((n) => n.textContent);
+      assert.deepEqual(marks2, ['^']); // chikari remains on P
     },
   },
   {
-    name: 'render: structural bol slots align da--da and a two-attack Diri under S--S SSSS',
+    name: 'render: legacy structural bol slots normalize without shifting later notes',
     fn: () => {
       const source = 'tal: tintal\n\n@10 gR (S--S SSSS)x2 S-SS\n> da da (da--da ra da diri)x2 .-. .\n';
       const { doc, problems } = parseDocument(source);
@@ -371,7 +371,21 @@ export const smokes = [
         [...fast.querySelectorAll('.sr-bol-mark')].map((node) => node.textContent),
         ['—', '|', 'V']
       );
-      assert.match(fast.querySelector('.sr-bol-diri').style.gridColumn, /\//);
+      assert.equal(fast.querySelector('.sr-bol-diri').style.gridColumn, '3');
+      assert.equal(fast.querySelector('.sr-bol-diri').dataset.bolRate, '2');
+    },
+  },
+  {
+    name: 'render: four per-note Diris remain four legible marks under SSSS',
+    fn: () => {
+      const source = 'tal: tintal\n\n(SSSS)x2\n> (diri diri diri diri)x2\n';
+      const { doc, problems } = parseDocument(source);
+      assert.deepEqual(problems, []);
+      const fast = renderDocument(doc).querySelector('.sr-bol[data-matra="0"]');
+      const marks = [...fast.querySelectorAll('.sr-bol-diri')];
+      assert.equal(marks.length, 4);
+      assert.deepEqual(marks.map((node) => node.style.gridColumn), ['1', '2', '3', '4']);
+      assert.deepEqual(marks.map((node) => node.dataset.bolRate), ['2', '2', '2', '2']);
     },
   },
   {

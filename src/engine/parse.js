@@ -19,7 +19,7 @@ import { frac, fracReduce, fracAdd } from './model.js';
 import { getTal, wrapMatra, vibhagOfMatra } from './tala.js';
 import { scanRepeatedSlideAt } from './repeated-slide.js';
 import { extractTerminalReturnCue, isReturnCueToken } from './return-cue.js';
-import { parseBolLane } from './bol-lane.js';
+import { parseBolLaneCompatible } from './bol-lane.js';
 import { performedMatraCount, performedOffsetAt } from './performed-time.js';
 
 const NOTE_CHARS = new Set(['S', 'r', 'R', 'g', 'G', 'm', 'M', 'P', 'd', 'D', 'n', 'N']);
@@ -1346,7 +1346,7 @@ function attachLyrics(musicLine, text, lineNo, problems) {
 // ---------------------------------------------------------------------------
 
 function attachBols(musicLine, text, lineNo, problems, pass = 1) {
-  const lane = parseBolLane(text, musicLine, { diriAttacks: pass > 1 ? 1 : 2 });
+  const lane = parseBolLaneCompatible(text, musicLine);
   lane.pass = pass;
   for (const message of lane.problems) {
     problems.push({ line: lineNo, col: null, msg: message });
@@ -1360,12 +1360,7 @@ function attachBols(musicLine, text, lineNo, problems, pass = 1) {
       ref: { matraIndex: attack.matraIndex, eventIndex: attack.eventIndex },
       mark,
     };
-    if (mark === 'diri' && pass === 1 && ordinal + 1 < lane.plan.attacks.length) {
-      const end = lane.plan.attacks[ordinal + 1];
-      bol.endRef = { matraIndex: end.matraIndex, eventIndex: end.eventIndex };
-    } else if (mark === 'diri' && pass > 1) {
-      bol.rate = 2;
-    }
+    if (mark === 'diri') bol.rate = 2;
     bols.push(bol);
   }
   lane.bols = bols;
