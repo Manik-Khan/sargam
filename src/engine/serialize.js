@@ -546,6 +546,11 @@ function serializeBols(line) {
   const numbered = passes.length > 1 || passes.some((lane) => Number(lane.pass) > 1);
   return passes.map((lane) => {
     const prefix = numbered ? `>${Number(lane.pass) || 1}` : '>';
-    return `${prefix} ${formatBolLane(line, lane.assignments, lane.coveredBy).text}`;
+    return `${prefix} ${formatBolLane(
+      line,
+      lane.assignments,
+      lane.coveredBy,
+      lane.gapChikaris
+    ).text}`;
   });
 }

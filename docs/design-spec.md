@@ -140,7 +140,7 @@ Tokens attach **left to right to matras that begin with a struck note**, skippin
 
 ### 3.8 Bol lines (`>`)
 
-Instrumental stroke words are `da`, `ra`, `diri`, `di-ri`, and `chikari`; `.` leaves an attacked note without a bol. Tokens attach **per note event** in order—including each note inside clusters—while skipping sustains and rests. `diri` means two strokes on one written pitch. `di-ri` consumes two successive note attacks as one spoken bol and preserves both written pitches. Example: `> da diri di-ri ra`.
+Instrumental stroke words are `da`, `ra`, `diri`, `di-ri`, and `chikari`; `.` leaves an attacked note without a bol. Tokens attach **per note event** in order—including each note inside clusters—while skipping sustains and rests. `diri` means two strokes on one written pitch. `di-ri` consumes two successive note attacks as one spoken bol and preserves both written pitches. A literal `^` is different: it occupies an exact written hold/rest subdivision as a chikari without consuming the following note attack. Thus `-S` with `> ^da` places chikari in the gap and da on S. Example: `> da diri di-ri ra`.
 
 ## 3.9 Repeats
 

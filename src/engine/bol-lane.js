@@ -2,9 +2,10 @@
 // rendering, and serialization.
 //
 // The music line owns rhythm. A bol lane mirrors its written hold slots and
-// phrase repeats, while bol words attach only to note attacks. `diri` belongs
-// to one note attack and re-articulates that note twice; `di-ri` binds two
-// successive attacks as the two spoken halves of one Diri.
+// phrase repeats, while bol words attach to note attacks. `diri` belongs to
+// one note attack and re-articulates that note twice; `di-ri` binds two
+// successive attacks as the two spoken halves of one Diri. `^` is the one
+// intentional slot-level mark: a chikari pluck in a written hold/rest gap.
 
 export const BOL_KINDS = new Set(['da', 'ra', 'diri', 'chikari']);
 
@@ -16,6 +17,7 @@ export function buildBolPlan(line) {
   const attacks = [];
   const slots = [];
   const attackByRef = new Map();
+  const slotByRefPart = new Map();
 
   for (let matraIndex = 0; matraIndex < (line?.matras || []).length; matraIndex++) {
     const events = line.matras[matraIndex]?.events || [];
@@ -36,7 +38,7 @@ export function buildBolPlan(line) {
         attackByRef.set(`${matraIndex}:${eventIndex}`, attack);
       }
       for (let partIndex = 0; partIndex < count; partIndex++) {
-        slots.push({
+        const slot = {
           kind: attack && partIndex === 0
             ? 'attack'
             : event?.type === 'rest'
@@ -46,7 +48,9 @@ export function buildBolPlan(line) {
           matraIndex,
           eventIndex,
           partIndex,
-        });
+        };
+        slotByRefPart.set(`${matraIndex}:${eventIndex}:${partIndex}`, slots.length);
+        slots.push(slot);
       }
     }
   }
@@ -66,7 +70,7 @@ export function buildBolPlan(line) {
     });
   }
 
-  return { attacks, slots, attackByRef, repeats };
+  return { attacks, slots, attackByRef, slotByRefPart, repeats };
 }
 
 function nextAttackSlot(plan, from) {
@@ -105,6 +109,8 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
   const assignments = Array(plan.attacks.length).fill(null);
   const coveredBy = Array(plan.attacks.length).fill(null);
   const ranges = Array(plan.attacks.length).fill(null);
+  const gapChikaris = Array(plan.slots.length).fill(false);
+  const slotRanges = Array(plan.slots.length).fill(null);
   const repeats = [];
   const problems = [];
   const repeatStack = [];
@@ -189,6 +195,18 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
       i++;
       continue;
     }
+    if (char === '^') {
+      const slot = plan.slots[visualCursor];
+      if (slot && slot.kind !== 'attack') {
+        gapChikaris[visualCursor] = true;
+        slotRanges[visualCursor] = { from: i, to: i + 1 };
+        visualCursor++;
+      } else {
+        problems.push('bol “^” needs a written hold or rest gap before the next note');
+      }
+      i++;
+      continue;
+    }
     if (char === '.') {
       placeAttack('.', i, i + 1);
       i++;
@@ -218,6 +236,8 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
     assignments,
     coveredBy,
     ranges,
+    gapChikaris,
+    slotRanges,
     repeats,
     problems,
     consumedAttacks: Math.max(0, lastAttack + 1),
@@ -259,7 +279,17 @@ export function assignmentsFromBols(line, bols = line?.bols || []) {
   const plan = buildBolPlan(line);
   const assignments = Array(plan.attacks.length).fill(null);
   const coveredBy = Array(plan.attacks.length).fill(null);
+  const gapChikaris = Array(plan.slots.length).fill(false);
   for (const bol of bols) {
+    if (bol.mark === 'chikari' && bol.gap) {
+      const slotIndex = plan.slotByRefPart.get(
+        `${bol.ref.matraIndex}:${bol.ref.eventIndex}:${Math.max(0, Number(bol.partIndex) || 0)}`
+      );
+      if (Number.isInteger(slotIndex) && plan.slots[slotIndex]?.kind !== 'attack') {
+        gapChikaris[slotIndex] = true;
+      }
+      continue;
+    }
     const attack = plan.attackByRef.get(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`);
     if (!attack || !BOL_KINDS.has(bol.mark)) continue;
     assignments[attack.ordinal] = bol.mark;
@@ -268,21 +298,43 @@ export function assignmentsFromBols(line, bols = line?.bols || []) {
       if (end && end.ordinal === attack.ordinal + 1) coveredBy[end.ordinal] = attack.ordinal;
     }
   }
-  return { plan, assignments, coveredBy };
+  return { plan, assignments, coveredBy, gapChikaris };
 }
 
-function formatMatraSegments(line, matraIndex, plan, assignments, coveredBy) {
+function formatMatraSegments(line, matraIndex, plan, assignments, coveredBy, gapChikaris) {
   const segments = [];
   const events = line.matras[matraIndex]?.events || [];
   for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
     const event = events[eventIndex];
-    if (event?.type !== 'note' || event.grace) continue;
+    if (event.grace) continue;
+    const count = writtenSlots(event);
+    if (event?.type !== 'note') {
+      for (let partIndex = 0; partIndex < count; partIndex++) {
+        const slotIndex = plan.slotByRefPart.get(`${matraIndex}:${eventIndex}:${partIndex}`);
+        segments.push({
+          text: gapChikaris[slotIndex] ? '^' : '-',
+          wordLength: 1,
+          ordinals: [],
+          slotIndices: [slotIndex],
+        });
+      }
+      continue;
+    }
     const attack = plan.attackByRef.get(`${matraIndex}:${eventIndex}`);
     if (!attack) continue;
+    let trailing = '';
+    const trailingSlots = [];
+    for (let partIndex = 1; partIndex < count; partIndex++) {
+      const slotIndex = plan.slotByRefPart.get(`${matraIndex}:${eventIndex}:${partIndex}`);
+      trailing += gapChikaris[slotIndex] ? '^' : '-';
+      trailingSlots.push(slotIndex);
+    }
     const covering = coveredBy[attack.ordinal];
     if (covering !== null && covering !== undefined) {
-      const hold = '-'.repeat(Math.max(0, attack.writtenSlots - 1));
-      if (hold && segments.length) segments.at(-1).text += hold;
+      if (trailing && segments.length) {
+        segments.at(-1).text += trailing;
+        segments.at(-1).slotIndices.push(...trailingSlots);
+      }
       continue;
     }
     const mark = assignments[attack.ordinal] || '.';
@@ -292,9 +344,10 @@ function formatMatraSegments(line, matraIndex, plan, assignments, coveredBy) {
       ordinals.push(attack.ordinal + 1);
     }
     segments.push({
-      text: (spanningDiri ? 'di-ri' : mark) + '-'.repeat(Math.max(0, attack.writtenSlots - 1)),
+      text: (spanningDiri ? 'di-ri' : mark) + trailing,
       wordLength: spanningDiri ? 5 : mark.length,
       ordinals,
+      slotIndices: trailingSlots,
     });
   }
   return segments;
@@ -303,18 +356,20 @@ function formatMatraSegments(line, matraIndex, plan, assignments, coveredBy) {
 /**
  * Canonical structural lane. Returns character ranges relative to `text`.
  */
-export function formatBolLane(line, assignments, coveredBy = []) {
+export function formatBolLane(line, assignments, coveredBy = [], gapChikaris = []) {
   const plan = buildBolPlan(line);
   const values = Array.from({ length: plan.attacks.length }, (_, i) => assignments?.[i] || null);
   const covers = Array.from({ length: plan.attacks.length }, (_, i) => coveredBy?.[i] ?? null);
+  const gaps = Array.from({ length: plan.slots.length }, (_, i) => Boolean(gapChikaris?.[i]));
   const ranges = Array(plan.attacks.length).fill(null);
+  const slotRanges = Array(plan.slots.length).fill(null);
   const repeatFrom = new Map(plan.repeats.map((repeat) => [repeat.fromMatra, repeat]));
   const repeatTo = new Map(plan.repeats.map((repeat) => [repeat.toMatra, repeat]));
   let text = '';
   let wroteMatra = false;
 
   for (let matraIndex = 0; matraIndex < (line?.matras || []).length; matraIndex++) {
-    const segments = formatMatraSegments(line, matraIndex, plan, values, covers);
+    const segments = formatMatraSegments(line, matraIndex, plan, values, covers, gaps);
     if (!segments.length) continue;
     if (wroteMatra) text += ' ';
     wroteMatra = true;
@@ -322,11 +377,12 @@ export function formatBolLane(line, assignments, coveredBy = []) {
 
     let previous = null;
     for (const segment of segments) {
-      if (previous && !previous.text.endsWith('-')) text += ' ';
+      if (previous && !/[-^]$/.test(previous.text) && !/^[-^]/.test(segment.text)) text += ' ';
       const wordStart = text.length;
       text += segment.text;
       const wordRange = { from: wordStart, to: wordStart + segment.wordLength };
       for (const ordinal of segment.ordinals) ranges[ordinal] = wordRange;
+      for (const slotIndex of segment.slotIndices || []) slotRanges[slotIndex] = wordRange;
       previous = segment;
     }
 
@@ -334,5 +390,13 @@ export function formatBolLane(line, assignments, coveredBy = []) {
     if (closing) text += `)x${closing.times}`;
   }
 
-  return { text, ranges, plan, assignments: values, coveredBy: covers };
+  return {
+    text,
+    ranges,
+    slotRanges,
+    plan,
+    assignments: values,
+    coveredBy: covers,
+    gapChikaris: gaps,
+  };
 }

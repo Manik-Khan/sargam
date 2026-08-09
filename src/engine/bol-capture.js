@@ -174,7 +174,12 @@ function migrateBolAnchors(text, sourceLine) {
   for (const mark of migrated) {
     assignments[mark.from] = mark.kind;
   }
-  const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
+  const formatted = formatBolLane(
+    lane.musicLine,
+    assignments,
+    coveredBy,
+    lane.parsed.gapChikaris
+  );
   const written = writeBolLane(withoutAnchors, sourceLine, formatted.text);
   return { ...written, count: migrated.length };
 }
@@ -249,7 +254,12 @@ function beginBolCaptureOnSourceLine(text, sourceLine, ordinal = 0) {
   if (!migrated.ok) return { ...migrated, cursor: null };
   const lane = structuralLane(migrated.text, sourceLine);
   if (!lane) return { ok: false, text: migrated.text, cursor: null, message: 'The active music line no longer exists.' };
-  const formatted = formatBolLane(lane.musicLine, lane.parsed.assignments, lane.parsed.coveredBy);
+  const formatted = formatBolLane(
+    lane.musicLine,
+    lane.parsed.assignments,
+    lane.parsed.coveredBy,
+    lane.parsed.gapChikaris
+  );
   const ready = writeBolLane(migrated.text, sourceLine, formatted.text);
   if (!ready.ok) return { ...ready, cursor: null };
   const safeOrdinal = Math.max(0, Math.min(info.attacks.length - 1, Number(ordinal) || 0));
@@ -356,7 +366,12 @@ export function removeBolAtCursor(text, cursor) {
     ordinal,
     ordinal
   );
-  const formatted = formatBolLane(lane.musicLine, cleared.assignments, cleared.coveredBy);
+  const formatted = formatBolLane(
+    lane.musicLine,
+    cleared.assignments,
+    cleared.coveredBy,
+    lane.parsed.gapChikaris
+  );
   const written = writeBolLane(text, sourceLine, formatted.text, { pass });
   if (!written.ok) return written;
   return {
@@ -394,7 +409,12 @@ export function setBolAtCursor(text, cursor, kind, { diriMode = 'single' } = {})
   assignments[ordinal] = kind;
   if (kind === 'diri' && span === 2) coveredBy[ordinal + 1] = ordinal;
 
-  const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
+  const formatted = formatBolLane(
+    lane.musicLine,
+    assignments,
+    coveredBy,
+    lane.parsed.gapChikaris
+  );
   const written = writeBolLane(text, sourceLine, formatted.text, { pass });
   if (!written.ok) return written;
   const nextOrdinal = Math.min(info.attacks.length, ordinal + span);
@@ -461,6 +481,57 @@ export function removeBolAtAttack(text, sourceLine, ordinal, pass = 1) {
   };
 }
 
+function writeGapChikari(text, sourceLine, slotIndex, pass, enabled) {
+  const lineNumber = Number(sourceLine);
+  const targetSlot = Number(slotIndex);
+  const targetPass = Math.max(1, Number(pass) || 1);
+  if (!Number.isInteger(lineNumber) || !Number.isInteger(targetSlot)) {
+    return { ok: false, text, message: 'Choose a written rhythmic gap first.' };
+  }
+
+  const migrated = migrateBolAnchors(text, lineNumber);
+  if (!migrated.ok) return migrated;
+  let nextText = migrated.text;
+  if (targetPass > 1) {
+    const switched = switchBolPass(nextText, { sourceLine: lineNumber, ordinal: 0 }, targetPass);
+    if (!switched.ok) return switched;
+    nextText = switched.text;
+  }
+  const lane = structuralLane(nextText, lineNumber, targetPass);
+  if (!lane) return { ok: false, text: nextText, message: 'The active music line no longer exists.' };
+  const slot = lane.parsed.plan.slots[targetSlot];
+  if (!slot || slot.kind === 'attack') {
+    return { ok: false, text: nextText, message: 'Chikari-in-gap needs a written hold or rest slot.' };
+  }
+
+  const gapChikaris = [...lane.parsed.gapChikaris];
+  gapChikaris[targetSlot] = Boolean(enabled);
+  const formatted = formatBolLane(
+    lane.musicLine,
+    lane.parsed.assignments,
+    lane.parsed.coveredBy,
+    gapChikaris
+  );
+  const written = writeBolLane(nextText, lineNumber, formatted.text, { pass: targetPass });
+  if (!written.ok) return written;
+  return {
+    ...written,
+    message: enabled
+      ? `Chikari written in the selected rhythmic gap on source line ${lineNumber}.`
+      : `Chikari removed from the selected rhythmic gap on source line ${lineNumber}.`,
+  };
+}
+
+/** Write `^` into a real non-note subdivision without consuming the next
+ * note attack or its ordinary bol. */
+export function setGapChikariAtSlot(text, sourceLine, slotIndex, pass = 1) {
+  return writeGapChikari(text, sourceLine, slotIndex, pass, true);
+}
+
+export function removeGapChikariAtSlot(text, sourceLine, slotIndex, pass = 1) {
+  return writeGapChikari(text, sourceLine, slotIndex, pass, false);
+}
+
 export function moveBolCursor(text, cursor, delta) {
   const sourceLine = Number(cursor?.sourceLine);
   const pass = cursorPass(cursor);
@@ -497,7 +568,12 @@ export function switchBolPass(text, cursor, pass) {
   let nextText = targetPass > 1 ? numberFirstBolLane(text, sourceLine) : text;
   const lane = structuralLane(nextText, sourceLine, targetPass);
   if (!lane) return { ok: false, text, cursor, message: 'The active music line no longer exists.' };
-  const formatted = formatBolLane(lane.musicLine, lane.parsed.assignments, lane.parsed.coveredBy);
+  const formatted = formatBolLane(
+    lane.musicLine,
+    lane.parsed.assignments,
+    lane.parsed.coveredBy,
+    lane.parsed.gapChikaris
+  );
   const written = writeBolLane(nextText, sourceLine, formatted.text, { pass: targetPass });
   if (!written.ok) return { ...written, cursor };
   const nextCursor = targetPass > 1

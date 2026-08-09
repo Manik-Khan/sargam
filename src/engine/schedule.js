@@ -151,6 +151,9 @@ export function scheduleDocument(doc, opts = {}) {
     const tal = isFree ? null : getTal(section.tal);
     const bolByRef = new Map();
     for (const bol of line.bols || []) {
+      // Gap chikari is real written rhythm, but it is not a melody-note bol.
+      // Keep it out of the note map until a dedicated chikari sound is chosen.
+      if (bol.gap) continue;
       if (bol.mark === 'diri' && bol.endRef) {
         bolByRef.set(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`, { ...bol, spanIndex: 0, spanCount: 2 });
         bolByRef.set(`${bol.endRef.matraIndex}:${bol.endRef.eventIndex}`, {

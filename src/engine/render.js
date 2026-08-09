@@ -756,10 +756,27 @@ function renderLineBlock(line, tal, ctx) {
               : 'minmax(0.84em, max-content)')
             .join(' ')
         : 'minmax(0.84em, max-content)';
-      const bolAtEvent = new Map(group.map((bol) => [bol.ref.eventIndex, bol]));
+      const bolAtEvent = new Map(
+        group.filter((bol) => !bol.gap).map((bol) => [bol.ref.eventIndex, bol])
+      );
+      const gapBolAtSlot = new Map(
+        group
+          .filter((bol) => bol.mark === 'chikari' && bol.gap)
+          .map((bol) => [`${bol.ref.eventIndex}:${Math.max(0, Number(bol.partIndex) || 0)}`, bol])
+      );
       for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
         const slot = slots[slotIndex];
-        if (slot.partIndex > 0) {
+        const gapBol = gapBolAtSlot.get(`${slot.eventIndex}:${slot.partIndex}`);
+        if (gapBol) {
+          const mark = h('span', 'sr-bol-slot sr-bol-mark sr-bol-chikari sr-bol-gap-chikari', '^');
+          mark.style.gridColumn = String(slotIndex + 1);
+          mark.setAttribute('data-bol-gap-slot', `${mi}:${slot.eventIndex}:${slot.partIndex}`);
+          mark.setAttribute('aria-label', 'Chikari in rhythmic gap');
+          mark.title = 'Chikari in this rhythmic gap';
+          grid.appendChild(mark);
+          continue;
+        }
+        if (slot.partIndex > 0 || slot.event?.type !== 'note') {
           const hold = h('span', 'sr-bol-slot sr-bol-hold', '-');
           hold.style.gridColumn = String(slotIndex + 1);
           grid.appendChild(hold);
@@ -1335,10 +1352,16 @@ function underarcSvg() {
   return svgEl('sr-arc-lane sr-underarc', 'M4,2 Q50,18 96,2');
 }
 
-/** One continuous Diri V whose endpoints align with attacks in two cells. */
+/** A cross-cell Diri uses the same compact V as an in-cell Diri. The rule
+ * beneath it carries that one symbol between the two attack positions; the V
+ * itself does not stretch wider just because the notes are farther apart. */
 function diriCrossSvg(fromX, toX) {
   const middle = (fromX + toX) / 2;
-  return svgEl('sr-bol-cross-svg', `M${fromX},2 L${middle},18 L${toX},2`);
+  const halfWidth = Math.min(4, Math.max(2.5, (toX - fromX) * 0.1));
+  return svgEl(
+    'sr-bol-cross-svg',
+    `M${fromX},18 L${toX},18 M${middle - halfWidth},3 L${middle},15 L${middle + halfWidth},3`
+  );
 }
 
 // ---------------------------------------------------------------------------

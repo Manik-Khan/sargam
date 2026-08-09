@@ -6,7 +6,9 @@ import {
   bolCursorSelection,
   migrateAllBolAnchors,
   moveBolCursor,
+  removeGapChikariAtSlot,
   removeBolAtAttack,
+  setGapChikariAtSlot,
   setBolAtAttack,
   setBolAtCursor,
   switchBolPass,
@@ -65,6 +67,41 @@ export const smokes = [
       assert.match(removed.message, /removed from note 5/);
       line = parseDocument(removed.text).doc.sections[0].lines[0];
       assert.equal(line._bolPasses[0].bols.length, 0);
+    },
+  },
+  {
+    name: 'gap chikari: ^ occupies a written gap without consuming the following note bol',
+    fn() {
+      const text = 'tal: tintal\n\n-S\n> ^da\n';
+      const parsed = parseDocument(text);
+      assert.deepEqual(parsed.problems, []);
+      assert.deepEqual(parsed.doc.sections[0].lines[0].bols, [
+        {
+          ref: { matraIndex: 0, eventIndex: 0 },
+          partIndex: 0,
+          mark: 'chikari',
+          gap: true,
+        },
+        { ref: { matraIndex: 0, eventIndex: 1 }, mark: 'da' },
+      ]);
+    },
+  },
+  {
+    name: 'gap chikari: Grid Write can add and remove ^ from an exact non-note slot',
+    fn() {
+      const text = 'tal: tintal\n\n-S\n';
+      const added = setGapChikariAtSlot(text, 3, 0);
+      assert.equal(added.ok, true);
+      assert.match(added.text, /-S\n> \^\./);
+      const withDa = setBolAtAttack(added.text, 3, 0, 'da');
+      assert.match(withDa.text, /-S\n> \^da/);
+      const removed = removeGapChikariAtSlot(withDa.text, 3, 0);
+      assert.equal(removed.ok, true);
+      assert.match(removed.text, /-S\n> -da/);
+      assert.deepEqual(
+        parseDocument(removed.text).doc.sections[0].lines[0].bols.map((bol) => bol.mark),
+        ['da']
+      );
     },
   },
   {

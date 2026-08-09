@@ -172,6 +172,22 @@ export const smokes = [
     },
   },
   {
+    name: 'grid write: rhythmic gaps are bol slots and retain chikari independently',
+    fn() {
+      const parsed = parseDocument('tal: tintal\n\n-S\n> ^da\n');
+      assert.deepEqual(parsed.problems, []);
+      const row = gridLines(parsed.doc)[0];
+      assert.deepEqual(
+        row.cells[0].bolSlots.map((slot) => ({ kind: slot.kind, slotIndex: slot.slotIndex })),
+        [{ kind: 'hold', slotIndex: 0 }, { kind: 'attack', slotIndex: 1 }]
+      );
+      assert.deepEqual(row.bolPasses[0].marks, [
+        { slotIndex: 0, gap: true, mark: 'chikari', rate: 1 },
+        { ordinal: 0, toOrdinal: 0, mark: 'da', rate: 1 },
+      ]);
+    },
+  },
+  {
     name: 'grid write: shell exposes persistent Text Write and Grid Write modes',
     async fn() {
       const app = await readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');

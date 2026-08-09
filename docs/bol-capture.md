@@ -37,6 +37,12 @@ The same spanning form can be typed directly on the `>` line. Pressing `-`
 inside Bol Capture does not create another meter lane or advance the attack
 cursor.
 
+A caret typed in a real non-note subdivision is a gap chikari. For example,
+`-S` with `> ^da` means chikari in the first half and da on the following S.
+This is distinct from the word `chikari`, which remains attached to a struck
+note. Grid Write exposes every written gap in the bol strip and limits its
+local menu to chikari/remove so the following note bol stays independent.
+
 Entering a bol over an existing bol replaces the conflicting point or diri
 span. Left/right plus Delete can correct the lane without re-entering the rest
 of the phrase.

@@ -1351,7 +1351,7 @@ function attachBols(musicLine, text, lineNo, problems, pass = 1) {
   for (const message of lane.problems) {
     problems.push({ line: lineNo, col: null, msg: message });
   }
-  const bols = [];
+  const orderedBols = [];
   for (let ordinal = 0; ordinal < lane.assignments.length; ordinal++) {
     const mark = lane.assignments[ordinal];
     if (!mark) continue;
@@ -1368,8 +1368,23 @@ function attachBols(musicLine, text, lineNo, problems, pass = 1) {
     } else if (mark === 'diri') {
       bol.rate = 2;
     }
-    bols.push(bol);
+    orderedBols.push({ slotIndex: attack.slotIndex, bol });
   }
+  for (let slotIndex = 0; slotIndex < lane.gapChikaris.length; slotIndex++) {
+    if (!lane.gapChikaris[slotIndex]) continue;
+    const slot = lane.plan.slots[slotIndex];
+    orderedBols.push({
+      slotIndex,
+      bol: {
+        ref: { matraIndex: slot.matraIndex, eventIndex: slot.eventIndex },
+        partIndex: slot.partIndex,
+        mark: 'chikari',
+        gap: true,
+      },
+    });
+  }
+  orderedBols.sort((a, b) => a.slotIndex - b.slotIndex);
+  const bols = orderedBols.map((item) => item.bol);
   lane.bols = bols;
   musicLine._bolPasses = [
     ...(musicLine._bolPasses || []).filter((item) => item.pass !== pass),

@@ -153,6 +153,20 @@ export default function GridEditor({
     ));
   };
 
+  const chooseBolGap = (sourceLine, matraIndex, gapSlotIndex, gapNumber, anchor) => {
+    const target = {
+      sourceLine,
+      matraIndex,
+      ordinal: null,
+      gapSlotIndex,
+      gapNumber,
+      style: bolMenuPosition(anchor.getBoundingClientRect()),
+    };
+    setBolMenu((current) => (
+      current?.sourceLine === sourceLine && current?.gapSlotIndex === gapSlotIndex ? null : target
+    ));
+  };
+
   const openCellMenu = (event, row, cell, anchor = event.currentTarget) => {
     event.preventDefault();
     event.stopPropagation();
@@ -174,15 +188,17 @@ export default function GridEditor({
     const ok = onBolApply?.({
       sourceLine: bolMenu.sourceLine,
       ordinal: bolMenu.ordinal,
+      gapSlotIndex: bolMenu.gapSlotIndex,
       kind,
       diriMode,
     });
     if (ok === false) return;
+    const gap = Number.isInteger(bolMenu.gapSlotIndex);
     setMessage(kind
       ? `${kind === 'diri'
         ? diriMode === 'span' ? 'Diri attached across this and the next note.' : 'Diri attached to this note.'
-        : `${kind} attached to this note.`}`
-      : 'Bol removed from this note.');
+        : gap ? 'Chikari written in this rhythmic gap.' : `${kind} attached to this note.`}`
+      : gap ? 'Chikari removed from this rhythmic gap.' : 'Bol removed from this note.');
     setBolMenu(null);
   };
 
@@ -396,7 +412,7 @@ export default function GridEditor({
       <div className="app-grid-writer-help">
         <strong>Grid Write</strong>
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>
-        <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol · right-click a cell for musical tools</span>
+        <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol; beneath a gap adds chikari · right-click a cell for musical tools</span>
       </div>
       <div
         className="app-grid-writer-scroll"
@@ -462,7 +478,16 @@ export default function GridEditor({
                     const endingStart = (firstEndingCell && cell.matraIndex === row.firstEndingFrom)
                       || (secondEndingCell && cell.matraIndex === 0);
                     const rowPass = row.bolPasses.find((lane) => lane.pass === 1);
-                    const bolByAttack = new Map((rowPass?.marks || []).map((mark) => [mark.ordinal, mark]));
+                    const bolByAttack = new Map(
+                      (rowPass?.marks || [])
+                        .filter((mark) => Number.isInteger(mark.ordinal))
+                        .map((mark) => [mark.ordinal, mark])
+                    );
+                    const gapBolBySlot = new Map(
+                      (rowPass?.marks || [])
+                        .filter((mark) => mark.gap && Number.isInteger(mark.slotIndex))
+                        .map((mark) => [mark.slotIndex, mark])
+                    );
                     const coveredByDiri = new Map();
                     for (const mark of rowPass?.marks || []) {
                       if (mark.mark !== 'diri') continue;
@@ -535,39 +560,54 @@ export default function GridEditor({
                             setMessage('Draft reverted to the Markdown source.');
                           }}
                         />
-                        {(cell.attacks?.length || 0) > 0 && (
+                        {(cell.bolSlots?.length || 0) > 0 && (
                           <span
                             className="app-grid-write-bols"
-                            style={{ '--grid-bol-slots': cell.attacks.length }}
+                            style={{ '--grid-bol-slots': cell.bolSlots.length }}
                             aria-label={`Bols for line ${row.sourceLine}, matra ${cell.matraIndex + 1}`}
                           >
-                            {cell.attacks.map((attack, attackIndex) => {
-                              const bol = bolByAttack.get(attack.ordinal);
-                              const covered = coveredByDiri.has(attack.ordinal);
+                            {cell.bolSlots.map((slot, slotIndex) => {
+                              const attack = slot.kind === 'attack' ? slot : null;
+                              const bol = attack ? bolByAttack.get(attack.attackOrdinal) : gapBolBySlot.get(slot.slotIndex);
+                              const covered = attack ? coveredByDiri.has(attack.attackOrdinal) : false;
                               const spanning = bol?.mark === 'diri' && bol.toOrdinal > bol.ordinal;
                               const selected = Number(bolMenu?.sourceLine) === Number(row.sourceLine)
-                                && Number(bolMenu?.ordinal) === Number(attack.ordinal);
+                                && (attack
+                                  ? Number(bolMenu?.ordinal) === Number(attack.attackOrdinal)
+                                  : Number(bolMenu?.gapSlotIndex) === Number(slot.slotIndex));
                               return (
                                 <button
                                   type="button"
-                                  key={attack.ordinal}
+                                  key={attack ? `attack-${attack.attackOrdinal}` : `gap-${slot.slotIndex}`}
                                   className={`app-grid-bol-slot${bol ? ' has-bol' : ''}${covered ? ' is-covered' : ''}${selected ? ' selected' : ''}`}
                                   aria-pressed={selected}
-                                  aria-label={`Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, attack ${attack.ordinal + 1}${bol ? `, ${bol.mark}` : ', no bol'}`}
-                                  title={bol
+                                  aria-label={attack
+                                    ? `Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, attack ${attack.attackOrdinal + 1}${bol ? `, ${bol.mark}` : ', no bol'}`
+                                    : `Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, rhythmic gap ${slotIndex + 1}${bol ? ', chikari' : ''}`}
+                                  title={!attack
+                                    ? bol ? 'Remove chikari from this rhythmic gap' : 'Add chikari to this rhythmic gap'
+                                    : bol
                                     ? `Change ${bol.mark}${bol.mark === 'diri'
                                       ? spanning ? ' · across this and the next note' : ' · two strokes on this note'
                                       : ''}`
                                     : covered
                                       ? 'Second note of Diri from the previous note'
                                       : 'Add a bol to this note'}
-                                  onClick={(event) => chooseBolAttack(
-                                    row.sourceLine,
-                                    cell.matraIndex,
-                                    attack.ordinal,
-                                    attackIndex + 1,
-                                    event.currentTarget
-                                  )}
+                                  onClick={(event) => attack
+                                    ? chooseBolAttack(
+                                      row.sourceLine,
+                                      cell.matraIndex,
+                                      attack.attackOrdinal,
+                                      cell.attacks.findIndex((item) => item.ordinal === attack.attackOrdinal) + 1,
+                                      event.currentTarget
+                                    )
+                                    : chooseBolGap(
+                                      row.sourceLine,
+                                      cell.matraIndex,
+                                      slot.slotIndex,
+                                      slotIndex + 1,
+                                      event.currentTarget
+                                    )}
                                 >{bol ? spanning ? 'di' : BOL_SYMBOL[bol.mark] : covered ? 'ri' : '+'}</button>
                               );
                             })}
@@ -613,11 +653,15 @@ export default function GridEditor({
         >
           <div className="app-grid-bol-menu-head">
             <strong>Bol</strong>
-            <span>note {bolMenu.noteNumber}</span>
+            <span>{Number.isInteger(bolMenu.gapSlotIndex)
+              ? `gap ${bolMenu.gapNumber}`
+              : `note ${bolMenu.noteNumber}`}</span>
             <button type="button" aria-label="Close bol menu" onClick={() => setBolMenu(null)}>×</button>
           </div>
           <div className="app-grid-bol-menu-options">
-            {BOL_OPTIONS.map((option) => (
+            {BOL_OPTIONS.filter((option) => (
+              !Number.isInteger(bolMenu.gapSlotIndex) || option.kind === 'chikari'
+            )).map((option) => (
               <button
                 type="button"
                 role="menuitem"

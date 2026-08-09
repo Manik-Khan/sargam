@@ -205,6 +205,13 @@ export function gridLines(doc) {
       const bolPasses = sourcePasses.map((lane) => ({
         pass: Math.max(1, Number(lane.pass) || 1),
         marks: (lane.bols || []).flatMap((bol) => {
+          if (bol.mark === 'chikari' && bol.gap) {
+            const slotIndex = bolPlan.slotByRefPart.get(
+              `${bol.ref.matraIndex}:${bol.ref.eventIndex}:${Math.max(0, Number(bol.partIndex) || 0)}`
+            );
+            if (!Number.isInteger(slotIndex)) return [];
+            return [{ slotIndex, gap: true, mark: 'chikari', rate: 1 }];
+          }
           const start = bolPlan.attackByRef.get(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`);
           if (!start) return [];
           const end = bol.endRef
@@ -233,6 +240,9 @@ export function gridLines(doc) {
               eventIndex: attack.eventIndex,
               writtenSlots: attack.writtenSlots,
             })),
+          bolSlots: bolPlan.slots
+            .map((slot, slotIndex) => ({ ...slot, slotIndex }))
+            .filter((slot) => slot.matraIndex === cell.matraIndex),
         };
       });
       rows.push({

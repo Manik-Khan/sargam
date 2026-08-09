@@ -355,6 +355,20 @@ export const smokes = [
     },
   },
   {
+    name: 'render: gap chikari occupies the empty subdivision before its note bol',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\n-S\n> ^da\n');
+      assert.deepEqual(problems, []);
+      const slots = renderDocument(doc).querySelector('.sr-bol-slots');
+      assert.deepEqual(
+        [...slots.querySelectorAll('.sr-bol-slot')].map((node) => node.textContent),
+        ['^', '|']
+      );
+      assert.equal(slots.querySelector('[data-bol-gap-slot]').dataset.bolGapSlot, '0:0:0');
+      assert.equal(slots.querySelector('[data-bol-attack-ordinal="0"]').textContent, '|');
+    },
+  },
+  {
     name: 'render: legacy structural bol slots normalize without shifting later notes',
     fn: () => {
       const source = 'tal: tintal\n\n@10 gR (S--S SSSS)x2 S-SS\n> da da (da--da ra da diri)x2 .-. .\n';
@@ -413,7 +427,10 @@ export const smokes = [
       assert.equal(span.style.gridColumn, '1 / 3');
       assert.equal(span.dataset.fromAttackOrdinal, '0');
       assert.equal(span.dataset.toAttackOrdinal, '1');
-      assert.equal(span.querySelector('path').getAttribute('d'), 'M25,2 L50,18 L75,2');
+      assert.equal(
+        span.querySelector('path').getAttribute('d'),
+        'M25,18 L75,18 M46,3 L50,15 L54,3'
+      );
       assert.equal(root.querySelectorAll('.sr-bol-cross-span').length, 1);
       assert.equal(root.querySelectorAll('.sr-bol-diri-span-start, .sr-bol-diri-span-end').length, 0);
       assert.deepEqual(
