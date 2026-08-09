@@ -137,6 +137,24 @@ export const smokes = [
     },
   },
   {
+    name: 'rhythm grid UI: Graph Paper draws one Diri V across adjacent matra cells',
+    fn() {
+      const parsed = parseDocument('tal: rupak\n\nGat\n[S R] G\n> . di-ri');
+      assert.equal(parsed.problems.length, 0);
+      const root = renderDocument(parsed.doc, {
+        graphPaper: true,
+        graphColumns: 7,
+        maxSystemEm: 18.2,
+      });
+      const span = root.querySelector('.sr-bol-cross-span');
+      assert.ok(span);
+      assert.equal(span.style.gridColumn, '1 / 3');
+      assert.equal(span.querySelector('path').getAttribute('d'), 'M37.5,2 L56.25,18 L75,2');
+      assert.equal(root.querySelectorAll('.sr-bol-cross-span').length, 1);
+      assert.equal(root.querySelectorAll('.sr-bol-mark.sr-bol-diri').length, 0);
+    },
+  },
+  {
     name: 'rhythm grid UI: identity and shell preserve graph selection and preferences',
     async fn() {
       const root = gridCorpus();

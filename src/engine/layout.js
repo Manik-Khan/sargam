@@ -65,6 +65,15 @@ export function isSafeBreak(line, k) {
   for (const repeat of line?.phraseRepeats || []) {
     if (repeat.fromMatra <= k && repeat.toMatra > k) return false;
   }
+  const bolLanes = line?._bolPasses?.length
+    ? line._bolPasses.flatMap((lane) => lane.bols || [])
+    : line?.bols || [];
+  for (const bol of bolLanes) {
+    if (
+      bol.mark === 'diri' && bol.endRef &&
+      bol.ref.matraIndex <= k && bol.endRef.matraIndex > k
+    ) return false;
+  }
   return true;
 }
 

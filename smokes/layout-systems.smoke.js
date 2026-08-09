@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 import { parseDocument } from '../src/engine/parse.js';
 import { renderDocument, renderExport } from '../src/engine/render.js';
 import { getTal } from '../src/engine/tala.js';
-import { planLineSystems } from '../src/engine/layout.js';
+import { isSafeBreak, planLineSystems } from '../src/engine/layout.js';
 import { BAGESHRI_STARTER } from '../src/examples/bageshri.js';
 
 const shellCss = readFileSync(new URL('../src/shell/sargam.css', import.meta.url), 'utf8');
@@ -36,6 +36,17 @@ export const smokes = [
         const cutsSlide = range.to >= slide.from.matraIndex && range.to < slide.to.matraIndex;
         assert.equal(cutsSlide, false, `system ended inside slide at ${range.to}`);
       }
+    },
+  },
+  {
+    name: 'systems: a two-note Diri is never divided between printed systems',
+    fn() {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS R G m\n> . di-ri .\n');
+      assert.deepEqual(problems, []);
+      const line = doc.sections[0].lines[0];
+      assert.equal(isSafeBreak(line, 0), true);
+      assert.equal(isSafeBreak(line, 1), false);
+      assert.equal(isSafeBreak(line, 2), true);
     },
   },
   {

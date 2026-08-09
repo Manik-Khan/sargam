@@ -316,11 +316,28 @@
   justify-self: stretch;
   border-bottom: 1px solid color-mix(in srgb, var(--sr-accent) 72%, var(--sr-ink));
 }
-.sr-bol-diri-span-start,
-.sr-bol-diri-span-end {
-  font-size: 10px;
-  letter-spacing: -0.08em;
-  white-space: nowrap;
+.sr-bol-cross-span {
+  z-index: 5;
+  align-self: end;
+  display: block;
+  height: 0.9em;
+  margin-bottom: calc(var(--sr-bol-pass-after, 0) * 1em);
+  color: var(--sr-ink);
+  pointer-events: none;
+  overflow: visible;
+}
+.sr-bol-cross-svg {
+  display: block;
+  width: 100%;
+  height: 0.78em;
+  overflow: visible;
+}
+.sr-bol-cross-svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .sr-bol-covered { color: var(--sr-accent); opacity: 0.72; }
 .sr-bol-hold {
@@ -2487,6 +2504,12 @@
   background: color-mix(in srgb, var(--sr-accent) 5%, var(--sr-paper-raised));
   overflow: hidden;
 }
+.app-rhythm-grid:not(.app-rhythm-grid-paper) .sr-bol-cross-span,
+.app-export-grid .sr-bol-cross-span {
+  grid-row: 2 !important;
+  align-self: end;
+  margin-bottom: calc(0.12em + (var(--sr-bol-pass-after, 0) * 1em));
+}
 .app-rhythm-grid .sr-bol-phrase-spacer,
 .app-export-grid .sr-bol-phrase-spacer,
 .app-export-graph-paper .sr-bol-phrase-spacer { display: none; }
@@ -2785,6 +2808,12 @@
   border-top: 1px dashed color-mix(in srgb, var(--sr-accent) 42%, transparent);
   background: color-mix(in srgb, var(--sr-graph-label-bg) 74%, transparent);
   overflow: hidden;
+}
+.app-rhythm-grid-paper .sr-bol-cross-span,
+.app-export-graph-paper .sr-bol-cross-span {
+  grid-row: 1 !important;
+  align-self: end;
+  margin-bottom: calc(0.12em + (var(--sr-bol-pass-after, 0) * 1.08em));
 }
 .app-rhythm-grid-paper .sr-bol-pass,
 .app-export-graph-paper .sr-bol-pass,

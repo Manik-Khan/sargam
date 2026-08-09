@@ -694,6 +694,17 @@ function renderLineBlock(line, tal, ctx) {
     : (line._bolLane || line.bols?.length)
       ? [{ pass: 1, bols: line.bols || [] }]
       : [];
+  const bolMatraGeometry = line.matras.map((matra) => {
+    const firstSlotOfEvent = new Map();
+    let writtenSlots = 0;
+    for (let eventIndex = 0; eventIndex < (matra.events || []).length; eventIndex++) {
+      const event = matra.events[eventIndex];
+      if (event.grace) continue;
+      firstSlotOfEvent.set(eventIndex, writtenSlots);
+      writtenSlots += Math.max(1, Number(event.writtenSlots) || 1);
+    }
+    return { firstSlotOfEvent, writtenSlots: Math.max(1, writtenSlots) };
+  });
   for (let mi = 0; mi < line.matras.length; mi++) {
     if (!bolPasses.length) continue;
     if (colOf[mi] === undefined) continue;
@@ -761,10 +772,20 @@ function renderLineBlock(line, tal, ctx) {
             ? firstSlotOfEvent.get(bol.endRef.eventIndex)
             : null;
           const crossCellSpan = bol.mark === 'diri' && bol.endRef && bol.endRef.matraIndex !== mi;
+          if (crossCellSpan) {
+            const blank = h('span', 'sr-bol-slot sr-bol-blank sr-bol-covered');
+            blank.style.gridColumn = String(slotIndex + 1);
+            blank.setAttribute('aria-label', 'First note of a Diri spanning the next note');
+            if (Number.isInteger(slot.attackOrdinal)) {
+              blank.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
+            }
+            grid.appendChild(blank);
+            continue;
+          }
           const mark = h(
             'span',
-            'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark + rateClass + (bol.endRef ? ' sr-bol-diri-span' : '') + (crossCellSpan ? ' sr-bol-diri-span-start' : ''),
-            crossCellSpan ? 'V›' : BOL_SYMBOL[bol.mark] ?? bol.mark
+            'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark + rateClass + (bol.endRef ? ' sr-bol-diri-span' : ''),
+            BOL_SYMBOL[bol.mark] ?? bol.mark
           );
           mark.style.gridColumn = Number.isInteger(endSlot)
             ? `${slotIndex + 1} / ${endSlot + 2}`
@@ -784,10 +805,9 @@ function renderLineBlock(line, tal, ctx) {
         } else if (coveringBolAtEvent.has(slot.eventIndex)) {
           const covering = coveringBolAtEvent.get(slot.eventIndex);
           if (covering.ref.matraIndex !== mi) {
-            const continuation = h('span', 'sr-bol-slot sr-bol-mark sr-bol-diri sr-bol-covered sr-bol-diri-span-end', '‹V');
+            const continuation = h('span', 'sr-bol-slot sr-bol-blank sr-bol-covered');
             continuation.style.gridColumn = String(slotIndex + 1);
             continuation.setAttribute('aria-label', 'Second note of Diri from the previous note');
-            continuation.title = 'Diri continues from the previous note';
             if (Number.isInteger(slot.attackOrdinal)) {
               continuation.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
             }
@@ -820,6 +840,45 @@ function renderLineBlock(line, tal, ctx) {
     renderedCells[mi]?.classList.add('sr-has-bol-lane');
     renderedCells[mi]?.style.setProperty('--sr-bol-pass-count', String(bolPasses.length));
     row.appendChild(el);
+  }
+
+  // A Diri that crosses a matra boundary is one musical mark, not two point
+  // symbols. Draw one V across the row-level grid so its arms land on the
+  // exact attack subdivisions in the two cells. The underlying bol slots stay
+  // present (and selectable) but visually blank.
+  for (let passIndex = 0; passIndex < bolPasses.length; passIndex++) {
+    const passLane = bolPasses[passIndex];
+    for (const bol of passLane.bols || []) {
+      if (bol.mark !== 'diri' || !bol.endRef) continue;
+      const fromMatra = Number(bol.ref?.matraIndex);
+      const toMatra = Number(bol.endRef?.matraIndex);
+      if (!Number.isInteger(fromMatra) || !Number.isInteger(toMatra) || fromMatra === toMatra) continue;
+      const fromCol = colOf[fromMatra];
+      const toCol = colOf[toMatra];
+      const fromGeometry = bolMatraGeometry[fromMatra];
+      const toGeometry = bolMatraGeometry[toMatra];
+      const fromSlot = fromGeometry?.firstSlotOfEvent.get(bol.ref.eventIndex);
+      const toSlot = toGeometry?.firstSlotOfEvent.get(bol.endRef.eventIndex);
+      if (
+        fromCol === undefined || toCol === undefined ||
+        !Number.isInteger(fromSlot) || !Number.isInteger(toSlot)
+      ) continue;
+
+      const matraSpan = toMatra - fromMatra + 1;
+      const fromX = ((fromSlot + 0.5) / fromGeometry.writtenSlots) * (100 / matraSpan);
+      const toX = ((toMatra - fromMatra) + (toSlot + 0.5) / toGeometry.writtenSlots) * (100 / matraSpan);
+      const span = h('span', 'sr-bol-cross-span');
+      span.setAttribute('data-bol-pass', String(Number(passLane.pass) || 1));
+      span.setAttribute('data-from-attack-ordinal', String(bolAttackOffset + (bolPlan.attackByRef.get(`${fromMatra}:${bol.ref.eventIndex}`)?.ordinal ?? 0)));
+      span.setAttribute('data-to-attack-ordinal', String(bolAttackOffset + (bolPlan.attackByRef.get(`${toMatra}:${bol.endRef.eventIndex}`)?.ordinal ?? 0)));
+      span.setAttribute('aria-label', 'Diri across two notes');
+      span.title = 'Diri across these two notes';
+      span.style.gridRow = '4';
+      span.style.gridColumn = `${fromCol} / ${toCol + 1}`;
+      span.style.setProperty('--sr-bol-pass-after', String(Math.max(0, bolPasses.length - passIndex - 1)));
+      span.appendChild(diriCrossSvg(fromX, toX));
+      row.appendChild(span);
+    }
   }
 
   // SARGAM_SHARED_GEOMETRY_LANES_2026_07_20 — every attachment uses a
@@ -1274,6 +1333,12 @@ function krintanSvg() {
  *  with the empty slot so reserved and drawn lanes are the same box. */
 function underarcSvg() {
   return svgEl('sr-arc-lane sr-underarc', 'M4,2 Q50,18 96,2');
+}
+
+/** One continuous Diri V whose endpoints align with attacks in two cells. */
+function diriCrossSvg(fromX, toX) {
+  const middle = (fromX + toX) / 2;
+  return svgEl('sr-bol-cross-svg', `M${fromX},2 L${middle},18 L${toX},2`);
 }
 
 // ---------------------------------------------------------------------------
