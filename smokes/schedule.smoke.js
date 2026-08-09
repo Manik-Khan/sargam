@@ -115,6 +115,21 @@ export const smokes = [
     },
   },
   {
+    name: 'timing: di-ri follows two written pitches as one two-note bol',
+    fn() {
+      const s = sched('tal: tintal\ntempo: 60\n\nS R\n> di-ri\n');
+      const ns = notes(s);
+      assert.equal(ns.length, 2);
+      assert.deepEqual(ns.map((note) => note.ch), ['S', 'R']);
+      assert.deepEqual(ns.map((note) => note.bol), ['diri', 'diri']);
+      assert.deepEqual(ns.map((note) => note.bolSpanIndex), [0, 1]);
+      assert.deepEqual(ns.map((note) => note.bolSpanCount), [2, 2]);
+      assert.deepEqual(ns.map((note) => note.strokeCount), [undefined, undefined]);
+      close(ns[0].t, 0);
+      close(ns[1].t, 1);
+    },
+  },
+  {
     name: 'timing: whole-matra sustains extend the previous note across matras',
     fn() {
       const s = sched('tal: tintal\ntempo: 60\n\nS - - m\n');

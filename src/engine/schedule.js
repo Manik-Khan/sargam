@@ -149,10 +149,20 @@ export function scheduleDocument(doc, opts = {}) {
     if (!line.matras || line.matras.length === 0) return;
     const isFree = section.tal === 'free';
     const tal = isFree ? null : getTal(section.tal);
-    const bolByRef = new Map((line.bols || []).map((bol) => [
-      `${bol.ref.matraIndex}:${bol.ref.eventIndex}`,
-      bol,
-    ]));
+    const bolByRef = new Map();
+    for (const bol of line.bols || []) {
+      if (bol.mark === 'diri' && bol.endRef) {
+        bolByRef.set(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`, { ...bol, spanIndex: 0, spanCount: 2 });
+        bolByRef.set(`${bol.endRef.matraIndex}:${bol.endRef.eventIndex}`, {
+          ...bol,
+          ref: bol.endRef,
+          spanIndex: 1,
+          spanCount: 2,
+        });
+      } else {
+        bolByRef.set(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`, bol);
+      }
+    }
 
     if (recordLineStart) {
       lineStarts.push({ sectionIndex, lineIndex, sourceLine: line.sourceLine, t });
@@ -298,7 +308,7 @@ export function scheduleDocument(doc, opts = {}) {
           }
           if (e.type === 'note') {
             const bol = bolByRef.get(`${matraIndex}:${eventIndex}`);
-            const strokeCount = bol?.mark === 'diri'
+            const strokeCount = bol?.mark === 'diri' && !Number.isInteger(bol.spanIndex)
               ? Math.max(2, Number(bol.rate) || 2)
               : 1;
             const strokeDur = dur / strokeCount;
@@ -314,6 +324,9 @@ export function scheduleDocument(doc, opts = {}) {
                 octave: e.octave || 0,
                 freq: degreeFreq(sa, SEMITONES[e.ch], e.octave || 0),
                 ...(bol ? { bol: bol.mark } : {}),
+                ...(Number.isInteger(bol?.spanIndex)
+                  ? { bolSpanIndex: bol.spanIndex, bolSpanCount: bol.spanCount }
+                  : {}),
                 ...(strokeCount > 1 ? { strokeIndex, strokeCount } : {}),
               };
               if (e.approachSlide && strokeIndex === 0) {

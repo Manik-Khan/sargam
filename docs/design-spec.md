@@ -140,7 +140,7 @@ Tokens attach **left to right to matras that begin with a struck note**, skippin
 
 ### 3.8 Bol lines (`>`)
 
-Instrumental stroke marks: `l` = da (vertical tick under the note), `-` = ra (horizontal tick; safe collision — `-` only means ra on a `>` line), `v` = diri. Tokens attach **per note event** in order — including each note inside clusters — skipping sustains and rests. Da diri diri da: `> l v v l`.
+Instrumental stroke words are `da`, `ra`, `diri`, `di-ri`, and `chikari`; `.` leaves an attacked note without a bol. Tokens attach **per note event** in order—including each note inside clusters—while skipping sustains and rests. `diri` means two strokes on one written pitch. `di-ri` consumes two successive note attacks as one spoken bol and preserves both written pitches. Example: `> da diri di-ri ra`.
 
 ## 3.9 Repeats
 

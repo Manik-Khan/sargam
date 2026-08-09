@@ -15,10 +15,11 @@ import { centeredElementScrollTop } from './editor-nav.js';
 
 const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
 const BOL_OPTIONS = [
-  { kind: 'da', label: 'da' },
-  { kind: 'ra', label: 'ra' },
-  { kind: 'diri', label: 'diri · 2 strokes' },
-  { kind: 'chikari', label: 'chikari' },
+  { id: 'da', kind: 'da', symbol: '|', label: 'da' },
+  { id: 'ra', kind: 'ra', symbol: '—', label: 'ra' },
+  { id: 'diri-single', kind: 'diri', diriMode: 'single', symbol: 'V×2', label: 'diri · same note' },
+  { id: 'diri-span', kind: 'diri', diriMode: 'span', symbol: 'V→', label: 'diri · next note' },
+  { id: 'chikari', kind: 'chikari', symbol: '^', label: 'chikari' },
 ];
 
 function bolMenuPosition(anchor) {
@@ -168,30 +169,38 @@ export default function GridEditor({
     });
   };
 
-  const applyBol = (kind) => {
+  const applyBol = (kind, diriMode = 'single') => {
     if (!bolMenu) return;
     const ok = onBolApply?.({
       sourceLine: bolMenu.sourceLine,
       ordinal: bolMenu.ordinal,
       kind,
+      diriMode,
     });
     if (ok === false) return;
     setMessage(kind
-      ? `${kind === 'diri' ? 'Diri' : kind} attached to this note.`
+      ? `${kind === 'diri'
+        ? diriMode === 'span' ? 'Diri attached across this and the next note.' : 'Diri attached to this note.'
+        : `${kind} attached to this note.`}`
       : 'Bol removed from this note.');
     setBolMenu(null);
   };
 
-  const applyCellMenuBol = (kind) => {
+  const applyCellMenuBol = (kind, diriMode = 'single') => {
     if (!cellMenu || !Number.isInteger(cellMenu.attackOrdinal)) return;
     const ok = onBolApply?.({
       sourceLine: cellMenu.sourceLine,
       ordinal: cellMenu.attackOrdinal,
       kind,
+      diriMode,
     });
     if (ok === false) return;
     setMessage(kind
-      ? `${kind === 'diri' ? 'Diri' : kind} attached to the chosen note in matra ${cellMenu.matraIndex + 1}.`
+      ? `${kind === 'diri'
+        ? diriMode === 'span'
+          ? `Diri attached across the chosen and next note from matra ${cellMenu.matraIndex + 1}.`
+          : `Diri attached to the chosen note in matra ${cellMenu.matraIndex + 1}.`
+        : `${kind} attached to the chosen note in matra ${cellMenu.matraIndex + 1}.`}`
       : 'Bol removed from the chosen note.');
     setCellMenu(null);
   };
@@ -535,6 +544,7 @@ export default function GridEditor({
                             {cell.attacks.map((attack, attackIndex) => {
                               const bol = bolByAttack.get(attack.ordinal);
                               const covered = coveredByDiri.has(attack.ordinal);
+                              const spanning = bol?.mark === 'diri' && bol.toOrdinal > bol.ordinal;
                               const selected = Number(bolMenu?.sourceLine) === Number(row.sourceLine)
                                 && Number(bolMenu?.ordinal) === Number(attack.ordinal);
                               return (
@@ -545,8 +555,12 @@ export default function GridEditor({
                                   aria-pressed={selected}
                                   aria-label={`Line ${row.sourceLine}, matra ${cell.matraIndex + 1}, attack ${attack.ordinal + 1}${bol ? `, ${bol.mark}` : ', no bol'}`}
                                   title={bol
-                                    ? `Change ${bol.mark}${bol.mark === 'diri' ? ' · two strokes on this note' : ''}`
-                                    : 'Add a bol to this note'}
+                                    ? `Change ${bol.mark}${bol.mark === 'diri'
+                                      ? spanning ? ' · across this and the next note' : ' · two strokes on this note'
+                                      : ''}`
+                                    : covered
+                                      ? 'Second note of Diri from the previous note'
+                                      : 'Add a bol to this note'}
                                   onClick={(event) => chooseBolAttack(
                                     row.sourceLine,
                                     cell.matraIndex,
@@ -554,7 +568,7 @@ export default function GridEditor({
                                     attackIndex + 1,
                                     event.currentTarget
                                   )}
-                                >{bol ? BOL_SYMBOL[bol.mark] : covered ? '·' : '+'}</button>
+                                >{bol ? spanning ? 'di' : BOL_SYMBOL[bol.mark] : covered ? 'ri' : '+'}</button>
                               );
                             })}
                           </span>
@@ -607,10 +621,10 @@ export default function GridEditor({
               <button
                 type="button"
                 role="menuitem"
-                key={option.kind}
-                onClick={() => applyBol(option.kind)}
+                key={option.id}
+                onClick={() => applyBol(option.kind, option.diriMode)}
               >
-                <b>{BOL_SYMBOL[option.kind]}</b>
+                <b>{option.symbol}</b>
                 <span>{option.label}</span>
               </button>
             ))}
@@ -654,8 +668,8 @@ export default function GridEditor({
               )}
               <div className="app-grid-cell-menu-actions bol-actions">
                 {BOL_OPTIONS.map((option) => (
-                  <button type="button" role="menuitem" key={option.kind} onClick={() => applyCellMenuBol(option.kind)}>
-                    <b>{BOL_SYMBOL[option.kind]}</b><span>{option.label}</span>
+                  <button type="button" role="menuitem" key={option.id} onClick={() => applyCellMenuBol(option.kind, option.diriMode)}>
+                    <b>{option.symbol}</b><span>{option.label}</span>
                   </button>
                 ))}
                 <button type="button" role="menuitem" className="remove" onClick={() => applyCellMenuBol(null)}>

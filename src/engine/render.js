@@ -684,8 +684,8 @@ function renderLineBlock(line, tal, ctx) {
 
   // --- structural bol lane (grid row 4).
   // It mirrors each matra's written microbeat slots. A hold remains a short
-  // '-', point strokes sit beneath their exact attack, and each Diri remains
-  // in one note column while declaring two performed strokes.
+  // '-', point strokes sit beneath their exact attack, and Diri either marks
+  // two strokes on one note or spans the two attacks joined by `di-ri`.
   const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
   const bolPlan = buildBolPlan(line);
   const bolAttackOffset = Math.max(0, Number(line._attackOffset) || 0);
@@ -705,9 +705,11 @@ function renderLineBlock(line, tal, ctx) {
     el.style.gridRow = '4';
     el.style.gridColumn = String(colOf[mi]);
     const slots = [];
+    const firstSlotOfEvent = new Map();
     for (let eventIndex = 0; eventIndex < line.matras[mi].events.length; eventIndex++) {
       const event = line.matras[mi].events[eventIndex];
       if (event.grace) continue;
+      firstSlotOfEvent.set(eventIndex, slots.length);
       const attack = bolPlan.attackByRef.get(`${mi}:${eventIndex}`);
       const count = Math.max(1, Number(event.writtenSlots) || 1);
       for (let partIndex = 0; partIndex < count; partIndex++) {
@@ -721,7 +723,13 @@ function renderLineBlock(line, tal, ctx) {
     }
     for (const passLane of bolPasses) {
       const pass = Number(passLane.pass) || 1;
-      const group = (passLane.bols || []).filter((bol) => bol.ref.matraIndex === mi);
+      const allBols = passLane.bols || [];
+      const group = allBols.filter((bol) => bol.ref.matraIndex === mi);
+      const coveringBolAtEvent = new Map(
+        allBols
+          .filter((bol) => bol.mark === 'diri' && bol.endRef?.matraIndex === mi)
+          .map((bol) => [bol.endRef.eventIndex, bol])
+      );
       const passRow = h('span', 'sr-bol-pass');
       passRow.setAttribute('data-bol-pass', String(pass));
       if (bolPasses.length > 1 && mi === 0) {
@@ -749,21 +757,42 @@ function renderLineBlock(line, tal, ctx) {
         const bol = bolAtEvent.get(slot.eventIndex);
         if (bol) {
           const rateClass = bol.mark === 'diri' && bol.rate === 2 ? ' sr-bol-diri-fast' : '';
+          const endSlot = bol.mark === 'diri' && bol.endRef?.matraIndex === mi
+            ? firstSlotOfEvent.get(bol.endRef.eventIndex)
+            : null;
+          const crossCellSpan = bol.mark === 'diri' && bol.endRef && bol.endRef.matraIndex !== mi;
           const mark = h(
             'span',
-            'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark + rateClass,
-            BOL_SYMBOL[bol.mark] ?? bol.mark
+            'sr-bol-slot sr-bol-mark sr-bol-' + bol.mark + rateClass + (bol.endRef ? ' sr-bol-diri-span' : '') + (crossCellSpan ? ' sr-bol-diri-span-start' : ''),
+            crossCellSpan ? 'V›' : BOL_SYMBOL[bol.mark] ?? bol.mark
           );
-          mark.style.gridColumn = String(slotIndex + 1);
+          mark.style.gridColumn = Number.isInteger(endSlot)
+            ? `${slotIndex + 1} / ${endSlot + 2}`
+            : String(slotIndex + 1);
           mark.setAttribute('data-bol-rate', String(Math.max(1, Number(bol.rate) || 1)));
           if (bol.mark === 'diri') {
-            mark.setAttribute('aria-label', 'Diri: two strokes on this note');
-            mark.title = 'Diri · two strokes on this note';
+            const label = bol.endRef
+              ? 'Diri across this and the next note'
+              : 'Diri: two strokes on this note';
+            mark.setAttribute('aria-label', label);
+            mark.title = label;
           }
           if (Number.isInteger(slot.attackOrdinal)) {
             mark.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
           }
           grid.appendChild(mark);
+        } else if (coveringBolAtEvent.has(slot.eventIndex)) {
+          const covering = coveringBolAtEvent.get(slot.eventIndex);
+          if (covering.ref.matraIndex !== mi) {
+            const continuation = h('span', 'sr-bol-slot sr-bol-mark sr-bol-diri sr-bol-covered sr-bol-diri-span-end', '‹V');
+            continuation.style.gridColumn = String(slotIndex + 1);
+            continuation.setAttribute('aria-label', 'Second note of Diri from the previous note');
+            continuation.title = 'Diri continues from the previous note';
+            if (Number.isInteger(slot.attackOrdinal)) {
+              continuation.setAttribute('data-bol-attack-ordinal', String(slot.attackOrdinal));
+            }
+            grid.appendChild(continuation);
+          }
         } else {
           const blank = h('span', 'sr-bol-slot sr-bol-blank', '');
           blank.style.gridColumn = String(slotIndex + 1);

@@ -9,7 +9,7 @@ line directly beneath the music phrase.
 
 - `↓`: da
 - `↑`: ra
-- `v`: diri across the current and next note attack
+- `v`: diri as two strokes on the current note
 - `^` or `c`: chikari
 - `←` / `→`: previous or next note attack
 - `Backspace`: move back one attack and remove its bol
@@ -29,10 +29,13 @@ rather than moving between source lines. Outside Bol Capture they immediately
 return to ordinary editor navigation.
 
 Held dashes, rests, matra spacing, subdivisions, and local meter remain owned
-by the note line. The capture cursor visits struck notes only. A diri consumes
-two consecutive attacks, regardless of their absolute speed. Its source form
-is `diri .`: the dot preserves the second covered attack. Pressing `-` inside
-Bol Capture does not create another meter lane or advance the attack cursor.
+by the note line. The capture cursor visits struck notes only. Keyboard capture
+writes `diri`, meaning two equal strokes on the current note. Grid Write's bol
+menu also offers **diri · next note**; this writes `di-ri`, binds the current and
+following note attacks, and advances across both without changing either pitch.
+The same spanning form can be typed directly on the `>` line. Pressing `-`
+inside Bol Capture does not create another meter lane or advance the attack
+cursor.
 
 Entering a bol over an existing bol replaces the conflicting point or diri
 span. Left/right plus Delete can correct the lane without re-entering the rest

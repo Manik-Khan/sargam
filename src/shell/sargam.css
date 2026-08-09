@@ -312,6 +312,16 @@
 .sr-bol-diri-fast {
   border-bottom: 1px double color-mix(in srgb, var(--sr-accent) 65%, transparent);
 }
+.sr-bol-diri-span {
+  justify-self: stretch;
+  border-bottom: 1px solid color-mix(in srgb, var(--sr-accent) 72%, var(--sr-ink));
+}
+.sr-bol-diri-span-start,
+.sr-bol-diri-span-end {
+  font-size: 10px;
+  letter-spacing: -0.08em;
+  white-space: nowrap;
+}
 .sr-bol-covered { color: var(--sr-accent); opacity: 0.72; }
 .sr-bol-hold {
   font-size: 12px;
@@ -1211,7 +1221,7 @@
   color: var(--sr-ink-soft);
   font: 800 14px/1 ui-sans-serif, system-ui, sans-serif;
 }
-.app-grid-bol-menu-options { display: grid; grid-template-columns: repeat(5, minmax(2.8rem, 1fr)); gap: 3px; }
+.app-grid-bol-menu-options { display: grid; grid-template-columns: repeat(3, minmax(3.7rem, 1fr)); gap: 3px; }
 .app-grid-bol-menu-options button {
   display: grid;
   min-width: 0;
@@ -1297,7 +1307,7 @@
   color: var(--sr-paper-raised);
 }
 .app-grid-cell-menu-actions { display: grid; gap: 4px; }
-.app-grid-cell-menu-actions.bol-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.app-grid-cell-menu-actions.bol-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .app-grid-cell-menu-actions.quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .app-grid-cell-menu-actions.wide-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .app-grid-cell-menu-actions button {

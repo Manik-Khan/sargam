@@ -2,8 +2,9 @@
 // rendering, and serialization.
 //
 // The music line owns rhythm. A bol lane mirrors its written hold slots and
-// phrase repeats, while bol words attach only to note attacks. Diri belongs
-// to one note attack and re-articulates that note twice inside its duration.
+// phrase repeats, while bol words attach only to note attacks. `diri` belongs
+// to one note attack and re-articulates that note twice; `di-ri` binds two
+// successive attacks as the two spoken halves of one Diri.
 
 export const BOL_KINDS = new Set(['da', 'ra', 'diri', 'chikari']);
 
@@ -111,7 +112,7 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
   let lastAttack = -1;
   let i = 0;
 
-  const placeAttack = (kind, from, to) => {
+  const placeAttack = (kind, from, to, attackSpan = null) => {
     const slotIndex = nextAttackSlot(plan, visualCursor);
     if (slotIndex < 0) {
       problems.push('more bol marks than note attacks');
@@ -123,7 +124,8 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
     lastAttack = ordinal;
     visualCursor = slotIndex + 1;
 
-    if (kind !== 'diri' || Number(diriAttacks) === 1) return;
+    const span = attackSpan == null ? Number(diriAttacks) : Number(attackSpan);
+    if (kind !== 'diri' || span === 1) return;
     const secondSlot = nextAttackSlot(plan, visualCursor);
     if (secondSlot < 0) {
       problems.push('diri needs two successive note attacks');
@@ -172,6 +174,12 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
       i += suffix[0].length;
       continue;
     }
+    const spanningDiri = source.slice(i).match(/^di-ri(?![A-Za-z])/);
+    if (spanningDiri) {
+      placeAttack('diri', i, i + spanningDiri[0].length, 2);
+      i += spanningDiri[0].length;
+      continue;
+    }
     if (char === '-') {
       if (plan.slots[visualCursor]?.kind === 'hold') {
         visualCursor++;
@@ -195,7 +203,7 @@ export function parseBolLane(text, line, { diriAttacks = 1 } = {}) {
     }
 
     const unknown = source.slice(i).match(/^[^\s()|.-]+/)?.[0] || char;
-    problems.push(`unrecognized bol mark '${unknown}' — use da, ra, diri, chikari, or . for a gap`);
+    problems.push(`unrecognized bol mark '${unknown}' — use da, ra, diri, di-ri, chikari, or . for a gap`);
     i += unknown.length;
   }
 
@@ -255,6 +263,10 @@ export function assignmentsFromBols(line, bols = line?.bols || []) {
     const attack = plan.attackByRef.get(`${bol.ref.matraIndex}:${bol.ref.eventIndex}`);
     if (!attack || !BOL_KINDS.has(bol.mark)) continue;
     assignments[attack.ordinal] = bol.mark;
+    if (bol.mark === 'diri' && bol.endRef) {
+      const end = plan.attackByRef.get(`${bol.endRef.matraIndex}:${bol.endRef.eventIndex}`);
+      if (end && end.ordinal === attack.ordinal + 1) coveredBy[end.ordinal] = attack.ordinal;
+    }
   }
   return { plan, assignments, coveredBy };
 }
@@ -274,16 +286,14 @@ function formatMatraSegments(line, matraIndex, plan, assignments, coveredBy) {
       continue;
     }
     const mark = assignments[attack.ordinal] || '.';
+    const spanningDiri = mark === 'diri' && coveredBy[attack.ordinal + 1] === attack.ordinal;
     const ordinals = [attack.ordinal];
-    if (
-      mark === 'diri' &&
-      coveredBy[attack.ordinal + 1] === attack.ordinal
-    ) {
+    if (spanningDiri) {
       ordinals.push(attack.ordinal + 1);
     }
     segments.push({
-      text: mark + '-'.repeat(Math.max(0, attack.writtenSlots - 1)),
-      wordLength: mark.length,
+      text: (spanningDiri ? 'di-ri' : mark) + '-'.repeat(Math.max(0, attack.writtenSlots - 1)),
+      wordLength: spanningDiri ? 5 : mark.length,
       ordinals,
     });
   }

@@ -188,7 +188,9 @@ export const smokes = [
       assert.match(editor, /createPortal[\s\S]*?app-grid-bol-menu-floating/);
       assert.match(editor, /bolMenuPosition[\s\S]*?position: 'fixed'/);
       assert.match(editor, /copyBolLanes[\s\S]*?navigator\.clipboard\.writeText[\s\S]*?>Copy bols</);
-      assert.match(editor, /kind: 'diri', label: 'diri · 2 strokes'/);
+      assert.match(editor, /id: 'diri-single'.*label: 'diri · same note'/);
+      assert.match(editor, /id: 'diri-span'.*label: 'diri · next note'/);
+      assert.match(editor, /covered \? 'ri'/);
       assert.match(editor, /Add 1st ending/);
       assert.match(editor, /Start here/);
       assert.match(editor, /2nd ending/);

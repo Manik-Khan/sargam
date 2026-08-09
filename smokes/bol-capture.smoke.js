@@ -117,6 +117,48 @@ export const smokes = [
     },
   },
   {
+    name: 'bol menu: di-ri binds two successive notes without replacing their pitches',
+    fn() {
+      const result = setBolAtAttack(source, 3, 1, 'diri', 1, { diriMode: 'span' });
+      assert.equal(result.ok, true);
+      assert.match(result.text, /S- SS SS SS\n> \.- di-ri \. \. \. \./);
+      const parsed = parseDocument(result.text);
+      assert.deepEqual(parsed.problems, []);
+      const bol = parsed.doc.sections[0].lines[0].bols[0];
+      assert.deepEqual(bol, {
+        ref: { matraIndex: 1, eventIndex: 0 },
+        endRef: { matraIndex: 1, eventIndex: 1 },
+        mark: 'diri',
+        rate: 1,
+      });
+    },
+  },
+  {
+    name: 'bol menu: editing the ri note cleanly replaces a two-note Diri',
+    fn() {
+      const spanned = setBolAtAttack(source, 3, 1, 'diri', 1, { diriMode: 'span' });
+      const corrected = setBolAtAttack(spanned.text, 3, 2, 'ra');
+      assert.equal(corrected.ok, true);
+      assert.match(corrected.text, /S- SS SS SS\n> \.- \. ra \. \. \. \./);
+      const bols = parseDocument(corrected.text).doc.sections[0].lines[0].bols;
+      assert.deepEqual(bols.map((bol) => bol.mark), ['ra']);
+    },
+  },
+  {
+    name: 'bol menu: two-note Diri can cross a matra boundary and needs a next attack',
+    fn() {
+      const short = 'tal: tintal\n\nS R\n';
+      const result = setBolAtAttack(short, 3, 0, 'diri', 1, { diriMode: 'span' });
+      assert.equal(result.ok, true);
+      assert.match(result.text, /S R\n> di-ri\n/);
+      const bol = parseDocument(result.text).doc.sections[0].lines[0].bols[0];
+      assert.deepEqual(bol.endRef, { matraIndex: 1, eventIndex: 0 });
+      const failed = setBolAtAttack(short, 3, 1, 'diri', 1, { diriMode: 'span' });
+      assert.equal(failed.ok, false);
+      assert.match(failed.message, /following note attack/);
+    },
+  },
+  {
     name: 'bol capture: a neighboring bol does not erase a per-note diri',
     fn() {
       const diri = setBolAtCursor(source, { sourceLine: 3, ordinal: 2 }, 'diri');

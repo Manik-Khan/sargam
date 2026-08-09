@@ -757,10 +757,10 @@ export default function App() {
     editorRef.current?.focus();
   };
 
-  const doApplyGridBol = ({ sourceLine, ordinal, kind }) => {
+  const doApplyGridBol = ({ sourceLine, ordinal, kind, diriMode = 'single' }) => {
     const currentText = textRef.current;
     const result = kind
-      ? setBolAtAttack(currentText, sourceLine, ordinal, kind)
+      ? setBolAtAttack(currentText, sourceLine, ordinal, kind, 1, { diriMode })
       : removeBolAtAttack(currentText, sourceLine, ordinal);
     setBolMessage(result.message);
     if (!result.ok) return false;

@@ -1360,7 +1360,14 @@ function attachBols(musicLine, text, lineNo, problems, pass = 1) {
       ref: { matraIndex: attack.matraIndex, eventIndex: attack.eventIndex },
       mark,
     };
-    if (mark === 'diri') bol.rate = 2;
+    const coveredOrdinal = lane.coveredBy.findIndex((covering) => covering === ordinal);
+    if (mark === 'diri' && coveredOrdinal >= 0) {
+      const end = lane.plan.attacks[coveredOrdinal];
+      bol.endRef = { matraIndex: end.matraIndex, eventIndex: end.eventIndex };
+      bol.rate = 1;
+    } else if (mark === 'diri') {
+      bol.rate = 2;
+    }
     bols.push(bol);
   }
   lane.bols = bols;

@@ -389,6 +389,31 @@ export const smokes = [
     },
   },
   {
+    name: 'render: di-ri visibly spans two attacks inside one matra',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS [R G]\n> . di-ri\n');
+      assert.deepEqual(problems, []);
+      const matra = renderDocument(doc).querySelector('.sr-bol[data-matra="1"]');
+      const mark = matra.querySelector('.sr-bol-diri-span');
+      assert.equal(mark.textContent, 'V');
+      assert.equal(mark.style.gridColumn, '1 / 3');
+      assert.equal(mark.dataset.bolRate, '1');
+      assert.match(mark.getAttribute('aria-label'), /next note/);
+      assert.equal(matra.querySelectorAll('.sr-bol-blank').length, 0);
+    },
+  },
+  {
+    name: 'render: a cross-matra di-ri has visible start and continuation marks',
+    fn: () => {
+      const { doc, problems } = parseDocument('tal: tintal\n\nS R\n> di-ri\n');
+      assert.deepEqual(problems, []);
+      const root = renderDocument(doc);
+      assert.equal(root.querySelector('.sr-bol-diri-span-start').textContent, 'V›');
+      assert.equal(root.querySelector('.sr-bol-diri-span-end').textContent, '‹V');
+      assert.equal(root.querySelector('.sr-bol-diri-span-end').dataset.bolAttackOrdinal, '1');
+    },
+  },
+  {
     name: 'render: unparsed fragment renders as dimmed passthrough text',
     fn: () => {
       const { doc } = parseDocument('tal: tintal\n\nS R xyz P\n');

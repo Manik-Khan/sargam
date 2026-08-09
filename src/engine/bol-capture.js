@@ -367,7 +367,7 @@ export function removeBolAtCursor(text, cursor) {
   };
 }
 
-export function setBolAtCursor(text, cursor, kind) {
+export function setBolAtCursor(text, cursor, kind, { diriMode = 'single' } = {}) {
   const sourceLine = Number(cursor?.sourceLine);
   const ordinal = Number(cursor?.ordinal);
   const pass = cursorPass(cursor);
@@ -376,7 +376,10 @@ export function setBolAtCursor(text, cursor, kind) {
   if (!Number.isInteger(ordinal) || ordinal < 0 || ordinal >= info.attacks.length) {
     return { ok: false, text, message: 'This phrase is complete. Move left to correct it.' };
   }
-  const span = 1;
+  const span = kind === 'diri' && diriMode === 'span' ? 2 : 1;
+  if (ordinal + span > info.attacks.length) {
+    return { ok: false, text, message: 'Diri across notes needs a following note attack.' };
+  }
 
   const lane = structuralLane(text, sourceLine, pass);
   if (!lane) return { ok: false, text, message: 'The active music line no longer exists.' };
@@ -389,6 +392,7 @@ export function setBolAtCursor(text, cursor, kind) {
   const assignments = cleared.assignments;
   const coveredBy = cleared.coveredBy;
   assignments[ordinal] = kind;
+  if (kind === 'diri' && span === 2) coveredBy[ordinal + 1] = ordinal;
 
   const formatted = formatBolLane(lane.musicLine, assignments, coveredBy);
   const written = writeBolLane(text, sourceLine, formatted.text, { pass });
@@ -401,13 +405,15 @@ export function setBolAtCursor(text, cursor, kind) {
     ...written,
     cursor: nextCursor,
     selection: bolCursorSelection(written.text, nextCursor),
-    message: `${kind === 'diri' ? 'Diri (two strokes)' : kind} written to bol pass ${pass}. ${captureStatus(info.attacks.length, nextOrdinal)}`,
+    message: `${kind === 'diri'
+      ? span === 2 ? 'Diri across two notes' : 'Diri (two strokes on one note)'
+      : kind} written to bol pass ${pass}. ${captureStatus(info.attacks.length, nextOrdinal)}`,
   };
 }
 
 /** Apply a bol directly from a grid cell menu. This deliberately has no
  * capture lifecycle: the clicked attack is the complete selection. */
-export function setBolAtAttack(text, sourceLine, ordinal, kind, pass = 1) {
+export function setBolAtAttack(text, sourceLine, ordinal, kind, pass = 1, { diriMode = 'single' } = {}) {
   const ready = beginBolCaptureAt(text, sourceLine, ordinal);
   if (!ready.ok) return ready;
   const targetPass = Math.max(1, Number(pass) || 1);
@@ -420,11 +426,13 @@ export function setBolAtAttack(text, sourceLine, ordinal, kind, pass = 1) {
   const cursor = targetPass > 1
     ? { sourceLine: Number(sourceLine), ordinal: Number(ordinal), pass: targetPass }
     : { sourceLine: Number(sourceLine), ordinal: Number(ordinal) };
-  const written = setBolAtCursor(nextText, cursor, kind);
+  const written = setBolAtCursor(nextText, cursor, kind, { diriMode });
   if (!written.ok) return written;
   return {
     ...written,
-    message: `${kind === 'diri' ? 'Diri' : kind} attached to note ${Number(ordinal) + 1} on source line ${Number(sourceLine)}.`,
+    message: `${kind === 'diri'
+      ? diriMode === 'span' ? 'Diri across this and the next note' : 'Diri on this note'
+      : kind} attached to note ${Number(ordinal) + 1} on source line ${Number(sourceLine)}.`,
   };
 }
 
