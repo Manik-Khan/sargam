@@ -73,8 +73,10 @@ function contentWidthInEm(el) {
 }
 
 function measureLine(line, group) {
+  if (group?.classList.contains('sr-alternate-ending-pair')) return null;
   const row = group?.querySelector('.sr-row');
-  const cells = [...(group?.querySelectorAll('.sr-cell') || [])];
+  const cells = [...(group?.querySelectorAll('.sr-cell') || [])]
+    .filter((cell) => cell.closest('.sr-line-group') === group);
   if (!row || cells.length !== (line?.matras?.length || 0) || cells.length === 0) return null;
 
   const rowRect = row.getBoundingClientRect();

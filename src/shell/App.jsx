@@ -19,6 +19,7 @@ import {
 } from './voices.js';
 import { normalizeToneMap, updateToneMap } from './tone.js';
 import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
+import { previewSourceLine } from './preview-scroll.js';
 import {
   applyMeterToSelection,
   clearMeterFromSelection,
@@ -197,6 +198,9 @@ export default function App() {
   const [writeMode, setWriteMode] = useState(() =>
     store.getPref('writeMode', 'text') === 'grid' ? 'grid' : 'text'
   );
+  const [writingFocus, setWritingFocus] = useState(() =>
+    store.getPref('writingFocus', false) === true
+  );
   const [gridSelection, setGridSelection] = useState(null);
   const [selectedMarkId, setSelectedMarkId] = useState(null);
   const [bolCapture, setBolCapture] = useState(null);
@@ -219,6 +223,7 @@ export default function App() {
   const editorSyncTargetRef = useRef(null);
   const stageRef = useRef(null);
   const panesRef = useRef(null);
+  const modeSwitchTargetRef = useRef(null);
 
   const syncSourceLineFromEditor = useCallback((sourceLine) => {
     const pendingTarget = editorSyncTargetRef.current;
@@ -1842,9 +1847,45 @@ export default function App() {
 
   const changeWriteMode = (value) => {
     const next = value === 'grid' ? 'grid' : 'text';
+    if (next === writeMode) return;
+    const sourceLine = previewSourceLine(doc, activeLine, bolCapture)
+      ?? doc.sections.flatMap((section) => section.lines || [])[0]?.sourceLine
+      ?? 1;
+    const matraIndex = Number(gridSelection?.sourceLine) === Number(sourceLine)
+      ? Math.max(0, Number(gridSelection?.matraIndex) || 0)
+      : 0;
+    modeSwitchTargetRef.current = { mode: next, sourceLine, matraIndex };
+    if (next === 'grid') setGridSelection({ sourceLine, matraIndex });
     setWriteMode(next);
     store.setPref('writeMode', next);
     if (next === 'grid' && !rhythmGrid) changeRhythmGrid(true);
+  };
+
+  useEffect(() => {
+    const target = modeSwitchTargetRef.current;
+    if (!target || target.mode !== writeMode) return undefined;
+    modeSwitchTargetRef.current = null;
+    if (writeMode === 'grid') return undefined;
+    const frame = window.requestAnimationFrame(() => focusSourceLine(target.sourceLine));
+    return () => window.cancelAnimationFrame(frame);
+  }, [writeMode]);
+
+  const goToNotationBeginning = () => {
+    const first = doc.sections.flatMap((section) => section.lines || [])[0];
+    if (!first) return;
+    const sourceLine = first.sourceLine;
+    setActiveLine(sourceLine);
+    setGridSelection({ sourceLine, matraIndex: 0 });
+    setPosition(timeFor(schedule, sourceLine, 0));
+    if (writeMode === 'text') {
+      window.requestAnimationFrame(() => focusSourceLine(sourceLine));
+    }
+  };
+
+  const changeWritingFocus = () => {
+    const next = !writingFocus;
+    setWritingFocus(next);
+    store.setPref('writingFocus', next);
   };
 
   useEffect(() => {
@@ -1865,7 +1906,7 @@ export default function App() {
   };
 
   return (
-    <div className={'app-root' + (showExport ? ' is-exporting' : '')}>
+    <div className={'app-root' + (showExport ? ' is-exporting' : '') + (writingFocus ? ' app-writing-focus' : '')}>
       {showExport && (
         <ExportView
           doc={doc}
@@ -2112,6 +2153,14 @@ export default function App() {
                 aria-pressed={writeMode === 'grid'}
                 onClick={() => changeWriteMode('grid')}
               >Grid Write</button>
+              <span className="app-write-spacer" />
+              <button type="button" onClick={goToNotationBeginning}>↑ Beginning</button>
+              <button
+                type="button"
+                className={writingFocus ? 'active' : ''}
+                aria-pressed={writingFocus}
+                onClick={changeWritingFocus}
+              >{writingFocus ? 'Show tools' : 'Writing focus'}</button>
             </div>
             <CommandBar
             onApply={doCommand}

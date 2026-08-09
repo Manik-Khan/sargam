@@ -2,6 +2,7 @@
 // is one matra; valid edits immediately replace only that Markdown music line.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   appendGridCellToken,
   gridLines,
@@ -16,6 +17,25 @@ const BOL_OPTIONS = [
   { kind: 'diri', label: 'diri · 2 strokes' },
   { kind: 'chikari', label: 'chikari' },
 ];
+
+function bolMenuPosition(anchor) {
+  const viewportWidth = Math.max(280, Number(window.innerWidth) || 0);
+  const viewportHeight = Math.max(220, Number(window.innerHeight) || 0);
+  const width = Math.min(292, viewportWidth - 16);
+  const left = Math.min(
+    Math.max(8, anchor.left + anchor.width / 2 - width / 2),
+    viewportWidth - width - 8
+  );
+  const placeAbove = anchor.bottom + 118 > viewportHeight;
+  return {
+    position: 'fixed',
+    width,
+    left,
+    ...(placeAbove
+      ? { bottom: viewportHeight - anchor.top + 6 }
+      : { top: anchor.bottom + 6 }),
+  };
+}
 
 function withoutKey(object, key) {
   const next = { ...object };
@@ -71,8 +91,14 @@ export default function GridEditor({
     setBolMenu(null);
   }, [activeSelection?.sourceLine, activeSelection?.matraIndex]);
 
-  const chooseBolAttack = (sourceLine, matraIndex, ordinal) => {
-    const target = { sourceLine, matraIndex, ordinal };
+  const chooseBolAttack = (sourceLine, matraIndex, ordinal, noteNumber, anchor) => {
+    const target = {
+      sourceLine,
+      matraIndex,
+      ordinal,
+      noteNumber,
+      style: bolMenuPosition(anchor.getBoundingClientRect()),
+    };
     setBolMenu((current) => (
       current?.sourceLine === sourceLine && current?.ordinal === ordinal ? null : target
     ));
@@ -134,6 +160,25 @@ export default function GridEditor({
     onChange?.(result.text);
   };
 
+  const copyBolLanes = async (row, rowIndex) => {
+    const lines = String(text ?? '').split('\n');
+    const nextSourceLine = rows[rowIndex + 1]?.sourceLine ?? (lines.length + 1);
+    const lanes = lines
+      .slice(row.sourceLine, Math.max(row.sourceLine, nextSourceLine - 1))
+      .map((line) => line.trim())
+      .filter((line) => /^>(?:\d+)?\s/.test(line) && !line.startsWith('>>'));
+    if (!lanes.length) {
+      setMessage('This notation line has no bol lane to copy yet.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(lanes.join('\n'));
+      setMessage(`Copied ${lanes.length === 1 ? 'the bol lane' : `${lanes.length} bol passes`} from source line ${row.sourceLine}.`);
+    } catch {
+      setMessage('Clipboard access is unavailable here. Switch to Text Write to copy the bol line directly.');
+    }
+  };
+
   if (!rows.length) {
     return (
       <div className="app-grid-writer app-grid-writer-empty">
@@ -153,8 +198,12 @@ export default function GridEditor({
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>
         <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol</span>
       </div>
-      <div className="app-grid-writer-scroll" ref={scrollRef}>
-        {rows.map((row) => {
+      <div
+        className="app-grid-writer-scroll"
+        ref={scrollRef}
+        onScroll={() => setBolMenu(null)}
+      >
+        {rows.map((row, rowIndex) => {
           const showSection = row.sectionLabel !== previousSection;
           previousSection = row.sectionLabel;
           return (
@@ -166,6 +215,9 @@ export default function GridEditor({
                 <div className="app-grid-writer-line-label">
                   <span>Line {row.sourceLine}</span>
                   {row.tal && <small>{row.tal.name}</small>}
+                  {row.bolPasses.length > 0 && (
+                    <button type="button" onClick={() => copyBolLanes(row, rowIndex)}>Copy bols</button>
+                  )}
                 </div>
                 <div className="app-grid-writer-cells" role="group" aria-label={`Source line ${row.sourceLine} matras`}>
                   {row.cells.map((cell) => {
@@ -226,7 +278,7 @@ export default function GridEditor({
                             style={{ '--grid-bol-slots': cell.attacks.length }}
                             aria-label={`Bols for line ${row.sourceLine}, matra ${cell.matraIndex + 1}`}
                           >
-                            {cell.attacks.map((attack) => {
+                            {cell.attacks.map((attack, attackIndex) => {
                               const bol = bolByAttack.get(attack.ordinal);
                               const covered = coveredByDiri.has(attack.ordinal);
                               const selected = Number(bolMenu?.sourceLine) === Number(row.sourceLine)
@@ -241,46 +293,17 @@ export default function GridEditor({
                                   title={bol
                                     ? `Change ${bol.mark}${bol.mark === 'diri' ? ' · two strokes on this note' : ''}`
                                     : 'Add a bol to this note'}
-                                  onClick={() => chooseBolAttack(row.sourceLine, cell.matraIndex, attack.ordinal)}
+                                  onClick={(event) => chooseBolAttack(
+                                    row.sourceLine,
+                                    cell.matraIndex,
+                                    attack.ordinal,
+                                    attackIndex + 1,
+                                    event.currentTarget
+                                  )}
                                 >{bol ? BOL_SYMBOL[bol.mark] : covered ? '·' : '+'}</button>
                               );
                             })}
                           </span>
-                        )}
-                        {Number(bolMenu?.sourceLine) === Number(row.sourceLine)
-                          && Number(bolMenu?.matraIndex) === Number(cell.matraIndex) && (
-                          <div
-                            className="app-grid-bol-menu"
-                            role="menu"
-                            aria-label={`Choose a bol for matra ${cell.matraIndex + 1}`}
-                            onKeyDown={(event) => {
-                              if (event.key !== 'Escape') return;
-                              event.preventDefault();
-                              setBolMenu(null);
-                            }}
-                          >
-                            <div className="app-grid-bol-menu-head">
-                              <strong>Bol</strong>
-                              <span>note {cell.attacks.findIndex((attack) => attack.ordinal === bolMenu.ordinal) + 1}</span>
-                              <button type="button" aria-label="Close bol menu" onClick={() => setBolMenu(null)}>×</button>
-                            </div>
-                            <div className="app-grid-bol-menu-options">
-                              {BOL_OPTIONS.map((option) => (
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  key={option.kind}
-                                  onClick={() => applyBol(option.kind)}
-                                >
-                                  <b>{BOL_SYMBOL[option.kind]}</b>
-                                  <span>{option.label}</span>
-                                </button>
-                              ))}
-                              <button type="button" role="menuitem" className="remove" onClick={() => applyBol(null)}>
-                                <b>×</b><span>remove</span>
-                              </button>
-                            </div>
-                          </div>
                         )}
                       </div>
                     );
@@ -308,6 +331,42 @@ export default function GridEditor({
           );
         })}
       </div>
+      {bolMenu && typeof document !== 'undefined' && createPortal(
+        <div
+          className="app-grid-bol-menu app-grid-bol-menu-floating"
+          role="menu"
+          aria-label={`Choose a bol for matra ${bolMenu.matraIndex + 1}`}
+          style={bolMenu.style}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            setBolMenu(null);
+          }}
+        >
+          <div className="app-grid-bol-menu-head">
+            <strong>Bol</strong>
+            <span>note {bolMenu.noteNumber}</span>
+            <button type="button" aria-label="Close bol menu" onClick={() => setBolMenu(null)}>×</button>
+          </div>
+          <div className="app-grid-bol-menu-options">
+            {BOL_OPTIONS.map((option) => (
+              <button
+                type="button"
+                role="menuitem"
+                key={option.kind}
+                onClick={() => applyBol(option.kind)}
+              >
+                <b>{BOL_SYMBOL[option.kind]}</b>
+                <span>{option.label}</span>
+              </button>
+            ))}
+            <button type="button" role="menuitem" className="remove" onClick={() => applyBol(null)}>
+              <b>×</b><span>remove</span>
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
       <div className="app-grid-writer-message" role="status" aria-live="polite">{bolMessage || message}</div>
     </div>
   );

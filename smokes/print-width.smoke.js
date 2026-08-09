@@ -185,6 +185,8 @@ export const smokes = [
       assert.match(css, /@media print\s*\{[\s\S]*?\.sr-section\s*\{[^}]*break-inside:\s*auto;[^}]*page-break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.sr-line-group\s*\{[^}]*break-inside:\s*auto;[^}]*page-break-inside:\s*auto;/s);
       assert.match(css, /@media print\s*\{[\s\S]*?\.sr-line-block\s*\{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;/s);
+      assert.match(css, /\.sr-alternate-ending-system\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*max-content max-content;[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-alternate-ending-system\s*\{[^}]*margin:\s*0;/s);
     },
   },
 ];

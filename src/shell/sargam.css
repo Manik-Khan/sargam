@@ -972,6 +972,19 @@
   font: 700 11px/1.2 ui-sans-serif, system-ui, sans-serif;
 }
 .app-write-mode button.active { background: var(--sr-ink); color: var(--sr-paper-raised); }
+.app-write-spacer { flex: 1 1 auto; }
+.app-writing-focus .cmdbar-wrap { display: none; }
+.app-writing-focus .app-stage > .app-panes,
+.app-writing-focus .app-workspace-split > .workspace-split-divider {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+.app-writing-focus .app-grid-writer-help {
+  padding-block: 4px;
+}
+.app-writing-focus .app-grid-writer-help > span:not(.app-grid-writer-bol-help) {
+  display: none;
+}
 
 .app-grid-writer {
   display: flex;
@@ -1017,6 +1030,16 @@
   font: 700 10px/1.25 ui-sans-serif, system-ui, sans-serif;
 }
 .app-grid-writer-line-label small { font-weight: 500; opacity: 0.72; }
+.app-grid-writer-line-label button {
+  width: max-content;
+  margin-top: 5px;
+  border: 1px solid color-mix(in srgb, var(--sr-accent) 34%, var(--sr-line));
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: transparent;
+  color: var(--sr-accent);
+  font: 700 9px/1.15 ui-sans-serif, system-ui, sans-serif;
+}
 .app-grid-writer-cells { display: flex; min-width: 0; flex-wrap: wrap; align-items: stretch; gap: 0; }
 .app-grid-write-cell {
   position: relative;
@@ -1092,6 +1115,17 @@
   color: var(--sr-ink);
   box-shadow: 0 7px 20px color-mix(in srgb, var(--sr-ink) 22%, transparent);
   font: 10px/1.2 ui-sans-serif, system-ui, sans-serif;
+}
+.app-grid-bol-menu-floating {
+  z-index: 1000;
+  top: auto;
+  bottom: auto;
+  min-width: 0;
+  max-width: calc(100vw - 16px);
+  transform: none;
+}
+.app-grid-bol-menu-floating .app-grid-bol-menu-options button {
+  min-height: 2.65rem;
 }
 .app-grid-bol-menu-head {
   display: flex;
@@ -1230,8 +1264,9 @@
 /* SARGAM_NOTATION_FOLLOWUP_V3_2026_07_18: compact, toggleable diagnostics. The old rules above remain as
    harmless history; these later rules intentionally override them. */
 .sr-volta-first {
-  display: none !important;
+  display: block !important;
 }
+.sr-volta-second { display: block; }
 
 .app-problems {
   flex: none;
@@ -2654,6 +2689,82 @@
   font-size: 0.82em;
   transform: none;
 }
+
+/* Alternate endings are one musical system, not a detached second line.
+   The common tail occupies the left column; both real ending grids share the
+   same right-hand origin. The ending column remains indivisible at print
+   boundaries, while either ending may still fold internally when it is wider
+   than the available system. */
+.sr-alternate-ending-system {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-rows: auto auto;
+  align-items: start;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: 1.65em;
+  overflow: visible;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.sr-alternate-ending-system > .sr-line-block,
+.sr-alternate-ending-system > .sr-alternate-ending-second > .sr-line-block {
+  padding-inline: 0;
+  margin-bottom: 0;
+  overflow: visible;
+}
+.sr-alternate-ending-common {
+  grid-column: 1;
+  grid-row: 1;
+}
+.sr-alternate-ending-first {
+  grid-column: 2;
+  grid-row: 1;
+}
+.sr-alternate-ending-second {
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  margin: 0;
+  padding-top: 0.18em;
+}
+.sr-alternate-ending-second::before {
+  content: '';
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  top: -0.34em;
+  height: 0.62em;
+  border-left: 1px solid currentColor;
+  pointer-events: none;
+}
+.sr-alternate-ending-no-common .sr-alternate-ending-first,
+.sr-alternate-ending-no-common .sr-alternate-ending-second {
+  grid-column: 1;
+}
+.sr-alternate-ending-system .sr-volta {
+  white-space: nowrap;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.sr-export .sr-alternate-ending-system { margin-inline: 1em; }
+.app-rhythm-grid-paper .sr-alternate-ending-system,
+.app-export-graph-paper .sr-alternate-ending-system {
+  margin: 0;
+  column-gap: 0;
+}
+.app-rhythm-grid-paper .sr-alternate-ending-second,
+.app-export-graph-paper .sr-alternate-ending-second {
+  padding-top: 0;
+}
+.app-rhythm-grid-paper .sr-alternate-ending-second::before,
+.app-export-graph-paper .sr-alternate-ending-second::before {
+  top: -1px;
+  height: 2px;
+  border-left-color: var(--sr-graph-line);
+}
 .app-rhythm-grid-paper .sr-graph-structure-cell,
 .app-export-graph-paper .sr-graph-structure-cell {
   position: relative;
@@ -3374,4 +3485,10 @@
   color: var(--sr-bg);
   background: var(--sr-accent);
   border-color: var(--sr-accent);
+}
+
+/* Keep these after the shared late-stage line padding rules. */
+.sr-alternate-ending-system > .sr-line-block,
+.sr-alternate-ending-system > .sr-alternate-ending-second > .sr-line-block {
+  padding-inline: 0;
 }

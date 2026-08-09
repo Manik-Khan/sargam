@@ -31,8 +31,18 @@ function rectDistance(rect, rail) {
   return Math.min(Math.abs(rect.top - rail), Math.abs(rect.bottom - rail));
 }
 
-export function previewAnchorElement(root, sourceLine, bolCapture = null) {
+export function previewAnchorElement(root, sourceLine, bolCapture = null, gridSelection = null) {
   if (!root) return null;
+  const selectedMatra = Number(gridSelection?.matraIndex);
+  if (
+    Number(gridSelection?.sourceLine) === Number(sourceLine) &&
+    Number.isInteger(selectedMatra)
+  ) {
+    const cell = root.querySelector(
+      `.sr-line-group[data-source-line="${sourceLine}"] .sr-cell[data-matra="${selectedMatra}"]`
+    );
+    if (cell) return cell;
+  }
   const captureOrdinal = Number(bolCapture?.ordinal);
   if (
     Number(bolCapture?.sourceLine) === Number(sourceLine) &&
@@ -45,7 +55,8 @@ export function previewAnchorElement(root, sourceLine, bolCapture = null) {
   }
   const group = previewLineElement(root, sourceLine);
   if (!group) return null;
-  const blocks = [...group.querySelectorAll('.sr-line-block')];
+  const blocks = [...group.querySelectorAll('.sr-line-block')]
+    .filter((block) => block.closest('.sr-line-group') === group);
   if (!blocks.length) return group;
   const rootRect = root.getBoundingClientRect?.();
   const rail = Number(rootRect?.top || 0) + Math.min(96, Math.max(24, Number(root.clientHeight || 0) * 0.28));
@@ -59,13 +70,23 @@ export function previewAnchorElement(root, sourceLine, bolCapture = null) {
 
 export function previewAnchorIdentity(element) {
   if (!element) return null;
-  const ordinal = Number(element.getAttribute?.('data-anchor-ordinal'));
+  const ordinalValue = element.getAttribute?.('data-anchor-ordinal');
+  const ordinal = ordinalValue === null || ordinalValue === undefined
+    ? Number.NaN
+    : Number(ordinalValue);
   const sourceLine = Number(
     element.getAttribute?.('data-anchor-line') ||
     element.closest?.('[data-source-line]')?.getAttribute('data-source-line')
   );
   if (Number.isInteger(ordinal) && Number.isInteger(sourceLine)) {
     return { kind: 'attack', sourceLine, ordinal };
+  }
+  const cell = element.classList?.contains('sr-cell')
+    ? element
+    : element.closest?.('.sr-cell');
+  const matraIndex = Number(cell?.getAttribute?.('data-matra'));
+  if (cell && Number.isInteger(sourceLine) && Number.isInteger(matraIndex)) {
+    return { kind: 'matra', sourceLine, matraIndex };
   }
   const block = element.classList?.contains('sr-line-block')
     ? element
@@ -87,14 +108,21 @@ export function restorePreviewAnchor(root, identity) {
       `[data-anchor-kind="attack"][data-anchor-line="${identity.sourceLine}"][data-anchor-ordinal="${identity.ordinal}"]`
     );
   }
+  if (identity.kind === 'matra') {
+    return root.querySelector(
+      `.sr-line-group[data-source-line="${identity.sourceLine}"] .sr-cell[data-matra="${identity.matraIndex}"]`
+    );
+  }
   const group = previewLineElement(root, identity.sourceLine);
   if (!group || identity.kind === 'line') return group;
   const target = Number(identity.from) || 0;
-  return [...group.querySelectorAll('.sr-line-block')].find((block) => {
+  return [...group.querySelectorAll('.sr-line-block')]
+    .filter((block) => block.closest('.sr-line-group') === group)
+    .find((block) => {
     const from = Number(block.getAttribute('data-system-from') || 0);
     const to = Number(block.getAttribute('data-system-to') || from);
     return from <= target && target <= to;
-  }) || group;
+    }) || group;
 }
 
 export function lineAnchoredScrollTop({

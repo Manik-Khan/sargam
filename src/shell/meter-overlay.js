@@ -97,7 +97,9 @@ export function mountMeterOverlays(root, spans = [], draft = null, { rhythmGrid 
     const sourceLine = Number(group.getAttribute('data-source-line'));
     const lineSpans = all.filter((span) => Number(span.sourceLine) === sourceLine);
     if (!lineSpans.length) continue;
-    for (const block of group.querySelectorAll('.sr-line-block')) {
+    const ownedBlocks = [...group.querySelectorAll('.sr-line-block')]
+      .filter((block) => block.closest('.sr-line-group') === group);
+    for (const block of ownedBlocks) {
       const systemFrom = Number(block.getAttribute('data-system-from') || 0);
       const systemTo = Number(block.getAttribute('data-system-to') || systemFrom);
       const systemStart = systemFrom;

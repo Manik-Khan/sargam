@@ -17,7 +17,7 @@
 import { getTal, wrapMatra, markerAtMatra, landing } from './tala.js';
 import { spellDegree } from './western.js';
 import { DEFAULT_SA } from './schedule.js';
-import { planLineSystems } from './layout.js';
+import { estimateMatraEm, isSafeBreak, planLineSystems } from './layout.js';
 import { buildLineGeometry } from './notation-geometry.js';
 import { performedOffsetAt } from './performed-time.js';
 import { buildBolPlan } from './bol-lane.js';
@@ -163,7 +163,31 @@ function renderSection(section, sectionIndex, opts) {
   }
   const tal = section.tal !== 'free' ? getTal(section.tal) : null;
   for (let li = 0; li < section.lines.length; li++) {
-    el.appendChild(renderLine(section.lines[li], tal, { sectionIndex, lineIndex: li, ...opts }));
+    const line = section.lines[li];
+    const next = section.lines[li + 1];
+    if (
+      line?.lineRepeat &&
+      Number.isInteger(line?.firstEndingFrom) &&
+      next
+    ) {
+      el.appendChild(renderAlternateEndingPair(line, next, tal, {
+        sectionIndex,
+        lineIndex: li,
+        ...opts,
+      }));
+      li++;
+      continue;
+    }
+    const previous = section.lines[li - 1];
+    const secondEnding = Boolean(
+      previous?.lineRepeat && Number.isInteger(previous?.firstEndingFrom)
+    );
+    el.appendChild(renderLine(line, tal, {
+      sectionIndex,
+      lineIndex: li,
+      secondEnding,
+      ...opts,
+    }));
   }
   return el;
 }
@@ -207,6 +231,210 @@ function renderLine(line, tal, ctx) {
     block.setAttribute('data-system-break', range.reason);
     group.appendChild(block);
   });
+  return group;
+}
+
+function estimatedRangeEm(line, tal, from, to) {
+  if (to < from) return 0;
+  let width = 0;
+  for (let index = from; index <= to; index++) {
+    width += estimateMatraEm(line.matras[index]);
+    if (
+      index < to &&
+      tal &&
+      markerAtMatra(tal, line.startMatra + performedOffsetAt(line, index + 1)) !== null
+    ) {
+      width += 0.5;
+    }
+  }
+  return width;
+}
+
+function maxPlannedRangeEm(line, tal, maxEm) {
+  const ranges = planLineSystems(line, tal, { maxEm });
+  return Math.max(
+    0,
+    ...ranges.map((range) => estimatedRangeEm(line, tal, range.from, range.to))
+  );
+}
+
+function alternateEndingLayout(first, second, tal, ctx) {
+  const endingStart = first.firstEndingFrom;
+  const maxEm = Number(ctx.maxSystemEm);
+  if (!Number.isFinite(maxEm) || maxEm <= 0) {
+    return {
+      prefixRanges: [],
+      finalFrom: 0,
+      commonEm: estimatedRangeEm(first, tal, 0, endingStart - 1),
+    };
+  }
+
+  const firstEndingEm = estimatedRangeEm(first, tal, endingStart, first.matras.length - 1) + 1.1;
+  const secondEndingEm = maxPlannedRangeEm(second, tal, maxEm);
+  const endingEm = Math.min(maxEm, Math.max(firstEndingEm, secondEndingEm));
+  let finalFrom = endingStart;
+  let commonEm = 0;
+
+  if (ctx.graphPaper) {
+    const totalColumns = Math.max(1, Number(ctx.graphColumns) || 1);
+    const firstEndingColumns = first.matras.length - endingStart + 1;
+    const secondEndingColumns = Math.min(totalColumns, Math.max(1, second.matras.length));
+    const endingColumns = Math.max(firstEndingColumns, secondEndingColumns);
+    let availableCommonColumns = Math.max(0, totalColumns - endingColumns);
+    while (finalFrom > 0 && availableCommonColumns > 0) {
+      const candidate = finalFrom - 1;
+      if (candidate > 0 && !isSafeBreak(first, candidate - 1)) break;
+      const repeatColumn = candidate === 0 && first.lineRepeat ? 1 : 0;
+      if (endingStart - candidate + repeatColumn > availableCommonColumns) break;
+      finalFrom = candidate;
+    }
+    commonEm = (endingStart - finalFrom + (finalFrom === 0 && first.lineRepeat ? 1 : 0)) * 2.6;
+  } else {
+    const commonBudget = Math.max(0, maxEm - endingEm);
+    while (finalFrom > 0) {
+      const candidate = finalFrom - 1;
+      if (candidate > 0 && !isSafeBreak(first, candidate - 1)) break;
+      const candidateEm = estimatedRangeEm(first, tal, candidate, endingStart - 1)
+        + (candidate === 0 && first.lineRepeat ? 1.1 : 0);
+      if (candidateEm > commonBudget) break;
+      finalFrom = candidate;
+      commonEm = candidateEm;
+    }
+  }
+
+  let prefixRanges = [];
+  if (finalFrom > 0) {
+    const prefix = sliceLineForSystem(first, tal, 0, finalFrom - 1, 0, 1);
+    prefix.lineRepeat = false;
+    prefix.repeatOpen = Boolean(first.lineRepeat);
+    prefix.repeatClose = false;
+    prefix.firstEndingFrom = null;
+    prefix.returnCue = null;
+    prefix.passthrough = [];
+    prefixRanges = planLineSystems(prefix, tal, { maxEm });
+  }
+  return { prefixRanges, finalFrom, commonEm };
+}
+
+function stampSystem(block, index, count, from, to, reason) {
+  block.setAttribute('data-system-index', String(index));
+  block.setAttribute('data-system-count', String(count));
+  block.setAttribute('data-system-from', String(from));
+  block.setAttribute('data-system-to', String(to));
+  block.setAttribute('data-system-break', reason);
+}
+
+function renderAlternateEndingPair(first, second, tal, ctx) {
+  const group = h(
+    'div',
+    'sr-line-group sr-alternate-ending-pair' +
+      (ctx.activeLine === first.sourceLine ? ' sr-source-active' : '')
+  );
+  if (first.sourceLine !== undefined) group.setAttribute('data-source-line', String(first.sourceLine));
+  if (ctx.activeLine === first.sourceLine) group.setAttribute('aria-current', 'true');
+  group.setAttribute('data-section-index', String(ctx.sectionIndex));
+  group.setAttribute('data-line-index', String(ctx.lineIndex));
+  if (second.sourceLine !== undefined) {
+    group.setAttribute('data-second-ending-source-line', String(second.sourceLine));
+  }
+
+  const firstGeometry = buildLineGeometry(first);
+  const layout = alternateEndingLayout(first, second, tal, ctx);
+  const systemCount = layout.prefixRanges.length + 1;
+  layout.prefixRanges.forEach((range, systemIndex) => {
+    const slice = sliceLineForSystem(first, tal, range.from, range.to, systemIndex, systemCount);
+    slice.repeatClose = false;
+    slice.firstEndingFrom = null;
+    const block = renderLineBlock(slice, tal, { ...ctx, geometry: firstGeometry, secondEnding: false });
+    stampSystem(block, systemIndex, systemCount, range.from, range.to, range.reason);
+    group.appendChild(block);
+  });
+
+  const endingStart = first.firstEndingFrom;
+  const finalIndex = systemCount - 1;
+  const aligned = h('div', 'sr-alternate-ending-system');
+  aligned.setAttribute('data-system-index', String(finalIndex));
+  const commonMatraCount = Math.max(0, endingStart - layout.finalFrom);
+  const commonGraphColumns = commonMatraCount + (layout.finalFrom === 0 && first.lineRepeat ? 1 : 0);
+  const endingGraphColumns = ctx.graphPaper
+    ? Math.max(1, Number(ctx.graphColumns || 1) - commonGraphColumns)
+    : undefined;
+
+  if (commonMatraCount > 0 || (layout.finalFrom === 0 && first.lineRepeat)) {
+    const common = sliceLineForSystem(
+      first,
+      tal,
+      layout.finalFrom,
+      endingStart - 1,
+      finalIndex,
+      systemCount
+    );
+    common.repeatOpen = Boolean(first.lineRepeat && layout.finalFrom === 0);
+    common.repeatClose = false;
+    common.firstEndingFrom = null;
+    common.returnCue = null;
+    common.passthrough = [];
+    const commonBlock = renderLineBlock(common, tal, {
+      ...ctx,
+      geometry: firstGeometry,
+      graphColumns: ctx.graphPaper ? commonGraphColumns : ctx.graphColumns,
+      secondEnding: false,
+    });
+    commonBlock.classList.add('sr-alternate-ending-common');
+    stampSystem(
+      commonBlock,
+      finalIndex,
+      systemCount,
+      layout.finalFrom,
+      endingStart - 1,
+      'alternate-ending'
+    );
+    aligned.appendChild(commonBlock);
+  } else {
+    aligned.classList.add('sr-alternate-ending-no-common');
+  }
+
+  const firstEnding = sliceLineForSystem(
+    first,
+    tal,
+    endingStart,
+    first.matras.length - 1,
+    finalIndex,
+    systemCount
+  );
+  firstEnding.repeatOpen = false;
+  firstEnding.repeatClose = Boolean(first.lineRepeat);
+  firstEnding.firstEndingFrom = 0;
+  const firstBlock = renderLineBlock(firstEnding, tal, {
+    ...ctx,
+    geometry: firstGeometry,
+    graphColumns: endingGraphColumns ?? ctx.graphColumns,
+    secondEnding: false,
+  });
+  firstBlock.classList.add('sr-alternate-ending-first');
+  stampSystem(
+    firstBlock,
+    finalIndex,
+    systemCount,
+    endingStart,
+    first.matras.length - 1,
+    'alternate-ending-first'
+  );
+  aligned.appendChild(firstBlock);
+
+  const endingMaxEm = Number.isFinite(Number(ctx.maxSystemEm))
+    ? Math.max(2.6, Number(ctx.maxSystemEm) - layout.commonEm)
+    : ctx.maxSystemEm;
+  const secondGroup = renderLine(second, tal, {
+    ...ctx,
+    lineIndex: ctx.lineIndex + 1,
+    secondEnding: true,
+    maxSystemEm: endingMaxEm,
+    graphColumns: endingGraphColumns ?? ctx.graphColumns,
+  });
+  secondGroup.classList.add('sr-alternate-ending-second');
+  aligned.appendChild(secondGroup);
+  group.appendChild(aligned);
   return group;
 }
 
@@ -301,7 +529,7 @@ function renderLineBlock(line, tal, ctx) {
     const fromCol = colOf[line.firstEndingFrom];
     const toCol = colOf[line.matras.length - 1];
     if (fromCol !== undefined && toCol !== undefined) {
-      const volta = h('div', 'sr-volta sr-volta-first', '1.');
+      const volta = h('div', 'sr-volta sr-volta-first', '1st time');
       volta.setAttribute('data-first-ending', String(line.firstEndingFrom));
       volta.style.gridRow = '1';
       volta.style.gridColumn = `${fromCol} / ${toCol + 1}`;
@@ -309,6 +537,30 @@ function renderLineBlock(line, tal, ctx) {
       volta.style.minHeight = '0.78em';
       volta.style.borderTop = '1px solid currentColor';
       volta.style.borderLeft = '1px solid currentColor';
+      volta.style.padding = '0.05em 0 0 0.28em';
+      volta.style.fontSize = '0.72em';
+      volta.style.lineHeight = '1';
+      volta.style.opacity = '0.8';
+      row.appendChild(volta);
+    }
+  }
+
+  // The notation line immediately after a repeated line with |1 is its
+  // replacement ending on pass two. Scheduling already follows that order;
+  // this bracket makes the compact written form equally clear to the reader.
+  if (ctx.secondEnding && line.matras.length > 0) {
+    const fromCol = colOf[0];
+    const toCol = colOf[line.matras.length - 1];
+    if (fromCol !== undefined && toCol !== undefined) {
+      const firstSystem = (Number(line._matraOffset) || 0) === 0;
+      const volta = h('div', 'sr-volta sr-volta-second', firstSystem ? '2nd time' : '');
+      volta.setAttribute('data-second-ending', 'true');
+      volta.style.gridRow = '1';
+      volta.style.gridColumn = `${fromCol} / ${toCol + 1}`;
+      volta.style.alignSelf = 'start';
+      volta.style.minHeight = '0.78em';
+      volta.style.borderTop = '1px solid currentColor';
+      if (firstSystem) volta.style.borderLeft = '1px solid currentColor';
       volta.style.padding = '0.05em 0 0 0.28em';
       volta.style.fontSize = '0.72em';
       volta.style.lineHeight = '1';

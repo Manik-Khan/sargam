@@ -84,7 +84,57 @@ export const smokes = [
         const volta = root.querySelector('.sr-volta-first[data-first-ending="8"]');
         assert.ok(arc, 'ranged meend arc');
         assert.ok(volta, 'structural first-ending marker');
-        assert.equal(volta.textContent, '1.');
+        assert.equal(volta.textContent, '1st time');
+      } finally {
+        globalThis.document = priorDocument;
+        dom.window.close();
+      }
+    },
+  },
+  {
+    name: 'render: the line replacing |1 is visibly marked as the second ending',
+    fn() {
+      const priorDocument = globalThis.document;
+      const dom = new JSDOM('<!doctype html><body></body>');
+      globalThis.document = dom.window.document;
+      try {
+        const doc = parsed([
+          'tal: tintal',
+          '',
+          '||: D--D DDDP n--n nnnn D--D DDmm P-DD m-gg |1 RS-.D .nSgm :||',
+          "RS-S gmDn 'S-'S'S n-nn",
+          '',
+        ].join('\n'));
+        const root = renderDocument(doc);
+        assert.equal(root.querySelector('.sr-volta-first')?.textContent, '1st time');
+        assert.equal(root.querySelector('.sr-volta-second')?.textContent, '2nd time');
+        const pair = root.querySelector('.sr-alternate-ending-pair');
+        const aligned = pair?.querySelector('.sr-alternate-ending-system');
+        assert.ok(pair && aligned, 'the two endings share one aligned visual system');
+        assert.ok(aligned.querySelector(':scope > .sr-alternate-ending-common'));
+        assert.ok(aligned.querySelector(':scope > .sr-alternate-ending-first'));
+        assert.ok(aligned.querySelector(':scope > .sr-alternate-ending-second'));
+        assert.equal(
+          [...aligned.querySelectorAll('.sr-alternate-ending-common .sr-cell')].at(-1)?.dataset.matra,
+          '7',
+          'the shared phrase ends immediately before |1'
+        );
+        assert.equal(
+          aligned.querySelector('.sr-alternate-ending-first .sr-cell')?.dataset.matra,
+          '8',
+          'the first ending begins at the divergence'
+        );
+        assert.equal(
+          aligned.querySelector('.sr-alternate-ending-second .sr-cell')?.dataset.matra,
+          '0',
+          'the replacement ending begins at the same visual origin'
+        );
+        assert.equal(aligned.querySelectorAll('.sr-line-repeat-close').length, 1);
+        const schedule = scheduleDocument(doc);
+        const first = schedule.events.filter((event) => event.kind === 'cursor' && event.lineIndex === 0);
+        const second = schedule.events.filter((event) => event.kind === 'cursor' && event.lineIndex === 1);
+        assert.equal(first.length, 18, '10 written matras plus 8 repeated common matras');
+        assert.equal(second.length, 4, 'only the compact second ending is written again');
       } finally {
         globalThis.document = priorDocument;
         dom.window.close();
@@ -98,6 +148,44 @@ export const smokes = [
       assert.ok(outside.problems.some((p) => p.msg.includes('requires ||:')));
       const empty = parseDocument('tal: tintal\n\n||: S R g m | P D n N |1 :||\n');
       assert.ok(empty.problems.some((p) => p.msg.includes('first ending is empty')));
+    },
+  },
+  {
+    name: 'render: graph-paper alternate endings share one divergence and real trailing cells',
+    fn() {
+      const priorDocument = globalThis.document;
+      const dom = new JSDOM('<!doctype html><body></body>');
+      globalThis.document = dom.window.document;
+      try {
+        const doc = parsed([
+          'tal: jhaptal',
+          '',
+          '||: D--D DDDP n--n nnnn D--D DDmm P-DD m-gg |1 RS-.D .nSgm :||',
+          "@9 RS-S gmDn 'S-'S'S n-nn",
+          '',
+        ].join('\n'));
+        const root = renderDocument(doc, {
+          graphPaper: true,
+          graphColumns: 16,
+          maxSystemEm: 41.6,
+        });
+        const aligned = root.querySelector('.sr-alternate-ending-system');
+        const commonRow = aligned?.querySelector(':scope > .sr-alternate-ending-common .sr-row');
+        const firstRow = aligned?.querySelector(':scope > .sr-alternate-ending-first .sr-row');
+        const secondRow = aligned?.querySelector(':scope > .sr-alternate-ending-second .sr-row');
+        assert.ok(commonRow && firstRow && secondRow);
+        assert.equal(
+          Number(commonRow.dataset.graphColumns) + Number(firstRow.dataset.graphColumns),
+          16,
+          'the top branch uses exactly one printable graph-paper row'
+        );
+        assert.equal(secondRow.dataset.graphColumns, firstRow.dataset.graphColumns);
+        assert.ok(firstRow.querySelectorAll('.sr-graph-empty-cell').length > 0);
+        assert.ok(secondRow.querySelectorAll('.sr-graph-empty-cell').length > 0);
+      } finally {
+        globalThis.document = priorDocument;
+        dom.window.close();
+      }
     },
   },
 ];

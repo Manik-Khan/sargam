@@ -116,6 +116,9 @@ export const smokes = [
       assert.match(editor, /One box = one matra/);
       assert.match(editor, /beneath a note adds its bol/);
       assert.match(editor, /app-grid-bol-menu/);
+      assert.match(editor, /createPortal[\s\S]*?app-grid-bol-menu-floating/);
+      assert.match(editor, /bolMenuPosition[\s\S]*?position: 'fixed'/);
+      assert.match(editor, /copyBolLanes[\s\S]*?navigator\.clipboard\.writeText[\s\S]*?>Copy bols</);
       assert.match(editor, /kind: 'diri', label: 'diri · 2 strokes'/);
     },
   },

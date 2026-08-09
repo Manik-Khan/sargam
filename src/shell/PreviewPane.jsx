@@ -62,6 +62,8 @@ export default function PreviewPane({
   const handleDrag = useRef(null);
   const activeCursorRef = useRef(activeCursor);
   activeCursorRef.current = activeCursor;
+  const gridSelectionRef = useRef(gridSelection);
+  gridSelectionRef.current = gridSelection;
   const [maxSystemEm, setMaxSystemEm] = useState(56);
 
   useLayoutEffect(() => {
@@ -82,7 +84,7 @@ export default function PreviewPane({
     const scroller = mount.current;
     const sourceLine = previewSourceLine(doc, activeLine, bolCapture);
     const beforeAnchor = followEditing
-      ? previewAnchorElement(scroller, sourceLine, bolCapture)
+      ? previewAnchorElement(scroller, sourceLine, bolCapture, gridSelectionRef.current)
       : null;
     const anchorIdentity = previewAnchorIdentity(beforeAnchor);
     const scrollerRect = scroller.getBoundingClientRect();
@@ -127,7 +129,7 @@ export default function PreviewPane({
     applyPlaybackCursor(scroller, activeCursorRef.current);
     if (followEditing) {
       const afterAnchor = restorePreviewAnchor(scroller, anchorIdentity)
-        || previewAnchorElement(scroller, sourceLine, bolCapture);
+        || previewAnchorElement(scroller, sourceLine, bolCapture, gridSelectionRef.current);
       scroller.scrollTop = lineAnchoredScrollTop({
         scrollTop: beforeScrollTop,
         beforeTop,

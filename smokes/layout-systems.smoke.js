@@ -89,6 +89,37 @@ export const smokes = [
     },
   },
   {
+    name: 'systems: compact alternate endings keep a shared tail beside both real ending grids',
+    fn() {
+      const src = [
+        'tal: tintal',
+        '',
+        '||: S R g m P d n S S R g m P d n S |1 R S :||',
+        "D n 'S n",
+        '',
+      ].join('\n');
+      const { doc } = parseDocument(src);
+      const root = renderDocument(doc, { maxSystemEm: 18 });
+      const pair = root.querySelector('.sr-alternate-ending-pair');
+      const aligned = pair?.querySelector('.sr-alternate-ending-system');
+      assert.ok(pair && aligned);
+      assert.ok(
+        [...pair.children].some((child) =>
+          child.classList.contains('sr-line-block') &&
+          !child.classList.contains('sr-alternate-ending-common')
+        ),
+        'long shared material folds before the indivisible ending block'
+      );
+      const common = aligned.querySelector(':scope > .sr-alternate-ending-common');
+      const first = aligned.querySelector(':scope > .sr-alternate-ending-first');
+      const second = aligned.querySelector(':scope > .sr-alternate-ending-second');
+      assert.ok(common?.querySelector('.sr-cell'));
+      assert.ok(first?.querySelector('.sr-cell'));
+      assert.ok(second?.querySelector('.sr-cell'));
+      assert.equal(second.dataset.sourceLine, '4');
+    },
+  },
+  {
     name: 'starter: Bageshri replaces Kirwani and carries no copied identity',
     fn() {
       const parsed = parseDocument(BAGESHRI_STARTER);

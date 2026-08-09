@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import {
   lineAnchoredScrollTop,
   previewAnchorIdentity,
+  previewAnchorElement,
   previewLineElement,
   previewSourceLine,
   revealElementScrollTop,
@@ -27,6 +28,27 @@ export const smokes = [
         scrollHeight: 1800,
         clientHeight: 600,
       }), 0);
+    },
+  },
+  {
+    name: 'preview scroll: the selected Grid Write matra is the stable editing anchor',
+    fn() {
+      const cell = {
+        classList: { contains: (name) => name === 'sr-cell' },
+        getAttribute: (name) => name === 'data-matra' ? '7' : null,
+        closest: (selector) => selector === '[data-source-line]'
+          ? { getAttribute: () => '61' }
+          : null,
+      };
+      const root = {
+        querySelector(selector) {
+          return selector.includes('data-source-line="61"') && selector.includes('data-matra="7"')
+            ? cell
+            : null;
+        },
+      };
+      assert.equal(previewAnchorElement(root, 61, null, { sourceLine: 61, matraIndex: 7 }), cell);
+      assert.deepEqual(previewAnchorIdentity(cell), { kind: 'matra', sourceLine: 61, matraIndex: 7 });
     },
   },
   {
