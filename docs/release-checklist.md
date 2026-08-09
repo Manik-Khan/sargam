@@ -18,6 +18,7 @@ The command must end with every smoke check passing and a successful production 
 - Click a rendered matra and confirm its Markdown source line is selected and centered.
 - Turn **Graph Grid** on. Confirm each matra has one cell, its tala-matra coordinate is visible, subdivisions stay inside the cell, and the selected cell remains highlighted after an edit.
 - Switch to **Grid Write**. Change a note, enter a spaced subdivision such as `S R`, add a hold or rest, and append one matra. Confirm the Markdown-backed score and playback duration update immediately.
+- While Grid Write is showing the beginning of a long composition, click a matra on a much later rendered score line. Confirm the matching source line and exact matra are centered and focused in the editor. Then click an early score matra and confirm the editor returns to it.
 - Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
 - Switch between Text Write and Grid Write and reload once. Confirm the chosen writing surface persists and headings or attachment lines remain unchanged.
 - Toggle the grid look between **Cells** and **Paper**. Confirm Paper continues each musical row through unused width with empty matra-sized boxes (no smaller background grid), the choice survives reload, and a kan such as `{m}g` remains legible.

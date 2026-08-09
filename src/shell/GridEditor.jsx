@@ -1,12 +1,13 @@
 // src/shell/GridEditor.jsx — direct graph-paper notation writing. Each input
 // is one matra; valid edits immediately replace only that Markdown music line.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   appendGridCellToken,
   gridLines,
   replaceGridCellToken,
 } from '../engine/grid-edit.js';
+import { centeredElementScrollTop } from './editor-nav.js';
 
 const BOL_SYMBOL = { da: '|', ra: '—', diri: 'V', chikari: '^' };
 const BOL_OPTIONS = [
@@ -27,6 +28,7 @@ export default function GridEditor({
   doc,
   onChange,
   onCellFocus,
+  activeSelection = null,
   gridStyle = 'cells',
   bolMessage = '',
   onBolApply,
@@ -37,6 +39,37 @@ export default function GridEditor({
   const [addDrafts, setAddDrafts] = useState({});
   const [message, setMessage] = useState('Each box is one matra. Spaces inside a box become subdivisions.');
   const [bolMenu, setBolMenu] = useState(null);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    const sourceLine = Number(activeSelection?.sourceLine);
+    const matraIndex = Number(activeSelection?.matraIndex);
+    if (!Number.isInteger(sourceLine) || !Number.isInteger(matraIndex)) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const cell = [...scroller.querySelectorAll('.app-grid-write-cell')].find((node) => (
+      Number(node.dataset.sourceLine) === sourceLine &&
+      Number(node.dataset.matraIndex) === matraIndex
+    ));
+    if (!cell) return;
+
+    const viewport = scroller.getBoundingClientRect();
+    const bounds = cell.getBoundingClientRect();
+    scroller.scrollTop = centeredElementScrollTop({
+      scrollTop: scroller.scrollTop,
+      containerTop: viewport.top,
+      containerHeight: viewport.height,
+      elementTop: bounds.top,
+      elementHeight: bounds.height,
+    });
+    const input = cell.querySelector('input[data-grid-cell="true"]');
+    try {
+      input?.focus({ preventScroll: true });
+    } catch {
+      input?.focus();
+    }
+    setBolMenu(null);
+  }, [activeSelection?.sourceLine, activeSelection?.matraIndex]);
 
   const chooseBolAttack = (sourceLine, matraIndex, ordinal) => {
     const target = { sourceLine, matraIndex, ordinal };
@@ -120,7 +153,7 @@ export default function GridEditor({
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>
         <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol</span>
       </div>
-      <div className="app-grid-writer-scroll">
+      <div className="app-grid-writer-scroll" ref={scrollRef}>
         {rows.map((row) => {
           const showSection = row.sectionLabel !== previousSection;
           previousSection = row.sectionLabel;
@@ -139,6 +172,8 @@ export default function GridEditor({
                     const key = `${row.sourceLine}:${cell.matraIndex}`;
                     const value = Object.hasOwn(drafts, key) ? drafts[key] : cell.text;
                     const error = errors[key] || '';
+                    const selected = Number(activeSelection?.sourceLine) === Number(row.sourceLine)
+                      && Number(activeSelection?.matraIndex) === Number(cell.matraIndex);
                     const rowPass = row.bolPasses.find((lane) => lane.pass === 1);
                     const bolByAttack = new Map((rowPass?.marks || []).map((mark) => [mark.ordinal, mark]));
                     const coveredByDiri = new Map();
@@ -150,8 +185,10 @@ export default function GridEditor({
                     }
                     return (
                       <div
-                        className={`app-grid-write-cell${error ? ' is-invalid' : ''}`}
+                        className={`app-grid-write-cell${error ? ' is-invalid' : ''}${selected ? ' is-selected' : ''}`}
                         key={key}
+                        data-source-line={row.sourceLine}
+                        data-matra-index={cell.matraIndex}
                         title={error || `Source line ${row.sourceLine}, written matra ${cell.matraIndex + 1}`}
                       >
                         <span className="app-grid-write-coordinate">

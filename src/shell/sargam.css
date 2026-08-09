@@ -1129,7 +1129,8 @@
 }
 .app-grid-bol-menu-options b { font: 800 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .app-grid-bol-menu-options .remove { color: var(--sr-alert); }
-.app-grid-write-cell:focus-within {
+.app-grid-write-cell:focus-within,
+.app-grid-write-cell.is-selected {
   z-index: 3;
   border-color: var(--sr-accent);
   background: color-mix(in srgb, var(--sr-accent) 14%, var(--sr-paper-raised));
@@ -2700,7 +2701,8 @@
   box-sizing: border-box;
   background: transparent;
 }
-.app-grid-writer-paper .app-grid-write-cell:focus-within {
+.app-grid-writer-paper .app-grid-write-cell:focus-within,
+.app-grid-writer-paper .app-grid-write-cell.is-selected {
   border-color: var(--sr-accent);
   background: color-mix(in srgb, var(--sr-accent) 10%, var(--sr-paper-raised));
 }

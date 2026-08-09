@@ -642,6 +642,9 @@ export default function App() {
 
   const doSeek = (sourceLine, matraIndex) => {
     setActiveLine(sourceLine);
+    if (writeMode === 'grid') {
+      setGridSelection((current) => ({ ...current, sourceLine, matraIndex }));
+    }
     focusSourceLine(sourceLine);
     const t = timeFor(schedule, sourceLine, matraIndex);
     setPosition(t);
@@ -2130,6 +2133,7 @@ export default function App() {
                 doc={doc}
                 onChange={setText}
                 onCellFocus={selectGridWriterCell}
+                activeSelection={gridSelection}
                 gridStyle={rhythmGridStyle}
                 bolMessage={bolMessage}
                 onBolApply={doApplyGridBol}
