@@ -9,6 +9,8 @@ import {
   normalizeGridCellToken,
   replaceGridCellToken,
   setGridFirstEnding,
+  setGridLineRepeat,
+  setGridPhraseRepeat,
 } from '../src/engine/grid-edit.js';
 import { parseDocument } from '../src/engine/parse.js';
 
@@ -105,6 +107,41 @@ export const smokes = [
     },
   },
   {
+    name: 'grid write: a cell menu can toggle a repeated line without exposing punctuation',
+    fn() {
+      const added = setGridLineRepeat(SOURCE, 4, true);
+      assert.equal(added.ok, true, added.message);
+      assert.match(added.text, /^\|\|: S R G \| m P \| - - :\|\|$/m);
+
+      const removed = setGridLineRepeat(added.text, 4, false);
+      assert.equal(removed.ok, true, removed.message);
+      assert.doesNotMatch(removed.text, /\|\|:|:\|\|/);
+      assert.equal(parseDocument(removed.text).doc.sections[0].lines[0].lineRepeat, false);
+    },
+  },
+  {
+    name: 'grid write: a cell menu adds, changes, and removes a bounded phrase repeat',
+    fn() {
+      const added = setGridPhraseRepeat(SOURCE, 4, 1, 3, 2);
+      assert.equal(added.ok, true, added.message);
+      assert.match(added.text, /^S \(R G \| m\)x2 \| P - -$/m);
+      assert.deepEqual(parseDocument(added.text).doc.sections[0].lines[0].phraseRepeats, [{
+        fromMatra: 1,
+        toMatra: 3,
+        times: 2,
+      }]);
+
+      const changed = setGridPhraseRepeat(added.text, 4, 1, 3, 3);
+      assert.equal(changed.ok, true, changed.message);
+      assert.match(changed.text, /\(R G \| m\)x3/);
+
+      const removed = setGridPhraseRepeat(changed.text, 4, 1, 3, null);
+      assert.equal(removed.ok, true, removed.message);
+      assert.equal(parseDocument(removed.text).doc.sections[0].lines[0].phraseRepeats.length, 0);
+      assert.match(removed.text, /^S R G \| m P \| - -$/m);
+    },
+  },
+  {
     name: 'grid write: first and second ending rows are exposed to the editor',
     fn() {
       const source = 'tal: rupak\n\nGat\n||: S R G m |1 P D n :||\n@5 S R G\n';
@@ -156,6 +193,16 @@ export const smokes = [
       assert.match(editor, /Start here/);
       assert.match(editor, /2nd ending/);
       assert.match(editor, /setGridFirstEnding/);
+      assert.match(editor, /onContextMenu=\{\(event\) => openCellMenu\(event, row, cell\)\}/);
+      assert.match(editor, /event\.key === 'ContextMenu'.*event\.shiftKey && event\.key === 'F10'/s);
+      assert.match(editor, /app-grid-cell-menu/);
+      assert.match(editor, /Right-click another cell to move this menu/);
+      assert.match(editor, /applyCellMenuBol/);
+      assert.match(editor, /Start phrase repeat here/);
+      assert.match(editor, /Repeat this line/);
+      assert.match(editor, /1st ending starts here/);
+      assert.match(editor, /setGridLineRepeat/);
+      assert.match(editor, /setGridPhraseRepeat/);
     },
   },
 ];

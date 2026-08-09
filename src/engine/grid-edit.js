@@ -4,7 +4,7 @@
 // the source text.
 
 import { parseDocument } from './parse.js';
-import { serializeGridCells, serializeGridLine } from './serialize.js';
+import { serializeGridCells, serializeGridLine, serializeMusicLine } from './serialize.js';
 import { performedOffsetAt } from './performed-time.js';
 import { getTal, markerAtMatra, wrapMatra } from './tala.js';
 import { buildBolPlan } from './bol-lane.js';
@@ -120,6 +120,76 @@ export function setGridFirstEnding(text, sourceLine, matraIndex) {
   return validateGridResult(nextText, sourceLine, found.line.matras.length);
 }
 
+/** Toggle the independent ||: … :|| cells for one notation line. */
+export function setGridLineRepeat(text, sourceLine, enabled) {
+  const parsed = parseDocument(String(text ?? ''));
+  const found = musicLineAt(parsed.doc, sourceLine);
+  if (!found) return { ok: false, message: 'Choose a rendered notation line first.' };
+
+  const lineRepeat = Boolean(enabled);
+  const cells = serializeGridCells(found.line, found.tal);
+  const changedLine = {
+    ...found.line,
+    lineRepeat,
+    firstEndingFrom: lineRepeat ? found.line.firstEndingFrom : null,
+  };
+  const nextLine = serializeGridLine(changedLine, found.tal, cells);
+  const nextText = replaceSourceLine(text, sourceLine, nextLine);
+  if (nextText === null) return { ok: false, message: 'The source line could not be updated.' };
+  return validateGridResult(nextText, sourceLine, found.line.matras.length);
+}
+
+/** Add, replace, or remove one explicit (phrase)xN range. */
+export function setGridPhraseRepeat(text, sourceLine, fromMatra, toMatra, times) {
+  const parsed = parseDocument(String(text ?? ''));
+  const found = musicLineAt(parsed.doc, sourceLine);
+  if (!found) return { ok: false, message: 'Choose a rendered notation line first.' };
+
+  const from = Number(fromMatra);
+  const to = Number(toMatra);
+  if (
+    !Number.isInteger(from) ||
+    !Number.isInteger(to) ||
+    from < 0 ||
+    to < from ||
+    to >= found.line.matras.length
+  ) {
+    return { ok: false, message: 'Choose a phrase range inside one notation line.' };
+  }
+
+  const repeats = [...(found.line.phraseRepeats || [])];
+  const exactIndex = repeats.findIndex((repeat) =>
+    repeat.fromMatra === from && repeat.toMatra === to
+  );
+  let nextRepeats;
+  if (times == null) {
+    if (exactIndex < 0) return { ok: false, message: 'That phrase repeat is no longer present.' };
+    nextRepeats = repeats.filter((_, index) => index !== exactIndex);
+  } else {
+    const repeatTimes = Number(times);
+    if (!Number.isInteger(repeatTimes) || repeatTimes < 2 || repeatTimes > 9) {
+      return { ok: false, message: 'A phrase can repeat from 2 to 9 times.' };
+    }
+    const overlaps = repeats.some((repeat, index) =>
+      index !== exactIndex && from <= repeat.toMatra && to >= repeat.fromMatra
+    );
+    if (overlaps) {
+      return { ok: false, message: 'Phrase repeats cannot overlap. Remove the existing repeat first.' };
+    }
+    const nextRepeat = { fromMatra: from, toMatra: to, times: repeatTimes };
+    nextRepeats = exactIndex < 0
+      ? [...repeats, nextRepeat]
+      : repeats.map((repeat, index) => index === exactIndex ? nextRepeat : repeat);
+    nextRepeats.sort((a, b) => a.fromMatra - b.fromMatra || a.toMatra - b.toMatra);
+  }
+
+  const changedLine = { ...found.line, phraseRepeats: nextRepeats };
+  const nextLine = serializeMusicLine(changedLine, found.tal);
+  const nextText = replaceSourceLine(text, sourceLine, nextLine);
+  if (nextText === null) return { ok: false, message: 'The source line could not be updated.' };
+  return validateGridResult(nextText, sourceLine, found.line.matras.length);
+}
+
 export function gridLines(doc) {
   const rows = [];
   for (const section of doc?.sections || []) {
@@ -172,6 +242,7 @@ export function gridLines(doc) {
         tal,
         cells,
         bolPasses,
+        phraseRepeats: (line.phraseRepeats || []).map((repeat) => ({ ...repeat })),
         lineRepeat: Boolean(line.lineRepeat),
         firstEndingFrom: Number.isInteger(line.firstEndingFrom) ? line.firstEndingFrom : null,
         alternateEndingRole: Number.isInteger(line.firstEndingFrom)

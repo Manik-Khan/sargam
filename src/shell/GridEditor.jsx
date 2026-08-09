@@ -8,6 +8,8 @@ import {
   gridLines,
   replaceGridCellToken,
   setGridFirstEnding,
+  setGridLineRepeat,
+  setGridPhraseRepeat,
 } from '../engine/grid-edit.js';
 import { centeredElementScrollTop } from './editor-nav.js';
 
@@ -38,6 +40,26 @@ function bolMenuPosition(anchor) {
   };
 }
 
+function cellMenuPosition(clientX, clientY, anchor) {
+  const viewportWidth = Math.max(300, Number(window.innerWidth) || 0);
+  const viewportHeight = Math.max(260, Number(window.innerHeight) || 0);
+  const width = Math.min(324, viewportWidth - 16);
+  const x = Number(clientX) > 0 ? Number(clientX) : anchor.left + anchor.width / 2;
+  const y = Number(clientY) > 0 ? Number(clientY) : anchor.top + anchor.height / 2;
+  const left = Math.min(Math.max(8, x + 5), viewportWidth - width - 8);
+  const estimatedHeight = Math.min(410, viewportHeight - 16);
+  const placeAbove = y + estimatedHeight > viewportHeight;
+  return {
+    position: 'fixed',
+    width,
+    maxHeight: viewportHeight - 16,
+    left,
+    ...(placeAbove
+      ? { bottom: Math.max(8, viewportHeight - y + 5) }
+      : { top: Math.max(8, y + 5) }),
+  };
+}
+
 function withoutKey(object, key) {
   const next = { ...object };
   delete next[key];
@@ -60,6 +82,8 @@ export default function GridEditor({
   const [addDrafts, setAddDrafts] = useState({});
   const [message, setMessage] = useState('Each box is one matra. Spaces inside a box become subdivisions.');
   const [bolMenu, setBolMenu] = useState(null);
+  const [cellMenu, setCellMenu] = useState(null);
+  const [phraseRepeatStart, setPhraseRepeatStart] = useState(null);
   const [endingPickerLine, setEndingPickerLine] = useState(null);
   const scrollRef = useRef(null);
 
@@ -93,6 +117,28 @@ export default function GridEditor({
     setBolMenu(null);
   }, [activeSelection?.sourceLine, activeSelection?.matraIndex]);
 
+  useEffect(() => {
+    if (!cellMenu) return undefined;
+    const dismiss = (event) => {
+      if (event.target?.closest?.('.app-grid-cell-menu')) return;
+      setCellMenu(null);
+    };
+    const escape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setCellMenu(null);
+    };
+    const resize = () => setCellMenu(null);
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('keydown', escape);
+    window.addEventListener('resize', resize);
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('keydown', escape);
+      window.removeEventListener('resize', resize);
+    };
+  }, [cellMenu]);
+
   const chooseBolAttack = (sourceLine, matraIndex, ordinal, noteNumber, anchor) => {
     const target = {
       sourceLine,
@@ -104,6 +150,22 @@ export default function GridEditor({
     setBolMenu((current) => (
       current?.sourceLine === sourceLine && current?.ordinal === ordinal ? null : target
     ));
+  };
+
+  const openCellMenu = (event, row, cell, anchor = event.currentTarget) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = anchor.getBoundingClientRect();
+    onCellFocus?.(row.sourceLine, cell.matraIndex);
+    setBolMenu(null);
+    setCellMenu({
+      row,
+      cell,
+      sourceLine: row.sourceLine,
+      matraIndex: cell.matraIndex,
+      attackOrdinal: cell.attacks?.[0]?.ordinal ?? null,
+      style: cellMenuPosition(event.clientX, event.clientY, bounds),
+    });
   };
 
   const applyBol = (kind) => {
@@ -118,6 +180,20 @@ export default function GridEditor({
       ? `${kind === 'diri' ? 'Diri' : kind} attached to this note.`
       : 'Bol removed from this note.');
     setBolMenu(null);
+  };
+
+  const applyCellMenuBol = (kind) => {
+    if (!cellMenu || !Number.isInteger(cellMenu.attackOrdinal)) return;
+    const ok = onBolApply?.({
+      sourceLine: cellMenu.sourceLine,
+      ordinal: cellMenu.attackOrdinal,
+      kind,
+    });
+    if (ok === false) return;
+    setMessage(kind
+      ? `${kind === 'diri' ? 'Diri' : kind} attached to the chosen note in matra ${cellMenu.matraIndex + 1}.`
+      : 'Bol removed from the chosen note.');
+    setCellMenu(null);
   };
 
   const editCell = (row, cell, value) => {
@@ -170,6 +246,7 @@ export default function GridEditor({
     }
     onCellFocus?.(row.sourceLine, matraIndex);
     setEndingPickerLine(null);
+    setCellMenu(null);
     setMessage(row.hasFollowingNotation
       ? `First ending now begins at written matra ${matraIndex + 1}. The next notation line is labelled as the second ending.`
       : `First ending now begins at written matra ${matraIndex + 1}. Add the second-ending phrase as the next notation line.`);
@@ -183,7 +260,81 @@ export default function GridEditor({
       return;
     }
     setEndingPickerLine(null);
+    setCellMenu(null);
     setMessage('Alternate-ending marker removed; both lines are ordinary notation again.');
+    onChange?.(result.text);
+  };
+
+  const toggleLineRepeat = (row) => {
+    const result = setGridLineRepeat(text, row.sourceLine, !row.lineRepeat);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    setCellMenu(null);
+    setEndingPickerLine(null);
+    setMessage(row.lineRepeat
+      ? 'Line repeat removed.'
+      : 'Line repeat added. Right-click the first changed matra to add an alternate ending.');
+    onChange?.(result.text);
+  };
+
+  const beginPhraseRepeat = (row, cell) => {
+    setPhraseRepeatStart({ sourceLine: row.sourceLine, matraIndex: cell.matraIndex });
+    setCellMenu(null);
+    setMessage(`Phrase repeat starts at matra ${cell.matraIndex + 1}. Right-click its last matra.`);
+  };
+
+  const finishPhraseRepeat = (row, cell, times) => {
+    if (
+      Number(phraseRepeatStart?.sourceLine) !== Number(row.sourceLine) ||
+      !Number.isInteger(phraseRepeatStart?.matraIndex)
+    ) return;
+    const result = setGridPhraseRepeat(
+      text,
+      row.sourceLine,
+      phraseRepeatStart.matraIndex,
+      cell.matraIndex,
+      times
+    );
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    setPhraseRepeatStart(null);
+    setCellMenu(null);
+    setMessage(`Matras ${phraseRepeatStart.matraIndex + 1}–${cell.matraIndex + 1} now repeat ${times} times.`);
+    onChange?.(result.text);
+  };
+
+  const removePhraseRepeat = (row, repeat) => {
+    const result = setGridPhraseRepeat(
+      text,
+      row.sourceLine,
+      repeat.fromMatra,
+      repeat.toMatra,
+      null
+    );
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    setCellMenu(null);
+    setMessage('Phrase repeat removed.');
+    onChange?.(result.text);
+  };
+
+  const useQuickCellValue = (row, cell, value, label) => {
+    const result = replaceGridCellToken(text, row.sourceLine, cell.matraIndex, value);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    const key = `${row.sourceLine}:${cell.matraIndex}`;
+    setDrafts((current) => withoutKey(current, key));
+    setErrors((current) => withoutKey(current, key));
+    setCellMenu(null);
+    setMessage(`Matra ${cell.matraIndex + 1} changed to ${label}.`);
     onChange?.(result.text);
   };
 
@@ -214,6 +365,19 @@ export default function GridEditor({
     );
   }
 
+  const menuRow = cellMenu?.row ?? null;
+  const menuCell = cellMenu?.cell ?? null;
+  const menuPhraseRepeat = menuRow && menuCell
+    ? (menuRow.phraseRepeats || []).find((repeat) =>
+        menuCell.matraIndex >= repeat.fromMatra && menuCell.matraIndex <= repeat.toMatra
+      )
+    : null;
+  const phraseStartOnMenuLine = menuRow &&
+    Number(phraseRepeatStart?.sourceLine) === Number(menuRow.sourceLine) &&
+    Number.isInteger(phraseRepeatStart?.matraIndex);
+  const canFinishPhraseRepeat = phraseStartOnMenuLine &&
+    menuCell && menuCell.matraIndex >= phraseRepeatStart.matraIndex;
+
   let previousSection = Symbol('first');
   return (
     <div
@@ -223,12 +387,15 @@ export default function GridEditor({
       <div className="app-grid-writer-help">
         <strong>Grid Write</strong>
         <span>One box = one matra · type <code>SR</code> for an even cluster · <code>S R</code> for visible slots · <code>-</code> hold · <code>.</code> rest</span>
-        <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol</span>
+        <span className="app-grid-writer-bol-help"><b>+</b> beneath a note adds its bol · right-click a cell for musical tools</span>
       </div>
       <div
         className="app-grid-writer-scroll"
         ref={scrollRef}
-        onScroll={() => setBolMenu(null)}
+        onScroll={() => {
+          setBolMenu(null);
+          setCellMenu(null);
+        }}
       >
         {rows.map((row, rowIndex) => {
           const showSection = row.sectionLabel !== previousSection;
@@ -301,6 +468,7 @@ export default function GridEditor({
                         data-source-line={row.sourceLine}
                         data-matra-index={cell.matraIndex}
                         title={error || `Source line ${row.sourceLine}, written matra ${cell.matraIndex + 1}`}
+                        onContextMenu={(event) => openCellMenu(event, row, cell)}
                       >
                         {placingEnding && cell.matraIndex > 0 && (
                           <button
@@ -340,6 +508,10 @@ export default function GridEditor({
                           onChange={(event) => editCell(row, cell, event.target.value)}
                           onBlur={() => finishCell(row, cell, key)}
                           onKeyDown={(event) => {
+                            if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                              openCellMenu(event, row, cell, event.currentTarget.closest('.app-grid-write-cell'));
+                              return;
+                            }
                             if (event.key === 'Enter') {
                               event.preventDefault();
                               if (!finishCell(row, cell, key)) return;
@@ -446,6 +618,107 @@ export default function GridEditor({
               <b>×</b><span>remove</span>
             </button>
           </div>
+        </div>,
+        document.body
+      )}
+      {cellMenu && menuRow && menuCell && typeof document !== 'undefined' && createPortal(
+        <div
+          className="app-grid-cell-menu"
+          role="menu"
+          aria-label={`Musical tools for line ${menuRow.sourceLine}, matra ${menuCell.matraIndex + 1}`}
+          style={cellMenu.style}
+        >
+          <div className="app-grid-cell-menu-head">
+            <span>
+              <strong>Matra {menuCell.matraIndex + 1}</strong>
+              <small>line {menuRow.sourceLine}{menuCell.cycleMatra ? ` · cycle ${menuCell.cycleMatra}` : ''}</small>
+            </span>
+            <button type="button" aria-label="Close matra menu" onClick={() => setCellMenu(null)}>×</button>
+          </div>
+
+          {(menuCell.attacks?.length || 0) > 0 && (
+            <section className="app-grid-cell-menu-section" aria-label="Bol tools">
+              <h4>Bol</h4>
+              {menuCell.attacks.length > 1 && (
+                <div className="app-grid-cell-menu-attacks" aria-label="Choose note attack">
+                  {menuCell.attacks.map((attack, index) => (
+                    <button
+                      type="button"
+                      key={attack.ordinal}
+                      className={cellMenu.attackOrdinal === attack.ordinal ? 'active' : ''}
+                      aria-pressed={cellMenu.attackOrdinal === attack.ordinal}
+                      onClick={() => setCellMenu((current) => ({ ...current, attackOrdinal: attack.ordinal }))}
+                    >note {index + 1}</button>
+                  ))}
+                </div>
+              )}
+              <div className="app-grid-cell-menu-actions bol-actions">
+                {BOL_OPTIONS.map((option) => (
+                  <button type="button" role="menuitem" key={option.kind} onClick={() => applyCellMenuBol(option.kind)}>
+                    <b>{BOL_SYMBOL[option.kind]}</b><span>{option.label}</span>
+                  </button>
+                ))}
+                <button type="button" role="menuitem" className="remove" onClick={() => applyCellMenuBol(null)}>
+                  <b>×</b><span>remove</span>
+                </button>
+              </div>
+            </section>
+          )}
+
+          <section className="app-grid-cell-menu-section" aria-label="Repeat and ending tools">
+            <h4>Repeat &amp; endings</h4>
+            <div className="app-grid-cell-menu-actions wide-actions">
+              {menuPhraseRepeat ? (
+                <button type="button" role="menuitem" className="remove" onClick={() => removePhraseRepeat(menuRow, menuPhraseRepeat)}>
+                  Remove ×{menuPhraseRepeat.times} phrase repeat
+                </button>
+              ) : canFinishPhraseRepeat ? (
+                <>
+                  <button type="button" role="menuitem" onClick={() => finishPhraseRepeat(menuRow, menuCell, 2)}>
+                    Repeat {phraseRepeatStart.matraIndex + 1}–{menuCell.matraIndex + 1} ×2
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => finishPhraseRepeat(menuRow, menuCell, 3)}>
+                    Repeat {phraseRepeatStart.matraIndex + 1}–{menuCell.matraIndex + 1} ×3
+                  </button>
+                  <button type="button" role="menuitem" className="quiet" onClick={() => {
+                    setPhraseRepeatStart(null);
+                    setCellMenu(null);
+                    setMessage('Phrase-repeat selection cancelled.');
+                  }}>Cancel phrase selection</button>
+                </>
+              ) : (
+                <button type="button" role="menuitem" onClick={() => beginPhraseRepeat(menuRow, menuCell)}>
+                  Start phrase repeat here
+                </button>
+              )}
+              <button type="button" role="menuitem" onClick={() => toggleLineRepeat(menuRow)}>
+                {menuRow.lineRepeat ? 'Remove line repeat' : 'Repeat this line'}
+              </button>
+              {menuRow.lineRepeat && menuCell.matraIndex > 0 && (
+                <button type="button" role="menuitem" onClick={() => placeFirstEnding(menuRow, menuCell.matraIndex)}>
+                  {Number.isInteger(menuRow.firstEndingFrom) ? 'Move 1st ending here' : '1st ending starts here'}
+                </button>
+              )}
+              {menuRow.lineRepeat && Number.isInteger(menuRow.firstEndingFrom) && (
+                <button type="button" role="menuitem" className="remove" onClick={() => removeFirstEnding(menuRow)}>
+                  Remove alternate ending
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="app-grid-cell-menu-section" aria-label="Quick cell tools">
+            <h4>Quick cell</h4>
+            <div className="app-grid-cell-menu-actions quick-actions">
+              <button type="button" role="menuitem" onClick={() => useQuickCellValue(menuRow, menuCell, '-', 'a hold')}>
+                <b>—</b><span>hold</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => useQuickCellValue(menuRow, menuCell, '.', 'a rest')}>
+                <b>·</b><span>rest</span>
+              </button>
+            </div>
+          </section>
+          <p className="app-grid-cell-menu-hint">Right-click another cell to move this menu.</p>
         </div>,
         document.body
       )}
