@@ -777,9 +777,14 @@ function renderLineBlock(line, tal, ctx) {
           continue;
         }
         if (slot.partIndex > 0 || slot.event?.type !== 'note') {
-          const hold = h('span', 'sr-bol-slot sr-bol-hold', '-');
-          hold.style.gridColumn = String(slotIndex + 1);
-          grid.appendChild(hold);
+          // Rhythmic holds and empty subdivisions belong to the notation
+          // grid, not the bol vocabulary. Preserve the slot so note/bol
+          // columns remain exact, but do not paint a dash that can be read as
+          // a ra stroke. A gap chikari is handled above and remains visible.
+          const blank = h('span', 'sr-bol-slot sr-bol-blank sr-bol-rhythm-gap', '');
+          blank.style.gridColumn = String(slotIndex + 1);
+          blank.setAttribute('aria-hidden', 'true');
+          grid.appendChild(blank);
           continue;
         }
         const bol = bolAtEvent.get(slot.eventIndex);

@@ -378,8 +378,10 @@ export const smokes = [
       const held = row.querySelector('.sr-bol[data-matra="1"]');
       assert.deepEqual(
         [...held.querySelectorAll('.sr-bol-slot')].map((node) => node.textContent),
-        ['|', '-', '-', '|']
+        ['|', '', '', '|']
       );
+      assert.equal(held.querySelectorAll('.sr-bol-rhythm-gap').length, 2);
+      assert.equal(held.querySelector('.sr-bol-hold'), null);
       const fast = row.querySelector('.sr-bol[data-matra="2"]');
       assert.deepEqual(
         [...fast.querySelectorAll('.sr-bol-mark')].map((node) => node.textContent),
@@ -387,6 +389,7 @@ export const smokes = [
       );
       assert.equal(fast.querySelector('.sr-bol-diri').style.gridColumn, '3');
       assert.equal(fast.querySelector('.sr-bol-diri').dataset.bolRate, '2');
+      assert.equal(fast.querySelector('.sr-bol-diri').classList.contains('sr-bol-diri-fast'), true);
     },
   },
   {

@@ -308,13 +308,15 @@
   line-height: 1;
   color: var(--sr-ink);
 }
-.sr-bol-diri { justify-self: stretch; text-align: center; }
-.sr-bol-diri-fast {
-  border-bottom: 1px double color-mix(in srgb, var(--sr-accent) 65%, transparent);
+.sr-bol-diri {
+  justify-self: stretch;
+  border-bottom: 0;
+  text-align: center;
 }
+.sr-bol-diri-fast { border-bottom: 0; }
 .sr-bol-diri-span {
   justify-self: stretch;
-  border-bottom: 1px solid color-mix(in srgb, var(--sr-accent) 72%, var(--sr-ink));
+  border-bottom: 0;
 }
 .sr-bol-cross-span {
   z-index: 5;
@@ -335,16 +337,11 @@
 .sr-bol-cross-svg path {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.25;
+  stroke-width: 1.1;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .sr-bol-covered { color: var(--sr-accent); opacity: 0.72; }
-.sr-bol-hold {
-  font-size: 12px;
-  line-height: 1;
-  color: var(--sr-dim);
-}
 
 /* landing report */
 .sr-landing {
@@ -2957,20 +2954,17 @@
   -webkit-text-stroke: 0.22px currentColor;
   paint-order: stroke fill;
 }
+.app-export-graph-paper .sr-bol-diri,
+.app-export-grid .sr-bol-diri {
+  border-bottom: 0;
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0;
+  -webkit-text-stroke: 0;
+}
 .app-export-grid .sr-bol-mark {
   color: var(--sr-ink);
   font-weight: 750;
-}
-.app-export-graph-paper .sr-bol-hold {
-  color: var(--sr-ink);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 750;
-  -webkit-text-stroke: 0.12px currentColor;
-  paint-order: stroke fill;
-}
-.app-export-grid .sr-bol-hold {
-  color: color-mix(in srgb, var(--sr-ink) 78%, transparent);
-  font-weight: 650;
 }
 
 /* Alternate endings are one musical system, not a detached second line.

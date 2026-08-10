@@ -171,6 +171,8 @@ export const smokes = [
       assert.match(css, /\.app-export-graph-paper \.sr-bol-slots\s*\{[^}]*padding-inline:\s*0\.04em;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol-slot\s*\{[^}]*font-size:\s*0\.82em;[^}]*font-weight:\s*750;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol-mark\s*\{[^}]*font-weight:\s*900;[^}]*-webkit-text-stroke:\s*0\.22px currentColor;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-bol-diri,[\s\S]*?border-bottom:\s*0;[\s\S]*?font-weight:\s*500;[\s\S]*?-webkit-text-stroke:\s*0;/s);
+      assert.doesNotMatch(css, /\.sr-bol-diri-(?:fast|span)\s*\{[^}]*border-bottom:\s*1px/s);
       assert.match(css, /\.app-export-graph-paper \.sr-glyphs:has\(\.sr-phrase-report\)\s*\{[^}]*padding-inline-end:\s*1\.18em;/s);
       assert.doesNotMatch(css, /\.app-export-graph-paper::before\s*\{[^}]*background-image:/s);
       assert.match(css, /\.app-rhythm-grid-paper\s*\{[^}]*background:\s*var\(--sr-paper-raised\);/s);
