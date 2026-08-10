@@ -2828,6 +2828,8 @@
 .app-export-graph-paper .sr-bol-slots {
   grid-template-columns: repeat(var(--sr-bol-written-slots), minmax(0, 1fr)) !important;
   column-gap: 0.02em;
+  box-sizing: border-box;
+  padding-inline: 0.04em;
 }
 .app-rhythm-grid-paper .sr-bol-slot,
 .app-export-graph-paper .sr-bol-slot {
@@ -2932,9 +2934,16 @@
    screen graph paper restrained, while printing bol letters at the full
    export text size with enough weight for ordinary grayscale printers. */
 .app-export-graph-paper .sr-bol-slot {
-  font-size: 1em;
-  font-weight: 650;
+  font-size: 0.82em;
+  font-weight: 750;
   letter-spacing: -0.02em;
+}
+.app-export-graph-paper .sr-bol {
+  /* Keep the lane on the same em geometry as its matra cell. The generic
+     export rule makes bol text 11px; if that size reaches this container,
+     `2.65em` becomes narrower than the 15px notation cell and every bol
+     subdivision drifts left. Size the symbols below instead. */
+  font-size: 1em;
 }
 .app-export-grid .sr-bol-slot {
   font-size: 1em;
@@ -2943,15 +2952,21 @@
 }
 .app-export-graph-paper .sr-bol-mark {
   color: var(--sr-ink);
-  font-weight: 750;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 900;
+  -webkit-text-stroke: 0.22px currentColor;
+  paint-order: stroke fill;
 }
 .app-export-grid .sr-bol-mark {
   color: var(--sr-ink);
   font-weight: 750;
 }
 .app-export-graph-paper .sr-bol-hold {
-  color: color-mix(in srgb, var(--sr-ink) 78%, transparent);
-  font-weight: 650;
+  color: var(--sr-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 750;
+  -webkit-text-stroke: 0.12px currentColor;
+  paint-order: stroke fill;
 }
 .app-export-grid .sr-bol-hold {
   color: color-mix(in srgb, var(--sr-ink) 78%, transparent);
