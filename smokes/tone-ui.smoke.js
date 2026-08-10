@@ -14,6 +14,11 @@ export const smokes = [
       }
       for (const phrase of [
         'Sound settings',
+        'Chikari sound',
+        'Soft string',
+        'Rounded tone',
+        'Intensity',
+        'Length',
         'Brightness',
         'Attack',
         'Release',

@@ -2895,18 +2895,26 @@
 .app-rhythm-grid-paper .sr-phrase-report,
 .app-export-graph-paper .sr-phrase-report {
   position: absolute;
-  right: 0.08em;
-  bottom: -0.82em;
+  right: 0.02em;
+  top: 50%;
+  bottom: auto;
   z-index: 5;
   display: inline-flex;
-  align-items: center;
-  gap: 0.08em;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
   padding: 0.05em 0.12em;
   border-radius: 2px;
   background: var(--sr-export-paper, var(--sr-paper-raised));
-  font-size: 0.58em;
-  line-height: 1;
+  font-size: 0.62em;
+  line-height: 0.92;
   white-space: nowrap;
+  transform: translateY(-50%);
+}
+.app-rhythm-grid-paper .sr-glyphs:has(.sr-phrase-report),
+.app-export-graph-paper .sr-glyphs:has(.sr-phrase-report) {
+  padding-inline-start: 0.04em;
+  padding-inline-end: 1.18em;
 }
 .app-rhythm-grid-paper .sr-phrase-report .sr-phrase-glyph,
 .app-export-graph-paper .sr-phrase-report .sr-phrase-glyph {
@@ -2918,6 +2926,36 @@
   margin: 0;
   font-size: 0.82em;
   transform: none;
+}
+
+/* The export bol lane is reading material, not a faint editing guide. Keep
+   screen graph paper restrained, while printing bol letters at the full
+   export text size with enough weight for ordinary grayscale printers. */
+.app-export-graph-paper .sr-bol-slot {
+  font-size: 1em;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.app-export-grid .sr-bol-slot {
+  font-size: 1em;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.app-export-graph-paper .sr-bol-mark {
+  color: var(--sr-ink);
+  font-weight: 750;
+}
+.app-export-grid .sr-bol-mark {
+  color: var(--sr-ink);
+  font-weight: 750;
+}
+.app-export-graph-paper .sr-bol-hold {
+  color: color-mix(in srgb, var(--sr-ink) 78%, transparent);
+  font-weight: 650;
+}
+.app-export-grid .sr-bol-hold {
+  color: color-mix(in srgb, var(--sr-ink) 78%, transparent);
+  font-weight: 650;
 }
 
 /* Alternate endings are one musical system, not a detached second line.

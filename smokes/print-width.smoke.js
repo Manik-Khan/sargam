@@ -167,6 +167,9 @@ export const smokes = [
       assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-has-bol-lane[\s\S]*?padding-bottom:\s*calc\(0\.08em \+ \(1\.08em \* var\(--sr-bol-pass-count, 1\)\)\);/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol\s*\{[^}]*width:\s*var\(--sr-graph-cell-width\);[^}]*border-top:\s*1px dashed/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol-slots\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--sr-bol-written-slots\), minmax\(0, 1fr\)\) !important;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-bol-slot\s*\{[^}]*font-size:\s*1em;[^}]*font-weight:\s*650;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-bol-mark\s*\{[^}]*font-weight:\s*750;/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-glyphs:has\(\.sr-phrase-report\)\s*\{[^}]*padding-inline-end:\s*1\.18em;/s);
       assert.doesNotMatch(css, /\.app-export-graph-paper::before\s*\{[^}]*background-image:/s);
       assert.match(css, /\.app-rhythm-grid-paper\s*\{[^}]*background:\s*var\(--sr-paper-raised\);/s);
       assert.match(css, /\.app-grid-writer-paper \.app-grid-writer-scroll\s*\{\s*background:\s*var\(--sr-paper-raised\);/s);

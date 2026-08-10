@@ -18,6 +18,10 @@ import {
   normalizeMelodyVoice,
 } from './voices.js';
 import { normalizeToneMap, updateToneMap } from './tone.js';
+import {
+  normalizeChikariSettings,
+  updateChikariSettings,
+} from './chikari.js';
 import { centeredLineScrollTop, sourceLineRange } from './editor-nav.js';
 import { previewSourceLine } from './preview-scroll.js';
 import {
@@ -430,6 +434,9 @@ export default function App() {
   const [toneByVoice, setToneByVoice] = useState(() =>
     normalizeToneMap(store.getPref('melodyToneSettings', null))
   );
+  const [chikariSettings, setChikariSettings] = useState(() =>
+    normalizeChikariSettings(store.getPref('chikariSettings', null))
+  );
   const [melodyVoice, setMelodyVoice] = useState(() =>
     normalizeMelodyVoice(store.getPref('melodyVoice', 'pluck'))
   );
@@ -460,6 +467,7 @@ export default function App() {
     for (const [voice, settings] of Object.entries(toneByVoice)) {
       player.setToneSettings(voice, settings);
     }
+    player.setChikariSettings(chikariSettings);
     player.setMelodyVoice(melodyVoice);
     player.setDroneMode(droneMode);
     player.setTalaSound(talaSound);
@@ -710,6 +718,15 @@ export default function App() {
       const next = updateToneMap(previous, melodyVoice, { [key]: value });
       player.setToneSettings(melodyVoice, next[melodyVoice]);
       store.setPref('melodyToneSettings', next);
+      return next;
+    });
+  };
+
+  const doChikariChange = (key, value) => {
+    setChikariSettings((previous) => {
+      const next = updateChikariSettings(previous, { [key]: value });
+      player.setChikariSettings(next);
+      store.setPref('chikariSettings', next);
       return next;
     });
   };
@@ -2015,6 +2032,7 @@ export default function App() {
           volumes={volumes}
           melodyVoice={melodyVoice}
           tone={toneByVoice[melodyVoice]}
+          chikari={chikariSettings}
           droneMode={droneMode}
           talaSound={talaSound}
           followEditing={followEditing}
@@ -2027,6 +2045,7 @@ export default function App() {
           onTrackGain={doTrackGain}
           onMelodyVoice={doMelodyVoice}
           onToneChange={doToneChange}
+          onChikariChange={doChikariChange}
           onDroneMode={doDroneMode}
           onTalaSound={doTalaSound}
           onFollowEditing={changeFollowEditing}

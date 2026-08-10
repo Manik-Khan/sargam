@@ -8,6 +8,10 @@ import {
   melodyVoiceLabel,
   MELODY_VOICE_OPTIONS,
 } from './voices.js';
+import {
+  CHIKARI_SOUND_OPTIONS,
+  DEFAULT_CHIKARI_SETTINGS,
+} from './chikari.js';
 
 function fmt(sec) {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -21,6 +25,8 @@ function pct(value) {
 }
 
 const TONE_LABELS = Object.freeze({
+  intensity: ['Intensity', 'Gentle', 'Present'],
+  length: ['Length', 'Short', 'Long'],
   velocity: ['Touch', 'Soft', 'Firm'],
   brightness: ['Brightness', 'Dark', 'Bright'],
   attack: ['Attack', 'Immediate', 'Gentle'],
@@ -108,6 +114,7 @@ export default function Transport({
   volumes,
   melodyVoice,
   tone,
+  chikari,
   droneMode,
   talaSound,
   followEditing = true,
@@ -120,6 +127,7 @@ export default function Transport({
   onTrackGain,
   onMelodyVoice,
   onToneChange,
+  onChikariChange,
   onDroneMode,
   onTalaSound,
   onFollowEditing,
@@ -151,6 +159,7 @@ export default function Transport({
     neutralWaveform: 'triangle',
   };
   const sampledVoice = isSoundfontVoice(melodyVoice);
+  const chikariTone = chikari || DEFAULT_CHIKARI_SETTINGS;
   const talaEnabled = talaSound !== 'off' && !tracks.tick;
 
   const toggleTala = () => {
@@ -265,6 +274,37 @@ export default function Transport({
               />
               Follow the measure being played
             </label>
+          </section>
+
+          <section className="tp-settings-section">
+            <div className="tp-settings-heading">
+              <strong>Chikari sound</strong>
+              <span>A separate, softer upper Sa for chikari strokes.</span>
+            </div>
+            <ToneSelect
+              label="Sound"
+              value={chikariTone.sound}
+              onChange={(value) => onChikariChange?.('sound', value)}
+              options={CHIKARI_SOUND_OPTIONS}
+            />
+            <ToneSlider
+              name="intensity"
+              value={chikariTone.intensity}
+              onChange={onChikariChange}
+            />
+            <ToneSlider
+              name="length"
+              value={chikariTone.length}
+              onChange={onChikariChange}
+            />
+            <ToneSlider
+              name="brightness"
+              value={chikariTone.brightness}
+              onChange={onChikariChange}
+            />
+            <p className="tp-tone-note">
+              Soft string is the gentlest default; Rounded tone removes the plucked edge.
+            </p>
           </section>
 
           <section className="tp-settings-section">

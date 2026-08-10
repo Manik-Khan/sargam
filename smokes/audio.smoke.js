@@ -149,6 +149,38 @@ export const smokes = [
     },
   },
   {
+    name: 'audio: chikari sound and shaping controls normalize safely',
+    fn() {
+      const player = createPlayer({ createContext: mockCtx });
+      player.setChikariSettings({
+        sound: 'clear-string',
+        intensity: 4,
+        length: -2,
+        brightness: 0.61,
+      });
+      assert.deepEqual(player.chikariSettings, {
+        sound: 'clear-string',
+        intensity: 1,
+        length: 0,
+        brightness: 0.61,
+      });
+      player.setChikariSettings({ sound: 'unknown' });
+      assert.equal(player.chikariSettings.sound, 'soft-string');
+    },
+  },
+  {
+    name: 'audio: rounded chikari keeps upper Sa but removes the plucked edge',
+    fn() {
+      const { ctx, player } = make('tal: tintal\ntempo: 60\nsa: A3\n\n-S\n> ^da\n');
+      player.setTalaSound('off');
+      player.setChikariSettings({ sound: 'rounded-tone', brightness: 0.2 });
+      player.play();
+      assert.equal(ctx._started.length, 1);
+      assert.equal(ctx._started[0].oscillatorType, 'sine');
+      assert.equal(ctx._started[0].freq, 440, 'chikari remains upper Sa');
+    },
+  },
+  {
     name: 'audio: the pump schedules later events as the clock advances',
     fn() {
       const { ctx, timers, player } = make(SRC);

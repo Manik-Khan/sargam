@@ -28,6 +28,7 @@ import {
   toneReleaseSeconds,
   toneVelocity,
 } from './tone.js';
+import { normalizeChikariSettings } from './chikari.js';
 
 const LOOKAHEAD_S = 0.3; // AudioWorklet commands need comfortable lead time
 const SOUNDFONT_START_LEAD_S = 0.06; // first sampled note is queued before it is due
@@ -105,6 +106,7 @@ export function createPlayer(env) {
   let melodyFilter = null;
   let melodyRoomGain = null;
   let toneByVoice = normalizeToneMap(null);
+  let chikariSettings = normalizeChikariSettings(null);
   let soundfont = null;
 
   // Tabla samples are loaded once, decoded into the current AudioContext,
@@ -461,21 +463,58 @@ export function createPlayer(env) {
     return playCurrentPluck(ev, at);
   }
 
+  function playRoundedChikari(ev, at, settings) {
+    if (typeof ctx.createOscillator !== 'function') return false;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    const dur = Math.min(0.22, Math.max(0.045, ev.dur * (0.38 + settings.length * 0.82)));
+    const level = 0.055 + settings.intensity * 0.18;
+    const attack = Math.min(0.009, dur * 0.12);
+    const release = 0.025 + settings.length * 0.085;
+
+    osc.type = settings.brightness > 0.58 ? 'triangle' : 'sine';
+    osc.connect(g);
+    g.connect(masterGains.melody);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(level, at + attack);
+    g.gain.setTargetAtTime(0.0001, at + attack, release);
+    setOscPitch(osc, ev.freq, null, at, dur);
+    osc.start(at);
+    osc.stop(at + dur + release * 5);
+    return true;
+  }
+
   // Chikari is its own short upper-Sa string, not a replacement for the
-  // written melody note. Keep its voice consistently sweet and restrained
-  // even when the user has selected a sustained melody instrument.
+  // written melody note. Its independent settings make the articulation
+  // audible without forcing a sharp, abrasive timbre on every composition.
   function playChikari(ev, at) {
-    if (!ctx.createBuffer || !ctx.createBufferSource) {
-      return playNeutralTone({ ...ev, grace: true }, at);
+    const settings = chikariSettings;
+    if (settings.sound === 'rounded-tone') {
+      return playRoundedChikari(ev, at, settings);
     }
+    if (!ctx.createBuffer || !ctx.createBufferSource) {
+      return playRoundedChikari(ev, at, settings);
+    }
+    const clear = settings.sound === 'clear-string';
     const tone = {
       ...toneByVoice.pluck,
-      brightness: 0.46,
-      velocity: 0.62,
-      attack: 0.04,
-      release: 0.12,
+      brightness: Math.min(1, settings.brightness + (clear ? 0.2 : 0)),
+      velocity: 0.34 + settings.intensity * 0.54,
+      attack: clear ? 0.025 : 0.055,
+      release: 0.055 + settings.length * 0.16,
     };
-    return playBufferNote(ev, at, pluckBuffer(ev.freq, tone), tone, { baseLevel: 0.42 });
+    const shapedEvent = {
+      ...ev,
+      dur: Math.min(0.22, Math.max(0.04, ev.dur * (0.42 + settings.length * 0.78))),
+    };
+    const baseLevel = (clear ? 0.28 : 0.2) + settings.intensity * (clear ? 0.24 : 0.18);
+    return playBufferNote(
+      shapedEvent,
+      at,
+      pluckBuffer(ev.freq, tone),
+      tone,
+      { baseLevel }
+    );
   }
 
   // ---- tanpura support ----
@@ -708,6 +747,9 @@ export function createPlayer(env) {
       }
       if (mode === melodyVoice) applyToneBus();
     },
+    setChikariSettings(settings) {
+      chikariSettings = normalizeChikariSettings(settings);
+    },
     setDroneMode(mode) {
       droneMode = DRONE_MODES.includes(mode) ? mode : 'off';
       nextDroneAt = playing && droneMode !== 'off' && ctx ? ctx.currentTime : null;
@@ -745,6 +787,9 @@ export function createPlayer(env) {
     },
     get toneSettings() {
       return normalizeToneMap(toneByVoice);
+    },
+    get chikariSettings() {
+      return normalizeChikariSettings(chikariSettings);
     },
     get soundfontReady() {
       return Boolean(soundfont?.ready);
