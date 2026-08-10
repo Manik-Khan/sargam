@@ -185,6 +185,26 @@ export const smokes = [
       const row = root.querySelectorAll('.sr-section')[0].querySelector('.sr-row');
       // Sthayi @7: boundaries after cells 1, 5, 9, 13 → 4 barlines.
       assert.equal(row.querySelectorAll('.sr-bar').length, 4);
+      assert.equal(row.querySelectorAll('.sr-bar-vibhag').length, 4);
+    },
+  },
+  {
+    name: 'render: written phrase bars remain visible and tala boundaries stay stronger',
+    fn: () => {
+      const { doc } = parseDocument('tal: tintal\n\nS R | g m P D | n S | R g m P\n');
+      const root = renderDocument(doc);
+      const row = root.querySelector('.sr-row');
+      assert.equal(row.querySelectorAll('.sr-bar-phrase').length, 2);
+      assert.equal(row.querySelectorAll('.sr-bar-vibhag').length, 2);
+
+      const paper = renderDocument(doc, { graphPaper: true, graphColumns: 16, maxSystemEm: 41.6 });
+      assert.equal(paper.querySelectorAll('.sr-graph-phrase-end').length, 2);
+      assert.equal(paper.querySelectorAll('.sr-graph-vibhag-end').length, 2);
+      assert.equal(
+        paper.querySelectorAll('.sr-graph-phrase-end.sr-graph-vibhag-end').length,
+        0,
+        'a coincident written bar uses only the stronger tala divider'
+      );
     },
   },
   {

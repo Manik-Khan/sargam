@@ -518,7 +518,7 @@ function renderLineBlock(line, tal, ctx) {
       cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : tal ? 'minmax(2.6em, max-content)' : 'max-content');
     }
     colEndOf[k] = cols.length + 1;
-    if (!graphPaper && tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
+    if (!graphPaper && k < line.matras.length - 1 && boundaryKindAfter(line, k, tal)) {
       cols.push('max-content'); // barline column
     }
   }
@@ -659,11 +659,20 @@ function renderLineBlock(line, tal, ctx) {
       ? `${colOf[k]} / ${colEndOf[k]}`
       : String(colOf[k]);
     row.appendChild(cell);
-    if (tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
+    const boundaryKind = k < line.matras.length - 1
+      ? boundaryKindAfter(line, k, tal)
+      : null;
+    if (boundaryKind) {
       if (graphPaper) {
-        cell.classList.add('sr-graph-vibhag-end');
+        cell.classList.add(
+          boundaryKind === 'phrase' ? 'sr-graph-phrase-end' : 'sr-graph-vibhag-end'
+        );
       } else {
-        const bar = h('div', 'sr-bar');
+        const bar = h('div', `sr-bar sr-bar-${boundaryKind}`);
+        bar.setAttribute(
+          'aria-label',
+          boundaryKind === 'phrase' ? 'Written phrase divider' : 'Tala division'
+        );
         bar.style.gridRow = '2';
         bar.style.gridColumn = String(colOf[k] + 1);
         row.appendChild(bar);
@@ -1066,10 +1075,19 @@ function sliceLineForSystem(line, tal, from, to, systemIndex, systemCount) {
   return sliced;
 }
 
-/** True if a structural or derived barline falls after 0-based matra k. */
-function boundaryAfter(line, k, tal) {
-  if (line.firstEndingFrom === k + 1) return true;
-  return markerAtMatra(tal, line.startMatra + performedOffsetAt(line, k + 1)) !== null;
+/** Visual strength of the boundary after 0-based matra k. Authored `|`
+ * dividers remain visible, while tala/ending boundaries take precedence and
+ * print heavier when both land on the same edge. */
+function boundaryKindAfter(line, k, tal) {
+  const after = k + 1;
+  const firstEnding = line.firstEndingFrom === after;
+  const talaBoundary = Boolean(tal) && markerAtMatra(
+    tal,
+    line.startMatra + performedOffsetAt(line, after)
+  ) !== null;
+  if (firstEnding || talaBoundary) return 'vibhag';
+  if ((line._bars || []).includes(after)) return 'phrase';
+  return null;
 }
 
 /** 1 → '1st', 2 → '2nd', 3 → '3rd', 11 → '11th' … */

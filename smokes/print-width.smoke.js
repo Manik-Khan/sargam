@@ -145,6 +145,8 @@ export const smokes = [
       assert.match(css, /\.sr-export \.sargam-render,[\s\S]*?\.sr-export \.sr-return-cue\s*\{\s*font-family:\s*inherit;/);
       assert.match(css, /@page\s*\{\s*size:\s*Letter portrait;\s*margin:\s*0\.3in 0\.28in;/);
       assert.match(css, /\.sr-bar\s*\{[^}]*border-inline-start:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
+      assert.match(css, /\.sr-bar-phrase\s*\{[^}]*border-inline-start-width:\s*1\.35px;/s);
+      assert.match(css, /\.sr-bar-vibhag\s*\{[^}]*border-inline-start-width:\s*2px;/s);
       assert.match(css, /\.app-export::before\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*-0\.3in -0\.28in;[^}]*background:\s*var\(--sr-export-paper, #fff\);/s);
       assert.match(css, /\.sr-marker-on-boundary::after\s*\{\s*content:\s*none;/);
       assert.match(css, /\.app-rhythm-grid \.sr-cell,[\s\S]*?\.app-export-grid \.sr-cell\s*\{[^}]*border:\s*1px solid/s);
@@ -164,6 +166,8 @@ export const smokes = [
       assert.match(css, /\.app-export-graph-paper \.sr-timed-slots\s*\{[^}]*max-width:\s*100%;[^}]*column-gap:\s*0\.04em;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-cell\[data-grid-span="2"\],[\s\S]*?width:\s*calc\(var\(--sr-graph-cell-width\) \* 2\);/s);
       assert.match(css, /\.app-export-graph-paper \.sr-cell\[data-grid-span="3"\],[\s\S]*?width:\s*calc\(var\(--sr-graph-cell-width\) \* 3\);/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-graph-phrase-end,[\s\S]*?inset -1\.35px 0/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-graph-vibhag-end,[\s\S]*?inset -2px 0/s);
       assert.doesNotMatch(css, /\.app-export-graph-paper \.sr-timed-slots\[data-written-slots="4"\]\s*\{\s*font-size:\s*0\.68em;/s);
       assert.match(css, /\.sr-graph-structure-label\s*\{[^}]*background:\s*var\(--sr-graph-label-bg\);[^}]*box-shadow:/s);
       assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-has-bol-lane[\s\S]*?padding-bottom:\s*calc\(0\.08em \+ \(1\.08em \* var\(--sr-bol-pass-count, 1\)\)\);/s);
