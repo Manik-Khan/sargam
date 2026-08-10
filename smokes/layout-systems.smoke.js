@@ -50,19 +50,36 @@ export const smokes = [
     },
   },
   {
-    name: 'systems: Graph Paper plans dense music by real matra cells, not glyph estimates',
+    name: 'systems: Graph Paper gives dense matras real multi-square spans',
     fn() {
       const source = `tal: jhaptal\n\n${Array(10).fill('SSSS').join(' ')}\n`;
       const { doc } = parseDocument(source);
       const line = doc.sections[0].lines[0];
       assert.deepEqual(
-        planLineSystems(line, getTal('jhaptal'), { maxEm: 26, graphColumns: 10 }),
+        planLineSystems(line, getTal('jhaptal'), { maxEm: 52, graphColumns: 20 }),
         [{ from: 0, to: 9, reason: 'fits' }]
+      );
+      assert.ok(
+        planLineSystems(line, getTal('jhaptal'), { graphColumns: 10 }).length > 1,
+        'ten two-square matras fold instead of overflowing ten paper squares'
       );
       assert.ok(
         planLineSystems(line, getTal('jhaptal'), { maxEm: 26 }).length > 1,
         'ordinary notation still reserves extra width for dense matras'
       );
+    },
+  },
+  {
+    name: 'systems: rendered Graph Paper cells span the same columns charged by planning',
+    fn() {
+      const { doc } = parseDocument('tal: tintal\n\nS SSSS ((SSSS)x3)\n');
+      const root = renderDocument(doc, { graphPaper: true, graphColumns: 8, maxSystemEm: 20.8 });
+      const cells = [...root.querySelectorAll('.sr-line-block:first-child .sr-cell')];
+      assert.equal(cells[0].dataset.gridSpan, '1');
+      assert.equal(cells[1].dataset.gridSpan, '2');
+      assert.equal(cells[2].dataset.gridSpan, '3');
+      assert.match(cells[1].style.gridColumn, /\/ 4$/);
+      assert.match(cells[2].style.gridColumn, /\/ 7$/);
     },
   },
   {

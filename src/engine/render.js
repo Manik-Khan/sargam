@@ -17,7 +17,12 @@
 import { getTal, wrapMatra, markerAtMatra, landing } from './tala.js';
 import { spellDegree } from './western.js';
 import { DEFAULT_SA } from './schedule.js';
-import { estimateMatraEm, isSafeBreak, planLineSystems } from './layout.js';
+import {
+  estimateMatraEm,
+  isSafeBreak,
+  planLineSystems,
+  visualGridSpanForMatra,
+} from './layout.js';
 import { buildLineGeometry } from './notation-geometry.js';
 import { performedOffsetAt } from './performed-time.js';
 import { buildBolPlan } from './bol-lane.js';
@@ -268,6 +273,26 @@ function maxPlannedRangeEm(line, tal, maxEm) {
   );
 }
 
+function graphRangeColumns(line, from = 0, to = (line?.matras?.length || 0) - 1) {
+  if (!line?.matras?.length || to < from) return 0;
+  const phraseEnds = new Set((line.phraseRepeats || []).map((repeat) => repeat.toMatra));
+  let columns = 0;
+  for (let index = Math.max(0, from); index <= Math.min(to, line.matras.length - 1); index++) {
+    columns += visualGridSpanForMatra(line.matras[index], {
+      phraseReport: phraseEnds.has(index),
+    });
+  }
+  return columns;
+}
+
+function graphLineColumns(line) {
+  return graphRangeColumns(line)
+    + ((line.repeatOpen ?? line.lineRepeat) ? 1 : 0)
+    + ((line.repeatClose ?? line.lineRepeat) ? 1 : 0)
+    + (line.returnCue ? 1 : 0)
+    + (line.passthrough?.length || 0);
+}
+
 function alternateEndingLayout(first, second, tal, ctx) {
   const endingStart = first.firstEndingFrom;
   const maxEm = Number(ctx.maxSystemEm);
@@ -287,18 +312,25 @@ function alternateEndingLayout(first, second, tal, ctx) {
 
   if (ctx.graphPaper) {
     const totalColumns = Math.max(1, Number(ctx.graphColumns) || 1);
-    const firstEndingColumns = first.matras.length - endingStart + 1;
-    const secondEndingColumns = Math.min(totalColumns, Math.max(1, second.matras.length));
+    const firstEndingColumns = graphRangeColumns(first, endingStart, first.matras.length - 1)
+      + (first.lineRepeat ? 1 : 0)
+      + (first.returnCue ? 1 : 0)
+      + (first.passthrough?.length || 0);
+    const secondEndingColumns = Math.min(totalColumns, Math.max(1, graphLineColumns(second)));
     const endingColumns = Math.max(firstEndingColumns, secondEndingColumns);
     let availableCommonColumns = Math.max(0, totalColumns - endingColumns);
     while (finalFrom > 0 && availableCommonColumns > 0) {
       const candidate = finalFrom - 1;
       if (candidate > 0 && !isSafeBreak(first, candidate - 1)) break;
       const repeatColumn = candidate === 0 && first.lineRepeat ? 1 : 0;
-      if (endingStart - candidate + repeatColumn > availableCommonColumns) break;
+      const candidateColumns = graphRangeColumns(first, candidate, endingStart - 1) + repeatColumn;
+      if (candidateColumns > availableCommonColumns) break;
       finalFrom = candidate;
     }
-    commonEm = (endingStart - finalFrom + (finalFrom === 0 && first.lineRepeat ? 1 : 0)) * 2.6;
+    commonEm = (
+      graphRangeColumns(first, finalFrom, endingStart - 1)
+      + (finalFrom === 0 && first.lineRepeat ? 1 : 0)
+    ) * 2.6;
   } else {
     const commonBudget = Math.max(0, maxEm - endingEm);
     while (finalFrom > 0) {
@@ -368,7 +400,8 @@ function renderAlternateEndingPair(first, second, tal, ctx) {
   const aligned = h('div', 'sr-alternate-ending-system');
   aligned.setAttribute('data-system-index', String(finalIndex));
   const commonMatraCount = Math.max(0, endingStart - layout.finalFrom);
-  const commonGraphColumns = commonMatraCount + (layout.finalFrom === 0 && first.lineRepeat ? 1 : 0);
+  const commonGraphColumns = graphRangeColumns(first, layout.finalFrom, endingStart - 1)
+    + (layout.finalFrom === 0 && first.lineRepeat ? 1 : 0);
   const endingGraphColumns = ctx.graphPaper
     ? Math.max(1, Number(ctx.graphColumns || 1) - commonGraphColumns)
     : undefined;
@@ -465,6 +498,7 @@ function renderLineBlock(line, tal, ctx) {
   //     [repeat-close?] [passthrough...]
   const cols = [];
   const colOf = []; // grid column (1-based) of each matra cell
+  const colEndOf = []; // exclusive grid line after each (possibly spanning) cell
   const showRepeatOpen = line.repeatOpen ?? line.lineRepeat;
   const showRepeatClose = line.repeatClose ?? line.lineRepeat;
   // Repeats are structural markers, not rhythmic contents. Give each visible
@@ -474,9 +508,16 @@ function renderLineBlock(line, tal, ctx) {
     cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : 'max-content');
     repeatOpenCol = cols.length;
   }
+  const phraseEndMatras = new Set((line.phraseRepeats || []).map((repeat) => repeat.toMatra));
   for (let k = 0; k < line.matras.length; k++) {
     colOf[k] = cols.length + 1;
-    cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : tal ? 'minmax(2.6em, max-content)' : 'max-content');
+    const graphSpan = graphPaper
+      ? visualGridSpanForMatra(line.matras[k], { phraseReport: phraseEndMatras.has(k) })
+      : 1;
+    for (let spanColumn = 0; spanColumn < graphSpan; spanColumn++) {
+      cols.push(graphPaper ? 'var(--sr-graph-cell-width)' : tal ? 'minmax(2.6em, max-content)' : 'max-content');
+    }
+    colEndOf[k] = cols.length + 1;
     if (!graphPaper && tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
       cols.push('max-content'); // barline column
     }
@@ -532,7 +573,7 @@ function renderLineBlock(line, tal, ctx) {
     wrap.setAttribute('data-from-matra', String(matraOffset + span.from.matraIndex));
     wrap.setAttribute('data-to-matra', String(matraOffset + span.to.matraIndex));
     wrap.style.gridRow = '1';
-    wrap.style.gridColumn = `${fromCol} / ${toCol + 1}`; // into the destination
+    wrap.style.gridColumn = `${fromCol} / ${colEndOf[span.to.matraIndex]}`; // into the destination
     wrap.appendChild(span.type === 'krintan' ? krintanSvg() : meendSvg());
     row.appendChild(wrap);
   }
@@ -545,7 +586,7 @@ function renderLineBlock(line, tal, ctx) {
       const volta = h('div', 'sr-volta sr-volta-first', '1st time');
       volta.setAttribute('data-first-ending', String(line.firstEndingFrom));
       volta.style.gridRow = '1';
-      volta.style.gridColumn = `${fromCol} / ${toCol + 1}`;
+      volta.style.gridColumn = `${fromCol} / ${colEndOf[line.matras.length - 1]}`;
       volta.style.alignSelf = 'start';
       volta.style.minHeight = '0.78em';
       volta.style.borderTop = '1px solid currentColor';
@@ -569,7 +610,7 @@ function renderLineBlock(line, tal, ctx) {
       const volta = h('div', 'sr-volta sr-volta-second', firstSystem ? '2nd time' : '');
       volta.setAttribute('data-second-ending', 'true');
       volta.style.gridRow = '1';
-      volta.style.gridColumn = `${fromCol} / ${toCol + 1}`;
+      volta.style.gridColumn = `${fromCol} / ${colEndOf[line.matras.length - 1]}`;
       volta.style.alignSelf = 'start';
       volta.style.minHeight = '0.78em';
       volta.style.borderTop = '1px solid currentColor';
@@ -614,7 +655,9 @@ function renderLineBlock(line, tal, ctx) {
     );
     renderedCells.push(cell);
     cell.style.gridRow = '2';
-    cell.style.gridColumn = String(colOf[k]);
+    cell.style.gridColumn = graphPaper && colEndOf[k] - colOf[k] > 1
+      ? `${colOf[k]} / ${colEndOf[k]}`
+      : String(colOf[k]);
     row.appendChild(cell);
     if (tal && k < line.matras.length - 1 && boundaryAfter(line, k, tal)) {
       if (graphPaper) {
@@ -678,7 +721,9 @@ function renderLineBlock(line, tal, ctx) {
     const el = h('div', 'sr-lyric', lyr.text);
     el.setAttribute('data-matra', String(lyr.matraIndex));
     el.style.gridRow = '3';
-    el.style.gridColumn = String(colOf[lyr.matraIndex]);
+    el.style.gridColumn = graphPaper
+      ? `${colOf[lyr.matraIndex]} / ${colEndOf[lyr.matraIndex]}`
+      : String(colOf[lyr.matraIndex]);
     row.appendChild(el);
   }
 
@@ -710,11 +755,14 @@ function renderLineBlock(line, tal, ctx) {
     if (colOf[mi] === undefined) continue;
     const el = h('div', 'sr-bol');
     el.setAttribute('data-matra', String(mi));
+    el.setAttribute('data-grid-span', String(graphPaper ? colEndOf[mi] - colOf[mi] : 1));
     el.setAttribute('data-source-line', String(line.sourceLine));
     el.setAttribute('data-bol-passes', String(bolPasses.length));
     el.style.setProperty('--sr-bol-pass-count', String(bolPasses.length));
     el.style.gridRow = '4';
-    el.style.gridColumn = String(colOf[mi]);
+    el.style.gridColumn = graphPaper
+      ? `${colOf[mi]} / ${colEndOf[mi]}`
+      : String(colOf[mi]);
     const slots = [];
     const firstSlotOfEvent = new Map();
     for (let eventIndex = 0; eventIndex < line.matras[mi].events.length; eventIndex++) {
@@ -1098,25 +1146,14 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
     }
   }
   const hasLocalApproach = visualSlots.some((item) => item.event?.approachSlide && !item.hold);
-  const longestGraceRun = visualSlots.reduce(
-    (longest, item) => Math.max(longest, item.graces?.length || 0),
-    0
-  );
   // A regular matra occupies one grid unit. Dense rhythmic clusters, kan
   // ornaments, approach slides, and repeat endings reserve more horizontal
   // units instead of making their notation progressively microscopic. Cell
   // mode uses the same hint for a modest expansion; true graph-paper mode
   // maps the hint to two or three exact squares.
-  let gridSpan = visualSlots.length >= 7 ? 3 : visualSlots.length >= 4 ? 2 : 1;
-  if (longestGraceRun > 0 || hasLocalApproach || suffix || repeatLanding) {
-    gridSpan = Math.max(gridSpan, 2);
-  }
-  if (
-    longestGraceRun >= 4 ||
-    (visualSlots.length >= 4 && (suffix || repeatLanding))
-  ) {
-    gridSpan = 3;
-  }
+  const gridSpan = visualGridSpanForMatra(matra, {
+    phraseReport: Boolean(suffix || repeatLanding),
+  });
   cell.setAttribute('data-grid-span', String(gridSpan));
   const slotColumns = hasLocalApproach
     ? visualSlots

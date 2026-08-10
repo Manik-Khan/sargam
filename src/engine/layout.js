@@ -57,6 +57,34 @@ export function estimateMatraEm(matra) {
   return Math.max(2.6, slots * 0.84 + Math.max(0, slots - 1) * 0.22 + 0.8 + graceChars);
 }
 
+/** Number of physical graph-paper squares needed to keep one semantic matra
+ * legible. The musical duration remains one matra; this is only a visual span.
+ * Keep this pure helper shared with the renderer so packing and painting can
+ * never disagree about the number of columns a dense cell occupies. */
+export function visualGridSpanForMatra(matra, { phraseReport = false } = {}) {
+  const events = matra?.events || [];
+  let writtenSlots = 0;
+  let pendingGraces = 0;
+  let longestGraceRun = 0;
+  let hasLocalApproach = false;
+
+  for (const event of events) {
+    if (event.grace) {
+      if (!event.preBeat) pendingGraces++;
+      continue;
+    }
+    longestGraceRun = Math.max(longestGraceRun, pendingGraces);
+    pendingGraces = 0;
+    writtenSlots += Math.max(1, Number(event.writtenSlots) || 1);
+    if (event.approachSlide) hasLocalApproach = true;
+  }
+
+  let span = writtenSlots >= 7 ? 3 : writtenSlots >= 4 ? 2 : 1;
+  if (longestGraceRun > 0 || hasLocalApproach || phraseReport) span = Math.max(span, 2);
+  if (longestGraceRun >= 4 || (writtenSlots >= 4 && phraseReport)) span = 3;
+  return span;
+}
+
 /** True when a system break after `k` would cut a load-bearing span. */
 export function isSafeBreak(line, k) {
   for (const span of line?.spans || []) {
@@ -173,13 +201,15 @@ export function planLineSystems(line, tal, { maxEm = Infinity, graphColumns = nu
   if (graphLimit !== null) maxEm = graphLimit;
   if (!Number.isFinite(maxEm) || maxEm <= 0) return [{ from: 0, to: count - 1, reason: 'unbounded' }];
 
-  // Graph Paper is already the layout model: one written matra is exactly one
-  // column and repeat/cue glyphs are independent structural columns. Do not
-  // charge a dense matra several estimated em here; doing so folds a ten-cell
-  // line after five cells and leaves most of the visible paper empty.
+  // Graph Paper uses exact physical columns. A plain matra owns one square;
+  // dense clusters and phrase reports may span two or three squares. Packing
+  // must charge those spans or the last cells overflow the printed row.
   const measured = graphLimit === null ? measuredLineLayouts.get(line) : null;
+  const phraseEnds = new Set((line.phraseRepeats || []).map((repeat) => repeat.toMatra));
   const widths = graphLimit !== null
-    ? line.matras.map(() => 1)
+    ? line.matras.map((matra, index) => visualGridSpanForMatra(matra, {
+        phraseReport: phraseEnds.has(index),
+      }))
     : measured?.widths || line.matras.map(estimateMatraEm);
   const graphRepeatOpen = Boolean(line.repeatOpen ?? line.lineRepeat);
   const graphRepeatClose = Boolean(line.repeatClose ?? line.lineRepeat);
@@ -190,7 +220,7 @@ export function planLineSystems(line, tal, { maxEm = Infinity, graphColumns = nu
     ? (graphRepeatClose ? 1 : 0) + (line.returnCue ? 1 : 0) + (line.passthrough?.length || 0)
     : measured ? measured.suffixEm : fixedEdgeEm(line);
   const widthAfter = graphLimit !== null
-    ? () => 1
+    ? (i) => widths[i]
     : measured
     ? (i) => widths[i]
     : (i) =>

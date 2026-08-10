@@ -2741,6 +2741,38 @@
   overflow: hidden;
   padding: 0.92em 0.18em 0.08em;
 }
+.app-rhythm-grid-paper .sr-cell[data-grid-span="2"],
+.app-export-graph-paper .sr-cell[data-grid-span="2"],
+.app-export-graph-paper .sr-export .sr-cell[data-grid-span="2"]:has(.sr-sustain) {
+  width: calc(var(--sr-graph-cell-width) * 2);
+  min-width: calc(var(--sr-graph-cell-width) * 2);
+  max-width: calc(var(--sr-graph-cell-width) * 2);
+  background-image: linear-gradient(
+    to right,
+    transparent calc(50% - 0.5px),
+    var(--sr-graph-line) calc(50% - 0.5px),
+    var(--sr-graph-line) calc(50% + 0.5px),
+    transparent calc(50% + 0.5px)
+  );
+}
+.app-rhythm-grid-paper .sr-cell[data-grid-span="3"],
+.app-export-graph-paper .sr-cell[data-grid-span="3"],
+.app-export-graph-paper .sr-export .sr-cell[data-grid-span="3"]:has(.sr-sustain) {
+  width: calc(var(--sr-graph-cell-width) * 3);
+  min-width: calc(var(--sr-graph-cell-width) * 3);
+  max-width: calc(var(--sr-graph-cell-width) * 3);
+  background-image: linear-gradient(
+    to right,
+    transparent calc(33.333% - 0.5px),
+    var(--sr-graph-line) calc(33.333% - 0.5px),
+    var(--sr-graph-line) calc(33.333% + 0.5px),
+    transparent calc(33.333% + 0.5px),
+    transparent calc(66.666% - 0.5px),
+    var(--sr-graph-line) calc(66.666% - 0.5px),
+    var(--sr-graph-line) calc(66.666% + 0.5px),
+    transparent calc(66.666% + 0.5px)
+  );
+}
 .app-rhythm-grid-paper .sr-cell.sr-has-bol-lane,
 .app-export-graph-paper .sr-cell.sr-has-bol-lane,
 .app-export-graph-paper .sr-export .sr-cell.sr-has-bol-lane:has(.sr-sustain) {
@@ -2806,6 +2838,18 @@
   background: color-mix(in srgb, var(--sr-graph-label-bg) 74%, transparent);
   overflow: hidden;
 }
+.app-rhythm-grid-paper .sr-bol[data-grid-span="2"],
+.app-export-graph-paper .sr-bol[data-grid-span="2"] {
+  width: calc(var(--sr-graph-cell-width) * 2);
+  min-width: calc(var(--sr-graph-cell-width) * 2);
+  max-width: calc(var(--sr-graph-cell-width) * 2);
+}
+.app-rhythm-grid-paper .sr-bol[data-grid-span="3"],
+.app-export-graph-paper .sr-bol[data-grid-span="3"] {
+  width: calc(var(--sr-graph-cell-width) * 3);
+  min-width: calc(var(--sr-graph-cell-width) * 3);
+  max-width: calc(var(--sr-graph-cell-width) * 3);
+}
 .app-rhythm-grid-paper .sr-bol-cross-span,
 .app-export-graph-paper .sr-bol-cross-span {
   grid-row: 1 !important;
@@ -2855,10 +2899,6 @@
   width: 100%;
   min-width: 0;
 }
-.app-rhythm-grid-paper .sr-timed-slots[data-written-slots="3"],
-.app-export-graph-paper .sr-timed-slots[data-written-slots="3"] { font-size: 0.76em; }
-.app-rhythm-grid-paper .sr-timed-slots[data-written-slots="4"],
-.app-export-graph-paper .sr-timed-slots[data-written-slots="4"] { font-size: 0.68em; }
 .app-rhythm-grid-paper .sr-timed-slots[data-written-slots="5"],
 .app-rhythm-grid-paper .sr-timed-slots[data-written-slots="6"],
 .app-rhythm-grid-paper .sr-timed-slots[data-written-slots="7"],

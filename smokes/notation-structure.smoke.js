@@ -181,7 +181,10 @@ export const smokes = [
         );
         assert.equal(secondRow.dataset.graphColumns, firstRow.dataset.graphColumns);
         assert.ok(firstRow.querySelectorAll('.sr-graph-empty-cell').length > 0);
-        assert.ok(secondRow.querySelectorAll('.sr-graph-empty-cell').length > 0);
+        assert.ok(
+          secondRow.querySelectorAll('.sr-cell').length > 0,
+          'a dense replacement ending may use its complete allotted grid without overflow'
+        );
       } finally {
         globalThis.document = priorDocument;
         dom.window.close();
