@@ -18,6 +18,7 @@ export const VILAMBIT_COMMANDS = Object.freeze([
   'extract-loop',
   'apply-workspace',
   'open-file',
+  'load-library-source',
 ]);
 
 const COMMAND_SET = new Set(VILAMBIT_COMMANDS);
@@ -91,6 +92,8 @@ export function sanitizeVilambitState(value) {
   const position = Math.min(duration, Math.max(0, finite(value.position)));
   const source = value.source && typeof value.source === 'object'
     ? {
+        ...(typeof value.source.id === 'string' && /^[a-z0-9][a-z0-9._:-]{0,159}$/i.test(value.source.id.trim())
+          ? { id: value.source.id.trim() } : {}),
         name: text(value.source.name),
         kind: value.source.kind === 'video' ? 'video' : 'audio',
         ...(value.source.size != null && Number.isFinite(Number(value.source.size)) && Number(value.source.size) >= 0

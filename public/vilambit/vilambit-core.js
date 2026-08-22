@@ -530,6 +530,7 @@
   function createPublicSnapshot({
     ready = false,
     fileURL = null,
+    sourceId = null,
     fileName = '',
     fileSize = null,
     fileLastModified = null,
@@ -562,6 +563,8 @@
       ready: Boolean(ready),
       loaded,
       source: loaded ? {
+        ...(typeof sourceId === 'string' && /^[a-z0-9][a-z0-9._:-]{0,159}$/i.test(sourceId.trim())
+          ? { id: sourceId.trim() } : {}),
         name: typeof fileName === 'string' ? fileName : '',
         kind: isVideo ? 'video' : 'audio',
         ...(fileSize != null && Number.isFinite(Number(fileSize)) && Number(fileSize) >= 0

@@ -18,7 +18,7 @@ function statePayload(overrides = {}) {
   return {
     ready: true,
     loaded: true,
-    source: { name: 'Summer class.wav', kind: 'audio', size: 123456, lastModified: 1760000000000 },
+    source: { id: 'fm:summer-class', name: 'Summer class.wav', kind: 'audio', size: 123456, lastModified: 1760000000000 },
     duration: 6994,
     position: 2541,
     playing: false,
@@ -65,6 +65,7 @@ export const smokes = [
       });
       assert.equal(message.type, 'state');
       assert.equal(message.state.source.name, 'Summer class.wav');
+      assert.equal(message.state.source.id, 'fm:summer-class');
       assert.equal(message.state.position, 2541);
       assert.equal(message.state.source.size, 123456);
       assert.equal(message.state.waveformView.start, 2530);
@@ -103,6 +104,9 @@ export const smokes = [
       });
       assert.equal(makeVilambitCommand('apply-workspace', { lastPosition: 42 }).type, 'apply-workspace');
       assert.equal(makeVilambitCommand('open-file').type, 'open-file');
+      assert.equal(makeVilambitCommand('load-library-source', {
+        id: 'fm:record-2274', url: '/classaudio/record-2274.wav', name: 'Class source',
+      }).type, 'load-library-source');
     },
   },
   {
@@ -168,6 +172,8 @@ export const smokes = [
       assert.match(app, /apply-workspace/);
       assert.match(app, /jump-marker/);
       assert.match(app, /extract-loop/);
+      assert.match(app, /load-library-source/);
+      assert.match(app, /loadArchiveURL\(payload\.url, payload\.name, sourceId\)/);
       assert.match(app, /sliceChannels\(state\.decoded/);
       assert.match(app, /type: 'clip'/);
       assert.doesNotMatch(app, /payload:\s*state\b/);

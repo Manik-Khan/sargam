@@ -50,7 +50,7 @@ if (window.frameElement && window.MutationObserver){
 }
 
 const state = {
-  fileURL: null, fileURLRevocable: false, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
+  fileURL: null, fileURLRevocable: false, sourceId: null, fileName: '', fileSize: null, fileLastModified: null, isVideo: false,
   archive: false,
   engine: 'none',            // 'buffer' | 'video' | 'fallback'
   tempo: 100, semitones: 0, cents: 0,
@@ -846,6 +846,7 @@ function resetSourceState(source){
   Object.assign(state, {
     fileURL: source.url,
     fileURLRevocable: Boolean(source.revocable),
+    sourceId: typeof source.id === 'string' ? source.id : null,
     fileName: source.name,
     archive: Boolean(source.archive),
     engine: 'none',
@@ -952,6 +953,7 @@ function loadFile(file){
   const generation = resetSourceState({
     url: URL.createObjectURL(file),
     revocable: true,
+    id: null,
     name: file.name,
     size: file.size,
     lastModified: file.lastModified,
@@ -1040,12 +1042,13 @@ async function loadArchiveEqProfiles(raw){
   }
 }
 
-function loadArchiveURL(raw, displayName){
+function loadArchiveURL(raw, displayName, sourceId = null){
   try {
     const url = archiveSourceURL(raw);
     resetSourceState({
       url: url.href,
       revocable: false,
+      id: typeof sourceId === 'string' ? sourceId.trim() : null,
       name: String(displayName || '').trim() || fileNameFromURL(url.href),
       size: null,
       lastModified: null,
@@ -1068,7 +1071,7 @@ function loadArchiveURLFromQuery(){
   const source = params.get('src');
   if (!source) return false;
   setArchiveMode(true);
-  const loaded = loadArchiveURL(source, params.get('name'));
+  const loaded = loadArchiveURL(source, params.get('name'), params.get('id'));
   if (loaded) loadArchiveEqProfiles(params.get('eqprofiles'));
   return loaded;
 }
@@ -2763,6 +2766,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   const BRIDGE_COMMANDS = new Set([
     'request-state', 'play', 'pause', 'toggle', 'seek', 'skip',
     'set-loop', 'clear-loop', 'jump-marker', 'extract-loop', 'apply-workspace', 'open-file',
+    'load-library-source',
   ]);
   const bridgeTargetOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
   let bridgeError = null;
@@ -2779,6 +2783,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
     return Core.createPublicSnapshot({
       ready: true,
       fileURL: state.fileURL,
+      sourceId: state.sourceId,
       fileName: state.fileName,
       fileSize: state.fileSize,
       fileLastModified: state.fileLastModified,
@@ -2860,6 +2865,17 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
     if (type === 'request-state') return;
     if (type === 'open-file') {
       $('fileInput').click();
+      return;
+    }
+    if (type === 'load-library-source') {
+      const sourceId = String(payload && payload.id || '').trim();
+      if (!/^[a-z0-9][a-z0-9._:-]{0,159}$/i.test(sourceId)) {
+        throw new TypeError('Library playback requires a stable source id.');
+      }
+      setArchiveMode(true);
+      const loaded = loadArchiveURL(payload.url, payload.name, sourceId);
+      if (!loaded) throw new Error('The selected archive recording could not be loaded.');
+      await loadArchiveEqProfiles(payload.eqProfilesUrl);
       return;
     }
     if (!state.fileURL) throw new Error('Load a recording in Vilambit first.');

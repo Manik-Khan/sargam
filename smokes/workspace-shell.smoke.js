@@ -5,7 +5,7 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), 'utf8');
 
 export const smokes = [
   {
-    name: 'workspace shell: branded header exposes Music, Notation, File, and Queue',
+    name: 'workspace shell: branded header exposes Music, Notation, File, Library, and Queue',
     async fn() {
       const toolbar = await read('../src/shell/Toolbar.jsx');
       for (const phrase of [
@@ -13,13 +13,15 @@ export const smokes = [
         'Notation',
         'Music',
         'File',
+        'Library',
+        'Linked phrases',
         'Queue',
         'Open recording',
       ]) {
         assert.ok(toolbar.includes(phrase), `missing ${phrase}`);
       }
       assert.doesNotMatch(toolbar, /File\s*<span[^>]*>\d/);
-      assert.doesNotMatch(toolbar, /Queue\s*<span[^>]*>\d/);
+      assert.match(toolbar, /workspace-queue-count/);
       assert.match(toolbar, />Save<\/button>/);
       assert.match(toolbar, />Print \/ PDF<\/button>/);
     },

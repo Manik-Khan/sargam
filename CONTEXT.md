@@ -6,6 +6,16 @@
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
 
+## August 19 Library and Queue Wave 1
+
+- **Library**, **Linked phrases**, and **Queue** are now separate shell surfaces. Library is the durable project/archive catalog; Linked phrases retains composition-specific notation A–B links; Queue is temporary listening-session order. Playlist remains later.
+- The pure session controller owns current, ordered upcoming items, history, and repeat mode. It smoke-covers add-without-interrupting, reorder, remove, clear, next/previous, repeat track, repeat queue, and the A–B exit policy.
+- An active A–B loop blocks automatic advancement. Pressing **Next** explicitly clears the loop and advances.
+- Project `media.json` sources form the first Library adapter. A stable record ID is mandatory. Only controlled same-origin HTTP(S) URLs are reopenable; a loaded local file remains visible but explicitly requires reconnection before it can be queued.
+- The same-origin player bridge accepts `load-library-source`, republishes the stable source ID, and restores the matched `workspace.json` state before queued autoplay. It never binds by filename.
+- The FileMaker/archive catalog adapter and real Chrome 109 / Windows 8.1 acceptance remain the next integration wave. The binding contract is recorded in `docs/library-queue.md`.
+- Verification at this checkpoint: **621 checks passed, 0 failed**, and the production build succeeded with 120 modules transformed. The existing large-chunk advisory remains non-blocking.
+
 ## August 10–19 print, rhythm, and playback checkpoint
 
 - A matra is always one **logical** rhythmic cell, but it is no longer forced into one narrow physical square in every view. Dense subdivisions, long kan/slide ornaments, and phrase reports may reserve two or three adjacent graph columns while remaining one selectable/editable matra with one timing identity. The notation cell, its bol lane, arcs, selection, system planning, and print geometry must use the same span. This supersedes the earlier assumption that every written matra must occupy exactly one physical graph column; preserving legibility takes precedence over making every box equally narrow.
@@ -14,7 +24,7 @@ Manik is the musical and product authority. Never invent raga, tala, bol, orname
 - Chikari is audible in playback as a separate short upper-Sa articulation without replacing the melody event. Sound Settings persist a **Soft string**, **Rounded tone**, or **Clear string** choice plus intensity, length, and brightness. The default is deliberately soft. Both a note-attached `chikari` and an exact gap `^` use this voice.
 - Local meter spans remain descriptive/validating overlays on the rhythm already written; they do not retime the line, move sam/khali, or replace the tala. The companion syntax requires whitespace between the ratio and range, for example `>> 3/2 @0..8`; multiple spans are separated by semicolons. The normal workflow is still to select the attacks and let Sargam write the exact rational offsets. Playback timing comes from the actual subdivisions in the notation source.
 - A bounded Gat return cue uses `gat@START..@STOP`. For example, `gat@9..@1` enters the nearest preceding Gat at cycle matra 9, plays until—but not including—the next matra 1, then resumes with the following written line on sam. It disambiguates a partial return even when the Gat spans multiple cycles. Export intentionally prints the reader-facing instruction simply as *gat*; the exact range remains source/playback structure.
-- Verification at this checkpoint: **607 functional checks passed** and the production build succeeded with 116 modules transformed. One repository-hygiene check still reports tracked Finder `.DS_Store` metadata; it is unrelated to notation behavior but should be cleaned before a release. The existing large-chunk build advisory remains non-blocking.
+- Verification at this checkpoint: **608 checks passed, 0 failed**, and the production build succeeded with 116 modules transformed. Tracked Finder `.DS_Store` metadata and the remaining numbered conflict copies were removed in the dedicated repository-cleanup pass. The existing large-chunk build advisory remains non-blocking.
 
 ## August 7 stabilization note
 
@@ -29,7 +39,7 @@ Manik is the musical and product authority. Never invent raga, tala, bol, orname
 - Grid users can persist either **Cells** (only written matras are boxed) or **Graph Paper** (an actual matrix in which every written cell is one logical matra and trailing empty columns are real cell elements) across both the rendered score and Grid Write. PDF export separately offers Clean, Matra cells, and the same real-cell Graph Paper matrix. Ordinary matras occupy one physical column; dense or ornament-heavy matras may reserve two or three while retaining one timing/editing identity. Repeats and cues have their own structural columns, and line planning must use the full available row without shrinking content into illegibility. Subdivisions, kan/approach ornaments, and repeat endings remain inside their owning logical matra. Line repeats `||:` / `:||` occupy their own non-musical structural grid positions before/after the repeated matras; they never share, shrink, or cover a note cell. Graph-paper descriptions, section labels, and numbered cues sit in compact inter-row strips rather than consuming a full matra-height row; their background cells remain pinned to the printable width. Rendered bol lanes occupy a small per-matra strip whose subdivisions share the note attack grid. The view changes without changing Markdown, timing, or playback math. Tala markers remain inset in their upper-left coordinate lane instead of following delayed attacks into vibhag dividers.
 - The graph-grid preference and the PDF page, typeface, grid, and ink choices persist locally.
 - `docs/release-checklist.md` is now the repeatable writing, playback, print, and restoration acceptance gate.
-- Active implementation files never use numbered conflict-copy suffixes. Some historical numbered copies and tracked Finder metadata are still present in the clone; do not treat them as authoritative, and remove them in a dedicated repository-cleanup pass before release.
+- Active implementation files never use numbered conflict-copy suffixes. The historical numbered copies and tracked Finder metadata were removed in the August 19 repository-cleanup pass; do not restore them.
 - Verification at this checkpoint: **602 checks passed, 0 failed**; the production build succeeded with the existing non-blocking large-chunk advisory.
 - Any future richer direct manipulation—deleting or reordering cells, creating whole lines, or editing attachment lanes—must continue to use parser-backed source identities rather than guessing at spaces or ornaments.
 
@@ -165,9 +175,9 @@ Do not casually reopen:
 - folded generated metadata in Clean mode and exact source in Structure mode;
 - Bol Capture's notation-derived structural lane.
 
-## Next product phase — Library and Queue
+## Library and Queue — first implementation slice
 
-The next session should begin with a product model and mock, not immediate implementation.
+The product mock was approved and the first pure controller and shell slice is implemented.
 
 ### Product rulings to carry forward
 
@@ -181,15 +191,13 @@ The next session should begin with a product model and mock, not immediate imple
 - Selecting a recording should restore its saved workspace, including EQ, loop, markers, position, and waveform view.
 - FileMaker/archive integration should use stable record identity.
 
-### Recommended implementation order
+### Remaining implementation order
 
-1. Mock and approve Library, current recording, Queue, and later Playlist boundaries.
-2. Define a pure queue/session controller with direct smoke coverage.
-3. Build minimal add-without-interrupting, reorder, remove, clear, next/previous, and repeat behavior.
-4. Connect the archive/FileMaker adapter through stable record IDs.
-5. Add durable named playlists only after the transient queue feels correct.
-6. Build Practice Sets on the same sequencing foundation: excerpts, repetitions, timed steps, rests, and speed ladders.
-7. Consider authenticated community EQ submission/voting only after the LAN archive workflow and ownership rules are established.
+1. Connect the real archive/FileMaker adapter through stable record IDs and controlled same-origin URLs.
+2. Browser-accept Library, reconnection, queue order, A–B exit, repeat, and workspace restoration against the real archive host.
+3. Add durable named playlists only after the transient queue feels correct.
+4. Build Practice Sets on the same sequencing foundation: excerpts, repetitions, timed steps, rests, and speed ladders.
+5. Consider authenticated community EQ submission/voting only after the LAN archive workflow and ownership rules are established.
 
 ## Binding architecture and working rules
 

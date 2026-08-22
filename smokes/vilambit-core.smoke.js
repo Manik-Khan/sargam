@@ -270,6 +270,7 @@ export const smokes = [
       const snapshot = core.createPublicSnapshot({
         ready: true,
         fileURL: 'blob:local-recording',
+        sourceId: 'fm:summer-class',
         fileName: 'Summer class.wav',
         duration: 120,
         position: 130,
@@ -286,7 +287,7 @@ export const smokes = [
       assert.deepEqual(JSON.parse(JSON.stringify(snapshot)), {
         ready: true,
         loaded: true,
-        source: { name: 'Summer class.wav', kind: 'audio' },
+        source: { id: 'fm:summer-class', name: 'Summer class.wav', kind: 'audio' },
         duration: 120,
         position: 120,
         playing: true,

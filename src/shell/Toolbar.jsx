@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import LibraryDrawer from './LibraryDrawer.jsx';
+import QueueDrawer from './QueueDrawer.jsx';
 
 export default function Toolbar({
   fileName,
@@ -30,17 +32,36 @@ export default function Toolbar({
   onRemoveRecent,
   sourceName,
   onOpenRecording,
-  queueItems = [],
-  onQueueItem,
+  libraryItems = [],
+  queuedLibraryIds = [],
+  onLibraryPlay,
+  onLibraryAdd,
+  linkedPhraseItems = [],
+  onLinkedPhrase,
+  queueSession,
+  queueLoopActive,
+  onQueueMove,
+  onQueueRemove,
+  onQueueClear,
+  onQueuePrevious,
+  onQueueNext,
+  onQueueRepeatMode,
 }) {
   const [openMenu, setOpenMenu] = useState(null);
   const sourcesRef = useRef(null);
+  const libraryRef = useRef(null);
+  const linkedRef = useRef(null);
   const queueRef = useRef(null);
 
   useEffect(() => {
     if (!openMenu) return undefined;
     const close = (event) => {
-      const activeRef = openMenu === 'sources' ? sourcesRef : queueRef;
+      const activeRef = {
+        sources: sourcesRef,
+        library: libraryRef,
+        linked: linkedRef,
+        queue: queueRef,
+      }[openMenu];
       if (!activeRef.current?.contains(event.target)) setOpenMenu(null);
     };
     const escape = (event) => {
@@ -208,6 +229,68 @@ export default function Toolbar({
           )}
         </div>
 
+        <div className="workspace-menu-wrap" ref={libraryRef}>
+          <button
+            type="button"
+            className={'workspace-menu-toggle' + (openMenu === 'library' ? ' is-open' : '')}
+            aria-expanded={openMenu === 'library'}
+            onClick={() => toggleMenu('library')}
+          >
+            Library <span aria-hidden="true">▾</span>
+          </button>
+          {openMenu === 'library' && (
+            <LibraryDrawer
+              items={libraryItems}
+              queuedLibraryIds={queuedLibraryIds}
+              onPlay={onLibraryPlay}
+              onAdd={onLibraryAdd}
+              onOpenRecording={() => run(onOpenRecording)}
+              onClose={() => setOpenMenu(null)}
+            />
+          )}
+        </div>
+
+        <div className="workspace-menu-wrap" ref={linkedRef}>
+          <button
+            type="button"
+            className={'workspace-menu-toggle' + (openMenu === 'linked' ? ' is-open' : '')}
+            aria-expanded={openMenu === 'linked'}
+            onClick={() => toggleMenu('linked')}
+          >
+            Linked phrases <span aria-hidden="true">▾</span>
+          </button>
+          {openMenu === 'linked' && (
+            <div className="workspace-drawer workspace-linked-drawer">
+              <div className="workspace-drawer-heading">
+                <div>
+                  <span>Current composition</span>
+                  <strong>Linked phrases</strong>
+                </div>
+                <button type="button" aria-label="Close linked phrases" onClick={() => setOpenMenu(null)}>×</button>
+              </div>
+              {linkedPhraseItems.length === 0 ? (
+                <p className="workspace-drawer-empty">
+                  Attach an A–B loop to a notation passage and it will appear here.
+                </p>
+              ) : (
+                <div className="workspace-queue-list">
+                  {linkedPhraseItems.map((item, index) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className={item.active ? 'is-active' : ''}
+                      onClick={() => run(() => onLinkedPhrase?.(item.id))}
+                    >
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <span><strong>{item.label}</strong><small>{item.detail}</small></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="workspace-menu-wrap" ref={queueRef}>
           <button
             type="button"
@@ -215,40 +298,22 @@ export default function Toolbar({
             aria-expanded={openMenu === 'queue'}
             onClick={() => toggleMenu('queue')}
           >
-            Queue <span aria-hidden="true">▾</span>
+            Queue
+            {queueSession?.upcoming?.length > 0 && <b className="workspace-queue-count">{queueSession.upcoming.length}</b>}
+            <span aria-hidden="true">▾</span>
           </button>
           {openMenu === 'queue' && (
-            <div className="workspace-drawer workspace-queue-drawer">
-              <div className="workspace-drawer-heading">
-                <div>
-                  <span>Current project</span>
-                  <strong>Practice queue</strong>
-                </div>
-                <button type="button" aria-label="Close queue" onClick={() => setOpenMenu(null)}>×</button>
-              </div>
-              {queueItems.length === 0 ? (
-                <p className="workspace-drawer-empty">
-                  Attach an A–B loop to a passage in the notation and it will appear here.
-                </p>
-              ) : (
-                <div className="workspace-queue-list">
-                  {queueItems.map((item, index) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      className={item.active ? 'is-active' : ''}
-                      onClick={() => run(() => onQueueItem?.(item.id))}
-                    >
-                      <span>{String(index + 1).padStart(2, '0')}</span>
-                      <span>
-                        <strong>{item.label}</strong>
-                        <small>{item.detail}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <QueueDrawer
+              session={queueSession}
+              loopActive={queueLoopActive}
+              onMove={onQueueMove}
+              onRemove={onQueueRemove}
+              onClear={onQueueClear}
+              onPrevious={onQueuePrevious}
+              onNext={onQueueNext}
+              onRepeatMode={onQueueRepeatMode}
+              onClose={() => setOpenMenu(null)}
+            />
           )}
         </div>
 

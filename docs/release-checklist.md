@@ -59,6 +59,17 @@ The command must end with every smoke check passing and a successful production 
 - Close and reopen Export; the last-used page, typeface, grid, and ink choices must return.
 - For a physical-printer check, verify mandra notes, tala markers, and held-beat dashes remain readable in grayscale.
 
+## Library and Queue
+
+- Open **Library** and confirm catalog recordings are separate from composition-specific **Linked phrases**.
+- While one archive recording is playing, choose **Add next** on another. Confirm the current recording continues without seeking, pausing, or losing its workspace.
+- Reorder upcoming items, remove one, and clear the list. Confirm none of those operations changes the current recording.
+- Test Previous and Next, Repeat track, and Repeat queue. Confirm history and the accepted order remain predictable.
+- Enable an A–B loop with an upcoming recording. Confirm automatic advancement remains blocked; press **Next** and confirm the loop clears and the next recording loads.
+- Load an archive item and confirm its stable source identity is returned before position, loop, markers, speed, pitch, waveform view, and EQ restore.
+- Load a local file, then inspect Library. Confirm it is shown as current but cannot be queued for later without reconnection. A same-named file must never be selected automatically.
+- Disconnect or invalidate an archive media URL. Confirm the Library record remains visible as unavailable and no substitute recording loads.
+
 ## Files and restoration
 
 - Save, close, and reopen the Markdown file.

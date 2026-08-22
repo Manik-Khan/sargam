@@ -67,9 +67,9 @@ This state travels automatically inside project folders and portable `.sargam`
 packages. The standalone Save/Load session JSON remains a manual compatibility
 path, not the primary project workflow.
 
-## Current next phase — Library and Queue
+## Current phase — Library and Queue Wave 1
 
-Begin with a product mock and explicit distinction:
+The approved product distinction is now implemented in the shell:
 
 - **Library:** durable archive/catalog surface;
 - **Queue:** temporary listening-session order;
@@ -78,10 +78,12 @@ Begin with a product mock and explicit distinction:
 The left Sargam rail must not become a growing source list. Current recording
 belongs to Music/File context; Queue may be a collapsible utility surface.
 
-The first implementation should be a pure queue/session controller supporting
-add-without-interrupting, reorder, remove, clear, next/previous, repeat track,
-and repeat queue. Named playlists and Practice Sets should reuse this
-foundation only after the queue interaction is accepted.
+The pure queue/session controller now supports add-without-interrupting,
+reorder, remove, clear, next/previous, repeat track, and repeat queue. The
+same-origin player bridge can load a controlled Library source by stable ID.
+See `docs/library-queue.md` for the binding contract. Named playlists and
+Practice Sets should reuse this foundation only after the queue interaction is
+accepted against the real archive.
 
 The LAN player should load stable record IDs rather than raw network paths,
 preserve the active recording while tracks are queued, restore per-recording

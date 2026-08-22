@@ -80,6 +80,21 @@ import {
   upsertSourceWorkspaceEntry,
 } from '../engine/source-workspace.js';
 import {
+  addQueueItem,
+  advanceQueue,
+  clearQueue,
+  createQueueSession,
+  moveQueueItem,
+  playQueueItem,
+  previousQueueItem,
+  removeQueueItem,
+  setQueueRepeatMode,
+} from '../engine/session-queue.js';
+import {
+  buildLibraryCatalog,
+  libraryQueueItem,
+} from '../engine/library.js';
+import {
   extractionRangeForLink,
   updateClipLoopAsset,
 } from '../engine/clip-loop.js';
@@ -218,10 +233,14 @@ export default function App() {
   const [selectedAudioLinkId, setSelectedAudioLinkId] = useState(null);
   const [vilambitState, setVilambitState] = useState(EMPTY_VILAMBIT_STATE);
   const vilambitStateRef = useRef(EMPTY_VILAMBIT_STATE);
+  const [queueSession, setQueueSession] = useState(() => createQueueSession());
+  const queueSessionRef = useRef(queueSession);
+  const queueAutoplayRef = useRef(null);
   const projectWorkspaceRef = useRef(projectWorkspace);
   const workspaceBindingRef = useRef(null);
   const workspaceWriteRef = useRef({ timer: null, project: null, projectId: null, workspace: null });
   projectWorkspaceRef.current = projectWorkspace;
+  queueSessionRef.current = queueSession;
   const editorRef = useRef(null);
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
@@ -294,7 +313,7 @@ export default function App() {
     () => audioLinkModel.links.find((link) => link.id === selectedAudioLinkId) || null,
     [audioLinkModel.links, selectedAudioLinkId]
   );
-  const queueItems = useMemo(
+  const linkedPhraseItems = useMemo(
     () => audioLinkModel.links.map((link, index) => ({
       id: link.id,
       label: `Linked phrase ${index + 1}`,
@@ -302,6 +321,30 @@ export default function App() {
       active: linkedPlayback?.linkId === link.id,
     })),
     [audioLinkModel.links, linkedPlayback]
+  );
+  const currentLibrarySource = useMemo(() => {
+    if (!vilambitState.loaded || !vilambitState.source || vilambitState.duration <= 0) return null;
+    const workspaceSourceId = sourceAssetIdFromReference({
+      ...vilambitState.source,
+      duration: vilambitState.duration,
+    });
+    return {
+      ...vilambitState.source,
+      id: vilambitState.source.id || workspaceSourceId,
+      workspaceSourceId,
+      duration: vilambitState.duration,
+    };
+  }, [vilambitState.duration, vilambitState.loaded, vilambitState.source]);
+  const libraryItems = useMemo(
+    () => buildLibraryCatalog(projectMedia.sources, {
+      baseUrl: window.location.href,
+      current: currentLibrarySource,
+    }),
+    [currentLibrarySource, projectMedia.sources]
+  );
+  const queuedLibraryIds = useMemo(
+    () => queueSession.upcoming.map((item) => item.libraryId),
+    [queueSession.upcoming]
   );
   const allProblems = useMemo(
     () => [...problems, ...meterModel.problems, ...anchorModel.problems, ...audioLinkModel.problems],
@@ -394,6 +437,141 @@ export default function App() {
       eq: { ...(currentEntry?.eq || {}), ...nextEntry.eq },
     }));
   }, [project, projectWorkspace, sendVilambit, vilambitState]);
+
+  const applyQueueEffect = useCallback((effect) => {
+    if (!effect || effect.type === 'none' || effect.type === 'blocked') return;
+    if (effect.type === 'load') {
+      const item = effect.item;
+      if (!item?.available || !item.sourceUrl) {
+        queueAutoplayRef.current = null;
+        setView('vilambit');
+        setNotice(`“${item?.title || 'This recording'}” needs reconnection before it can play.`);
+        return;
+      }
+      queueAutoplayRef.current = item.libraryId;
+      setView('vilambit');
+      const sent = sendVilambit('load-library-source', {
+        id: item.libraryId,
+        name: item.title,
+        url: item.sourceUrl,
+        ...(item.eqProfilesUrl ? { eqProfilesUrl: item.eqProfilesUrl } : {}),
+      });
+      if (!sent) {
+        queueAutoplayRef.current = null;
+        setNotice('Sargam Music is not ready to load that Library recording.');
+      }
+      return;
+    }
+    if (effect.type === 'play') {
+      setView('vilambit');
+      sendVilambit('play');
+      return;
+    }
+    if (effect.type === 'restart') {
+      sendVilambit('clear-loop');
+      sendVilambit('seek', { seconds: 0 });
+      sendVilambit('play');
+      return;
+    }
+    if (effect.type === 'stop') sendVilambit('pause');
+  }, [sendVilambit]);
+
+  const commitQueueResult = useCallback((result) => {
+    if (!result?.session) return;
+    queueSessionRef.current = result.session;
+    setQueueSession(result.session);
+    applyQueueEffect(result.effect);
+  }, [applyQueueEffect]);
+
+  const doLibraryPlay = useCallback((item) => {
+    if (!item) return;
+    if (item.current && !item.reopenable) {
+      setView('vilambit');
+      sendVilambit('play');
+      return;
+    }
+    if (!item.reopenable) {
+      setNotice(`“${item.name}” needs reconnection before it can play.`);
+      return;
+    }
+    commitQueueResult(playQueueItem(queueSessionRef.current, libraryQueueItem(item)));
+  }, [commitQueueResult, sendVilambit]);
+
+  const doLibraryAdd = useCallback((item) => {
+    if (!item?.reopenable) {
+      setNotice(`“${item?.name || 'This recording'}” needs reconnection before it can be queued.`);
+      return;
+    }
+    const next = addQueueItem(queueSessionRef.current, libraryQueueItem(item));
+    queueSessionRef.current = next;
+    setQueueSession(next);
+    setNotice(`Added “${item.name}” to Queue without interrupting the current recording.`);
+  }, []);
+
+  const doQueueNext = useCallback(() => {
+    if (vilambitStateRef.current.loop?.on) sendVilambit('clear-loop');
+    commitQueueResult(advanceQueue(queueSessionRef.current, {
+      reason: 'manual',
+      loopActive: Boolean(vilambitStateRef.current.loop?.on),
+    }));
+  }, [commitQueueResult, sendVilambit]);
+
+  const doQueuePrevious = useCallback(() => {
+    if (vilambitStateRef.current.loop?.on) sendVilambit('clear-loop');
+    commitQueueResult(previousQueueItem(queueSessionRef.current));
+  }, [commitQueueResult, sendVilambit]);
+
+  const doQueueMove = useCallback((queueId, index) => {
+    const next = moveQueueItem(queueSessionRef.current, queueId, index);
+    queueSessionRef.current = next;
+    setQueueSession(next);
+  }, []);
+
+  const doQueueRemove = useCallback((queueId) => {
+    const next = removeQueueItem(queueSessionRef.current, queueId);
+    queueSessionRef.current = next;
+    setQueueSession(next);
+  }, []);
+
+  const doQueueClear = useCallback(() => {
+    const next = clearQueue(queueSessionRef.current);
+    queueSessionRef.current = next;
+    setQueueSession(next);
+  }, []);
+
+  const doQueueRepeatMode = useCallback((mode) => {
+    const next = setQueueRepeatMode(queueSessionRef.current, mode);
+    queueSessionRef.current = next;
+    setQueueSession(next);
+  }, []);
+
+  useEffect(() => {
+    if (!currentLibrarySource) return;
+    if (queueSessionRef.current.current?.libraryId === currentLibrarySource.id) return;
+    const catalogItem = libraryItems.find((item) => item.libraryId === currentLibrarySource.id);
+    const currentItem = catalogItem
+      ? { ...libraryQueueItem(catalogItem), available: true }
+      : {
+          libraryId: currentLibrarySource.id,
+          workspaceSourceId: currentLibrarySource.workspaceSourceId,
+          title: currentLibrarySource.name,
+          kind: currentLibrarySource.kind,
+          duration: currentLibrarySource.duration,
+          available: true,
+          detail: 'Current local recording',
+        };
+    const result = playQueueItem(queueSessionRef.current, currentItem);
+    queueSessionRef.current = result.session;
+    setQueueSession(result.session);
+  }, [currentLibrarySource, libraryItems]);
+
+  useEffect(() => {
+    const pendingId = queueAutoplayRef.current;
+    if (!pendingId || !currentLibrarySource || vilambitState.duration <= 0) return;
+    if (currentLibrarySource.id !== pendingId) return;
+    queueAutoplayRef.current = null;
+    sendVilambit('play');
+  }, [currentLibrarySource, sendVilambit, vilambitState.duration]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1375,9 +1553,19 @@ export default function App() {
     } else if (active?.kind === 'source' && previous.playing && !state.playing) {
       setLinkedPlaybackState(null);
     }
+    const naturallyEnded = previous.playing
+      && !state.playing
+      && state.duration > 0
+      && state.position >= state.duration - 0.25;
     vilambitStateRef.current = state;
     setVilambitState(state);
-  }, [setLinkedPlaybackState, stopLinkedPlayback]);
+    if (naturallyEnded) {
+      commitQueueResult(advanceQueue(queueSessionRef.current, {
+        reason: 'ended',
+        loopActive: Boolean(state.loop?.on),
+      }));
+    }
+  }, [commitQueueResult, setLinkedPlaybackState, stopLinkedPlayback]);
 
   const doAttachAudioLoop = (playerState = vilambitState) => {
     const el = editorRef.current;
@@ -2002,11 +2190,23 @@ export default function App() {
         onRemoveRecent={removeRecent}
         sourceName={vilambitState.source?.name || null}
         onOpenRecording={openRecordingPicker}
-        queueItems={queueItems}
-        onQueueItem={(id) => {
+        libraryItems={libraryItems}
+        queuedLibraryIds={queuedLibraryIds}
+        onLibraryPlay={doLibraryPlay}
+        onLibraryAdd={doLibraryAdd}
+        linkedPhraseItems={linkedPhraseItems}
+        onLinkedPhrase={(id) => {
           const link = audioLinkModel.links.find((item) => item.id === id);
           if (link) activateAudioLink(link, { play: true });
         }}
+        queueSession={queueSession}
+        queueLoopActive={Boolean(vilambitState.loop?.on)}
+        onQueueMove={doQueueMove}
+        onQueueRemove={doQueueRemove}
+        onQueueClear={doQueueClear}
+        onQueuePrevious={doQueuePrevious}
+        onQueueNext={doQueueNext}
+        onQueueRepeatMode={doQueueRepeatMode}
       />
       {notice && (
         <div className="app-notice">
