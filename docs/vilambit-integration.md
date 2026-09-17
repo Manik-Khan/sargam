@@ -83,9 +83,10 @@ reorder, remove, clear, next/previous, repeat track, and repeat queue. The
 same-origin player bridge can load a controlled Library source by stable ID.
 See `docs/library-queue.md` for the binding contract. Named playlists and
 Practice Sets should reuse this foundation only after the queue interaction is
-accepted against the real archive.
+accepted with real Sargam project recordings.
 
-The LAN player should load stable record IDs rather than raw network paths,
-preserve the active recording while tracks are queued, restore per-recording
-workspace only after identity validation, and remain testable against Chrome
-109 on the Windows 8.1 archive computer.
+The LAN/FileMaker player is a separate build, not the next Sargam integration
+wave. If that build reuses the shared player boundary, it should load stable
+record IDs rather than raw network paths, preserve the active recording while
+tracks are queued, and restore per-recording workspace only after identity
+validation.

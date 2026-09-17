@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "repo:preflight": "node scripts/repo-preflight.mjs",
+    "repo:preflight:remote": "node scripts/repo-preflight.mjs --remote",
     "dev": "vite",
     "build": "vite build",
     "build:player-server": "node scripts/build-player-server.mjs",

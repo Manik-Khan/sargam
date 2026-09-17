@@ -14,6 +14,8 @@
 import { getTal, wrapMatra, vibhagOfMatra, markerAtMatra } from './tala.js';
 import {
   performedMatraCount,
+  performedOffsetAt,
+  matraDuration,
   performedWrittenOrder,
 } from './performed-time.js';
 import { meterTicksForMatra, rationalNumber } from './meter.js';
@@ -108,11 +110,11 @@ export function scheduleDocument(doc, opts = {}) {
 
   const findEntry = (section, desiredMatra) => {
     const targetTal = section?.tal === 'free' ? null : getTal(section?.tal);
-    if (!targetTal || !Number.isInteger(desiredMatra)) return null;
+    if (!targetTal || !Number.isFinite(desiredMatra)) return null;
     for (let lineIndex = 0; lineIndex < (section.lines || []).length; lineIndex++) {
       const candidate = section.lines[lineIndex];
       for (let matraIndex = 0; matraIndex < (candidate.matras || []).length; matraIndex++) {
-        if (wrapMatra(targetTal, (candidate.startMatra || 1) + matraIndex) === desiredMatra) {
+        if (wrapMatra(targetTal, (candidate.startMatra || 1) + performedOffsetAt(candidate, matraIndex)) === desiredMatra) {
           return { lineIndex, matraIndex };
         }
       }
@@ -130,7 +132,7 @@ export function scheduleDocument(doc, opts = {}) {
     for (let lineIndex = 0; lineIndex < (section.lines || []).length; lineIndex++) {
       const candidate = section.lines[lineIndex];
       for (let matraIndex = 0; matraIndex < (candidate.matras || []).length; matraIndex++) {
-        const cycleMatra = wrapMatra(targetTal, (candidate.startMatra || 1) + matraIndex);
+        const cycleMatra = wrapMatra(targetTal, (candidate.startMatra || 1) + performedOffsetAt(candidate, matraIndex));
         if (!start && cycleMatra === startMatra) {
           start = { lineIndex, matraIndex };
           continue;
@@ -219,7 +221,7 @@ export function scheduleDocument(doc, opts = {}) {
       if (pass === 0 && Number.isInteger(startMatraIndex)) {
         const entry = passOrder.findIndex((matraIndex) => matraIndex === startMatraIndex);
         if (entry >= 0) {
-          entryOrderOffset = entry;
+          entryOrderOffset = passOrder.slice(0, entry).reduce((sum, i) => sum + matraDuration(line, i), 0);
           passOrder = passOrder.slice(entry);
         }
       }
@@ -230,8 +232,13 @@ export function scheduleDocument(doc, opts = {}) {
       // (matraIndex:eventIndex) → scheduled note, for span resolution.
       const placed = new Map();
       let ringing = null; // last note event, for whole-matra sustains
-      passOrder.forEach((matraIndex, playedOrdinal) => {
+      let playedOffset = 0;
+      passOrder.forEach((matraIndex) => {
         const matraStart = t;
+        const beatDuration = matraDuration(line, matraIndex);
+        const cellSeconds = spm * beatDuration;
+        const cycleOffset = passOffset + entryOrderOffset + playedOffset;
+        playedOffset += beatDuration;
         events.push({
           kind: 'cursor',
           t: matraStart,
@@ -244,7 +251,7 @@ export function scheduleDocument(doc, opts = {}) {
         if (tal) {
           const cycleMatra = wrapMatra(
             tal,
-            (line.startMatra || 1) + passOffset + entryOrderOffset + playedOrdinal
+            (line.startMatra || 1) + cycleOffset
           );
           let accent = 'plain';
           if (markerAtMatra(tal, cycleMatra) !== null) {
@@ -262,7 +269,7 @@ export function scheduleDocument(doc, opts = {}) {
         // A local meter is structural, but it never moves the surrounding
         // tala. Its exact rational grid repeats with the written phrase and
         // becomes audible as quieter subdivision clicks.
-        for (const tick of meterTicksForMatra(meterSpans, line.sourceLine, matraIndex)) {
+        for (const tick of meterTicksForMatra(meterSpans, line.sourceLine, matraIndex, line)) {
           events.push({
             kind: 'tick',
             t: matraStart + rationalNumber(tick.offset) * spm,
@@ -276,10 +283,10 @@ export function scheduleDocument(doc, opts = {}) {
 
         // Whole-matra sustain: extend whatever is ringing.
         if (evs.length === 1 && evs[0].type === 'sustain') {
-          const sustainDur = spm * (evs[0].dur.num / evs[0].dur.den);
+          const sustainDur = cellSeconds * (evs[0].dur.num / evs[0].dur.den);
           addGapChikaris(matraIndex, 0, evs[0], matraStart, sustainDur);
           if (ringing) ringing.dur += sustainDur;
-          t = matraStart + spm;
+          t = matraStart + cellSeconds;
           return;
         }
 
@@ -289,7 +296,7 @@ export function scheduleDocument(doc, opts = {}) {
         // Either way, the grid never moves.
         const preGraces = evs.filter((e) => e.grace && e.preBeat);
         const sameGraces = evs.filter((e) => e.grace && !e.preBeat);
-        const sliverOf = (n) => (n > 0 ? Math.min(GRACE_FRACTION, GRACE_CAP / n) * spm : 0);
+        const sliverOf = (n) => (n > 0 ? Math.min(GRACE_FRACTION, GRACE_CAP / n) * cellSeconds : 0);
         const preSliver = sliverOf(preGraces.length);
         const sliver = sliverOf(sameGraces.length);
 
@@ -339,7 +346,7 @@ export function scheduleDocument(doc, opts = {}) {
             cursor += sliver;
             return;
           }
-          let dur = spm * frac;
+          let dur = cellSeconds * frac;
           if (graceTotal > 0 && e.type === 'note') {
             dur -= graceTotal; // the destination pays for its graces
             graceTotal = 0;
@@ -394,7 +401,7 @@ export function scheduleDocument(doc, opts = {}) {
             cursor += dur;
           }
         });
-        t = matraStart + spm;
+        t = matraStart + cellSeconds;
       });
 
       // Resolve meend spans for this pass: the destination glides from
@@ -405,7 +412,7 @@ export function scheduleDocument(doc, opts = {}) {
         const to = placed.get(`${span.to.matraIndex}:${span.to.eventIndex}`);
         if (from && to && !to.glideFrom) to.glideFrom = from.freq;
       }
-      passOffset += passOrder.length;
+      passOffset += playedOffset;
     }
 
     // Gat return cues replay a preceding Gat section once and then resume:

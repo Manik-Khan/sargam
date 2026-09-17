@@ -88,7 +88,7 @@ export default function LibraryDrawer({
         </div>
       )}
       <div className="workspace-library-footer">
-        FileMaker/archive remains authoritative. Library records load only by stable ID and controlled same-origin URL.
+        Library records load only by stable ID and controlled same-origin URL.
       </div>
     </div>
   );

@@ -3,8 +3,28 @@
 // A source line stores each repeated phrase once. Tala position, continuation,
 // folding, and playback must nevertheless count every performed pass.
 
-export function phraseRepeatLength(repeat) {
+import { frac, fracAdd } from './model.js';
+
+/** Cell-relative event fractions stay normalized; this is its beat duration. */
+export function matraDuration(line, index) {
+  const value = line?.matras?.[index]?.duration;
+  return value ? value.num / value.den : 1;
+}
+
+export function writtenDuration(line, from = 0, to = line?.matras?.length || 0) {
+  let duration = frac(0);
+  for (let i = from; i < to; i++) {
+    duration = fracAdd(duration, line?.matras?.[i]?.duration || frac(1));
+  }
+  return duration;
+}
+
+export function phraseRepeatLength(repeat, line = null) {
   if (!repeat) return 0;
+  if (line) {
+    const value = writtenDuration(line, repeat.fromMatra, repeat.toMatra + 1);
+    return value.num / value.den;
+  }
   return Math.max(0, Number(repeat.toMatra) - Number(repeat.fromMatra) + 1);
 }
 
@@ -14,7 +34,7 @@ export function repeatExtraBefore(line, index) {
   let extra = 0;
   for (const repeat of line?.phraseRepeats || []) {
     if (Number(repeat.toMatra) >= target) continue;
-    extra += phraseRepeatLength(repeat) * Math.max(0, (Number(repeat.times) || 1) - 1);
+    extra += phraseRepeatLength(repeat, line) * Math.max(0, (Number(repeat.times) || 1) - 1);
   }
   return extra;
 }
@@ -22,7 +42,8 @@ export function repeatExtraBefore(line, index) {
 /** Performed offset of a written matra from the beginning of its source line. */
 export function performedOffsetAt(line, writtenMatraIndex) {
   const written = Math.max(0, Number(writtenMatraIndex) || 0);
-  return written + repeatExtraBefore(line, written);
+  const value = writtenDuration(line, 0, written);
+  return value.num / value.den + repeatExtraBefore(line, written);
 }
 
 /** Written order expanded through phrase repeats, before any whole-line pass. */
@@ -46,9 +67,10 @@ export function performedWrittenOrder(line) {
 /** Total performed duration in matras, including phrase and line repeats. */
 export function performedMatraCount(line) {
   const order = performedWrittenOrder(line);
-  if (!line?.lineRepeat) return order.length;
+  const duration = (items) => items.reduce((sum, i) => sum + matraDuration(line, i), 0);
+  if (!line?.lineRepeat) return duration(order);
   const firstEnding = Number.isInteger(line.firstEndingFrom)
     ? order.findIndex((matraIndex) => matraIndex === line.firstEndingFrom)
     : -1;
-  return order.length + (firstEnding >= 0 ? firstEnding : order.length);
+  return duration(order) + duration(firstEnding >= 0 ? order.slice(0, firstEnding) : order);
 }

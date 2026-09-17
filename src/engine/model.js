@@ -77,7 +77,8 @@ export function fracToNumber(a) {
  * @property {number} sourceLine
  *
  * @typedef {Object} Matra
- * @property {Event[]} events   — event durs sum to exactly 1
+ * @property {Event[]} events   — event durs sum to exactly 1, relative to the cell
+ * @property {Frac} [duration]  — explicit cell duration in beats; absent means 1
  *
  * @typedef {Object} Event
  * @property {'note'|'rest'|'sustain'} type

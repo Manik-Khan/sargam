@@ -15,7 +15,7 @@ import { getTal, wrapMatra, vibhagOfMatra, markerAtMatra } from './tala.js';
 import { serializeRepeatedSlideMatra } from './repeated-slide.js';
 import { serializeReturnCue } from './return-cue.js';
 import { assignmentsFromBols, formatBolLane } from './bol-lane.js';
-import { performedOffsetAt } from './performed-time.js';
+import { performedOffsetAt, matraDuration } from './performed-time.js';
 
 // Canonical header order. `composition`/`type`/`laya` added 2026-07-16 (M2.5)
 // after `tempo` and before identity — Appendix A's relative order is
@@ -139,7 +139,7 @@ function decorateMusicItems(line, items) {
     if (span.type !== 'meend' || span.ranged) continue;
     if (span.from.matraIndex === span.to.matraIndex) continue; // handled in matraToken
     const item = items.find((it) => it.from <= span.from.matraIndex && span.from.matraIndex <= it.to);
-    if (item && !item.text.endsWith('~')) item.text += '~';
+    if (item && !item.text.endsWith('~')) item.text = item.text.replace(/(:1\/2)?$/, '~$1');
   }
 
   // 3. Ranged multi-matra meend. The parentheses preserve spaces/matras;
@@ -228,18 +228,20 @@ function holdRunLength(line, k, tal) {
     const v = vibhagOfMatra(tal, pos);
     let vibhagStart = 1;
     for (let i = 0; i < v; i++) vibhagStart += tal.vibhags[i];
-    expected = Math.max(1, vibhagStart + tal.vibhags[v] - pos);
+    expected = Math.max(0.5, vibhagStart + tal.vibhags[v] - pos);
   }
   let run = 1;
+  let elapsed = matraDuration(line, k);
   while (
-    run < expected &&
+    elapsed < expected &&
     k + run < line.matras.length &&
     isWholeSustain(line.matras[k + run]) &&
     line.matras[k + run].events[0].holdToVibhag !== true
   ) {
+    elapsed += matraDuration(line, k + run);
     run++;
   }
-  return run;
+  return elapsed === expected ? run : 0;
 }
 
 function isWholeSustain(matra) {
@@ -266,6 +268,11 @@ function lcm(a, b) {
 }
 
 function matraToken(line, k) {
+  const token = wholeMatraToken(line, k);
+  return token + (matraDuration(line, k) === 0.5 ? ':1/2' : '');
+}
+
+function wholeMatraToken(line, k) {
   const matraIndex = k;
   const all = line.matras[k].events;
   const scopedKrintan = scopedKrintanToken(line, matraIndex, all);

@@ -188,8 +188,9 @@ export function createStore(storage, clock) {
 
     // -- recents (deduped by id, newest first, capped) --
     recordRecent({ id, title, name }) {
-      const list = readJSON(storage, KEY_RECENTS) || [];
-      const kept = list.filter((r) => r && r.id !== id);
+      const stored = readJSON(storage, KEY_RECENTS);
+      const list = Array.isArray(stored) ? stored : [];
+      const kept = list.filter((r) => r && typeof r.id === 'string' && r.id !== id);
       kept.unshift({ id, title: title || null, name: name || null, at: clock.now() });
       const dropped = kept.splice(MAX_RECENTS);
       for (const r of dropped) {
@@ -199,11 +200,12 @@ export function createStore(storage, clock) {
     },
     listRecents() {
       const list = readJSON(storage, KEY_RECENTS);
-      return Array.isArray(list) ? list : [];
+      return Array.isArray(list) ? list.filter((r) => r && typeof r.id === 'string') : [];
     },
     removeRecent(id) {
-      const list = readJSON(storage, KEY_RECENTS) || [];
-      writeJSON(storage, KEY_RECENTS, list.filter((r) => r && r.id !== id));
+      const stored = readJSON(storage, KEY_RECENTS);
+      const list = Array.isArray(stored) ? stored : [];
+      writeJSON(storage, KEY_RECENTS, list.filter((r) => r && typeof r.id === 'string' && r.id !== id));
       try { storage.removeItem(KEY_SNAP(id)); } catch { /* best effort */ }
     },
 

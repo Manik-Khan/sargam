@@ -1,5 +1,11 @@
 # Sargam — current project handoff
 
+Before implementation work, run `npm run repo:preflight:remote`. It confirms
+that the checkout is the canonical GitHub repository, is not a Codex project
+mirror, has a clean `main` branch, and matches both `origin/main` and live GitHub.
+A failed preflight is a hard stop: preserve any existing work and resolve the
+repository state before editing.
+
 Start with:
 
 - `CONTEXT.md` — broad project memory and binding product/technical rulings.

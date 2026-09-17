@@ -71,7 +71,7 @@ export default function NewDocDialog({ onCreate, onCancel }) {
             <select id="nd-tal" value={tal} onChange={(e) => setTal(e.target.value)}>
               {talNames.map((n) => (
                 <option key={n} value={n}>
-                  {n}
+                  {n === 'jhampak' ? 'jhampak · 8½ beats' : n}
                 </option>
               ))}
               <option value="free">free (unmetered)</option>
@@ -90,6 +90,7 @@ export default function NewDocDialog({ onCreate, onCancel }) {
           </div>
         </div>
 
+        {tal === 'jhampak' && <p className="nd-sub">2 + 3 + 2 + 1½. Dhi Na | Dhi Dhi Na | Tun Na | Di Di Na. End with three half-beat cells, such as S:1/2 R:1/2 S:1/2. Khali on 6 (provisional).</p>}
         <div className="nd-field">
           <label>Composition</label>
           <div className="nd-seg">

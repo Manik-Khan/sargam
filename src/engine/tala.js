@@ -42,6 +42,18 @@ export const TALS = Object.freeze({
     samVibhag: 0,
     khaliVibhags: [2],
   }),
+  jhampak: tal({
+    // Manik confirmed 2 + 3 + 2 + 1½ and three equal half-beat ending strokes.
+    // Khali on 6 remains provisional, following his stated convention.
+    name: 'jhampak',
+    matras: 8.5,
+    vibhags: [2, 3, 2, 1.5],
+    markers: ['+', '2', '0', '3'],
+    samVibhag: 0,
+    khaliVibhags: [2],
+    bols: ['Dhi', 'Na', 'Dhi', 'Dhi', 'Na', 'Tun', 'Na', 'Di', 'Di', 'Na'],
+    strokeDurations: [1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
+  }),
   rupak: tal({
     // Rupak's sam is khali-marked — the reason markers are per-tal data.
     name: 'rupak',
@@ -84,7 +96,7 @@ export function getTal(name) {
   return byAnyName.get(key) ?? null;
 }
 
-/** Wrap any integer onto the cycle: → 1..tal.matras. */
+/** Wrap a beat position onto the cycle: 1 <= position < 1 + tal.matras. */
 export function wrapMatra(tal, n) {
   const m = ((n - 1) % tal.matras + tal.matras) % tal.matras + 1;
   return m;
@@ -126,8 +138,8 @@ export function markerAtMatra(tal, m) {
  * is the cycle position of the FINAL repetition's LAST matra.
  * @returns {{matra: number, marker: string|null, isSam: boolean, isKhali: boolean}}
  */
-export function landing(tal, startMatra, phraseMatras, times) {
-  const last = wrapMatra(tal, startMatra + phraseMatras * times - 1);
+export function landing(tal, startMatra, phraseMatras, times, lastDuration = 1) {
+  const last = wrapMatra(tal, startMatra + phraseMatras * times - lastDuration);
   const v = vibhagOfMatra(tal, last);
   return {
     matra: last,

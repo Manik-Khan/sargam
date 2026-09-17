@@ -22,10 +22,11 @@ const SECTIONS = [
     [
       ['S R g m', 'spaces separate beats — one token per matra'],
       ['SRg', 'notes together share one beat, split evenly'],
+      ['S:1/2', 'half-beat cell — also works on a hold, rest, or [group]'],
       ['[m - g]', 'uneven beat: m holds two-thirds, g the last third'],
       ['-', 'sustain — the previous note keeps ringing'],
       ['.', 'rest (silence) when written alone on a beat'],
-      ['|', 'barline between vibhags; checked against the tal'],
+      ['|', 'written phrase divider; heavier tala divisions are derived automatically'],
       ['@6', 'start this line at matra 6 (lines auto-continue the cycle — @ overrides)'],
     ],
   ],
@@ -47,7 +48,7 @@ const SECTIONS = [
       ['||: … :||', 'repeat the whole passage'],
       ['(SR gm P)x3', 'repeat the phrase three times — landing is reported'],
       ['Sthayi / Antara / 1.', 'a line with no notes is a section label; sections reset to sam'],
-      ['> dha dhin', 'bol line, attached to the music line above'],
+      ['> da ra diri chikari', 'stroke attachments for the notes on the music line above'],
     ],
   ],
   [

@@ -1,3 +1,4 @@
+import { matraDuration, performedWrittenOrder } from './performed-time.js';
 // western.js — sargam → Western staff notation, via MusicXML.
 //
 // THE SPELLING INSIGHT (the part that needs sargam, not justarithmetic):
@@ -89,7 +90,7 @@ function noteType(durDiv, divisions) {
 function flatten(doc) {
   const out = [];
   let at = 0; // absolute matra position
-  let meterMatras = 16;
+  let meterMatras = getTal(doc?.directives?.tal)?.matras ?? (doc?.directives?.tal === 'free' ? 4 : 16);
   let firstMeterSet = false;
 
   for (const section of doc?.sections || []) {
@@ -101,29 +102,20 @@ function flatten(doc) {
     for (const line of section.lines || []) {
       if (!line.matras || line.matras.length === 0) continue;
 
-      const order = [];
-      for (let i = 0; i < line.matras.length; ) {
-        const pr = (line.phraseRepeats || []).find((r) => r.fromMatra === i);
-        if (pr) {
-          for (let rep = 0; rep < pr.times; rep++) {
-            for (let k = pr.fromMatra; k <= pr.toMatra; k++) order.push(k);
-          }
-          i = pr.toMatra + 1;
-        } else {
-          order.push(i);
-          i++;
-        }
-      }
+      const order = performedWrittenOrder(line);
       const passes = line.lineRepeat ? 2 : 1;
 
       for (let pass = 0; pass < passes; pass++) {
         let ringing = null;
-        for (const mi of order) {
+        const endingCut = Number.isInteger(line.firstEndingFrom) ? order.indexOf(line.firstEndingFrom) : -1;
+        const passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
+        for (const mi of passOrder) {
+          const duration = matraDuration(line, mi);
           const evs = line.matras[mi].events;
           if (evs.length === 1 && evs[0].type === 'sustain') {
-            if (ringing) ringing.dur += 1;
-            else out.push({ kind: 'rest', at, dur: 1 });
-            at += 1;
+            if (ringing) ringing.dur += duration;
+            else out.push({ kind: 'rest', at, dur: duration });
+            at += duration;
             continue;
           }
           let cursor = at;
@@ -132,7 +124,7 @@ function flatten(doc) {
               out.push({ kind: 'grace', at: cursor, ch: e.ch, octave: e.octave || 0 });
               continue;
             }
-            const frac = e.dur.num / e.dur.den;
+            const frac = duration * e.dur.num / e.dur.den;
             if (e.type === 'note') {
               const ev = { kind: 'note', at: cursor, dur: frac, ch: e.ch, octave: e.octave || 0 };
               out.push(ev);
@@ -147,7 +139,7 @@ function flatten(doc) {
             }
             cursor += frac;
           }
-          at += 1;
+          at += duration;
         }
       }
     }
@@ -171,7 +163,7 @@ export function documentToMusicXML(doc) {
   const { events, meterMatras, total } = flatten(doc);
 
   // divisions per quarter (= per matra) must make every duration an integer
-  let divisions = 1;
+  let divisions = denomOf(meterMatras);
   for (const e of events) if (e.dur) divisions = lcm(divisions, denomOf(e.dur));
   divisions = Math.max(1, Math.min(divisions, 5040));
 
@@ -239,7 +231,7 @@ export function documentToMusicXML(doc) {
       L.push('      <attributes>');
       L.push(`        <divisions>${divisions}</divisions>`);
       L.push('        <key><fifths>0</fifths></key>');
-      L.push(`        <time><beats>${meterMatras}</beats><beat-type>4</beat-type></time>`);
+      L.push(`        <time><beats>${meterMatras * denomOf(meterMatras)}</beats><beat-type>${4 * denomOf(meterMatras)}</beat-type></time>`);
       L.push('        <clef><sign>G</sign><line>2</line></clef>');
       L.push('      </attributes>');
       if (dirs.tempo) {

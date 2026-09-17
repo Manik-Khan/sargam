@@ -131,7 +131,7 @@ export function parseDocument(text) {
 
     // Directive?
     const dm = trimmed.match(DIRECTIVE_RE);
-    if (dm) {
+    if (dm && !/^[SrRgGmMPdDnN]+:\d/.test(trimmed)) {
       applyDirective(dm[1], dm[2].trim(), lineNo);
       continue;
     }
@@ -238,10 +238,10 @@ function resolveReturnCues(doc, problems) {
 // ---------------------------------------------------------------------------
 
 function looksLikeMusic(trimmed) {
-  const flat = trimmed.replace(/\[\[|\]\]|[\[\](){}|]/g, ' ');
+  const flat = trimmed.replace(/:\d+(?:\/\d+)?(?=$|[\s/|()[\]{}~])/g, '').replace(/\[\[|\]\]|[\[\](){}|]/g, ' ');
   for (const tok of flat.split(/[\s/]+/)) {
     if (!tok) continue;
-    if (/^@\d+$/.test(tok)) return true;
+    if (/^@\d+(?:\.5)?$/.test(tok)) return true;
     if (tok === '||:' || tok === ':||') continue;
     const bare = tok.replace(/^x\d+/, ''); // )xN residue after bracket strip
     if (bare === '') return true;
@@ -291,9 +291,9 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
   // (defaultStart), because the avartan does not restart at a written
   // line break — the tradition's own convention, and M's ruling
   // 2026-07-16 ("doesn't count the 'S as the 6th beat" without @6).
-  const at = body.match(/^@(\d+)\s*/);
+  const at = body.match(/^@(\d+(?:\.5)?)\s*/);
   if (at) {
-    line.startMatra = parseInt(at[1], 10) || 1;
+    line.startMatra = Number(at[1]) || 1;
     line.explicitStart = true;
     body = body.slice(at[0].length);
   } else if (defaultStart !== null) {
@@ -365,6 +365,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
   // instead of a hang: the engine's contract is that it never throws, and
   // a frozen page is worse than either. The bound is generous — the scanner
   // consumes at least one character per iteration when healthy.
+  let previousMatraCount = 0;
   let guard = n * 4 + 64;
   while (i < n) {
     if (--guard < 0) {
@@ -376,6 +377,19 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
       break;
     }
     const c = body[i];
+    const durationTarget = line.matras.length === previousMatraCount + 1;
+    previousMatraCount = line.matras.length;
+    if (c === ':' && body[i + 1] !== '|') {
+      const suffix = body.slice(i).match(/^:1(\/2)?(?=$|[\s/|()[\]{}])/);
+      if (suffix && durationTarget && i > 0 && !/\s/.test(body[i - 1])) {
+        if (suffix[1]) line.matras.at(-1).duration = frac(1, 2);
+        i += suffix[0].length;
+      } else {
+        problems.push({ line: lineNo, col: i + 1, msg: 'Use :1/2 directly after one note, hold, rest, or [group] for a half-beat cell.' });
+        i++;
+      }
+      continue;
+    }
 
     if (c === ' ' || c === '\t' || c === '/') {
       i++;
@@ -550,7 +564,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
       const inner = body.slice(i + 1, close).replace(/[\s/]+/g, '');
       // Destination: the plain-token run right after the closing brace.
       let j = close + 1;
-      while (j < n && !' \t/|[](){}'.includes(body[j])) j++;
+      while (j < n && !' \t/|[](){}:'.includes(body[j])) j++;
       const destTok = body.slice(close + 1, j);
       if (inner === '') {
         problems.push({ line: lineNo, col: i + 1, msg: 'empty ornament { }' });
@@ -646,7 +660,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
 
     // Plain token: run of non-structural chars.
     let j = i;
-    while (j < n && !' \t/|[](){}'.includes(body[j])) j++;
+    while (j < n && !' \t/|[](){}:'.includes(body[j])) j++;
     if (j === i) {
       // A structural character reached the token reader without any branch
       // above consuming it — a stray ']' or ')'. Narrate it and step over.
@@ -721,9 +735,20 @@ function parseTokenRun(text, colBase, ctx, bars) {
       continue;
     }
     let j = i;
-    while (j < n && !' \t/|'.includes(text[j])) j++;
+    while (j < n && !' \t/|:'.includes(text[j])) j++;
+    const before = ctx.line.matras.length;
     parseToken(text.slice(i, j), colBase + i, ctx);
-    i = j;
+    if (text[j] === ':') {
+      const suffix = text.slice(j).match(/^:1(\/2)?(?=$|[\s/|])/);
+      if (suffix && ctx.line.matras.length === before + 1) {
+        if (suffix[1]) ctx.line.matras.at(-1).duration = frac(1, 2);
+        j += suffix[0].length;
+      } else {
+        ctx.problems.push({ line: ctx.lineNo, col: colBase + j + 1, msg: 'Use :1/2 directly after one krintan cell.' });
+        j++;
+      }
+    }
+    i = Math.max(i + 1, j);
   }
 }
 
@@ -790,12 +815,12 @@ function parseToken(tok, col, ctx) {
       let vibhagStart = 1;
       for (let k = 0; k < v; k++) vibhagStart += tal.vibhags[k];
       const vibhagEnd = vibhagStart + tal.vibhags[v] - 1;
-      count = Math.max(1, vibhagEnd - pos + 1);
+      count = Math.max(0.5, vibhagEnd - pos + 1);
     }
-    for (let k = 0; k < count; k++) {
+    for (let k = 0; k < Math.ceil(count); k++) {
       const ev = { type: 'sustain', dur: frac(1, 1) };
       if (k === 0) ev.holdToVibhag = true;
-      line.matras.push({ events: [ev] });
+      line.matras.push({ events: [ev], ...(count - k < 1 ? { duration: frac(1, 2) } : {}) });
     }
     return;
   }

@@ -57,6 +57,8 @@ A currently loaded local file may appear in Library, but it is not reopenable or
 
 Per-source workspace restoration still runs through `workspace.json` only after the returned source identity matches.
 
-## Next adapter wave
+## Next Sargam wave
 
-The FileMaker/archive adapter remains pending. It should translate authoritative records into the Library shape above without exposing raw network filesystem paths. Named playlists follow only after the transient Queue interaction is accepted in the real archive environment.
+Browser-accept the transient Queue with real Sargam project recordings, including reconnection, order, A–B exit, repeat, and workspace restoration. Named playlists follow only after that interaction feels correct.
+
+FileMaker integration belongs to a separate build. It is not a pending adapter or dependency for this Sargam project.

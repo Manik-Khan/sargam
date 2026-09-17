@@ -1,19 +1,35 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-08-19, after the graph-cell density, printed-divider, bol-legibility, local-meter, return-cue, and chikari-playback passes. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
+**Updated:** 2026-09-08, after adding the authoritative-repository preflight. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
 
 **What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with `SARGAM_NEXT_SESSION_CONTEXT_2026-07-30_PRINT_PLAYER_CHECKPOINT.md`, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
 
+## September 16 Jhampak and audit checkpoint
+
+- Jhampak is 8½ beats, grouped 2 + 3 + 2 + 1½. Manik confirmed Dhi Na | Dhi Dhi Na | Tun Na | Di Di Na with three equal half-beat ending strokes. Khali on 6 remains provisional.
+- `:1/2` explicitly shortens a cell to half a beat; `:1` restores a full beat in Grid Write. Duration, onset, and source-cell identity remain distinct. See `docs/jhampak.md`.
+- Fractional timing is shared by continuation, repeats, playback, anchors, local meter, render/print, and 17/8 staff export. Jhampak uses click fallback pending an approved sampled theka.
+- The audit fixed staff-export first endings, free-time grid labels, damaged recent-file handling, silent autosave failures, draft flushing, and outdated notation-key guidance.
+- Verification: **643 checks passed, 0 failed**; production build successful. Browser policy verification blocked visual/aural acceptance. See `docs/site-audit-2026-09-16.md` for evidence and remaining Queue, multi-tala/Gat staff-export, and performance work.
+- The starting uncommitted September 8 changes were reviewed and explicitly approved as the working base. No commit, push, or deployment was authorized or performed.
+
+## September 8 repository source-of-truth guardrail
+
+- `npm run repo:preflight:remote` is now the mandatory first step before implementation work.
+- It rejects Codex project mirrors, the wrong GitHub remote, a non-main or untracked branch, a stale local/tracking/live GitHub commit, and an already-dirty worktree.
+- Root `AGENTS.md` makes a failed preflight a hard stop and requires every implementation handoff to name the repository root, branch, HEAD, verification result, and remaining manual acceptance.
+- Verification after the guardrail: **625 checks passed, 0 failed**, and the production build succeeded with 120 modules transformed. The existing large-chunk advisory remains non-blocking.
+
 ## August 19 Library and Queue Wave 1
 
-- **Library**, **Linked phrases**, and **Queue** are now separate shell surfaces. Library is the durable project/archive catalog; Linked phrases retains composition-specific notation A–B links; Queue is temporary listening-session order. Playlist remains later.
+- **Library**, **Linked phrases**, and **Queue** are now separate shell surfaces. Library is the durable project catalog; Linked phrases retains composition-specific notation A–B links; Queue is temporary listening-session order. Playlist remains later.
 - The pure session controller owns current, ordered upcoming items, history, and repeat mode. It smoke-covers add-without-interrupting, reorder, remove, clear, next/previous, repeat track, repeat queue, and the A–B exit policy.
 - An active A–B loop blocks automatic advancement. Pressing **Next** explicitly clears the loop and advances.
 - Project `media.json` sources form the first Library adapter. A stable record ID is mandatory. Only controlled same-origin HTTP(S) URLs are reopenable; a loaded local file remains visible but explicitly requires reconnection before it can be queued.
 - The same-origin player bridge accepts `load-library-source`, republishes the stable source ID, and restores the matched `workspace.json` state before queued autoplay. It never binds by filename.
-- The FileMaker/archive catalog adapter and real Chrome 109 / Windows 8.1 acceptance remain the next integration wave. The binding contract is recorded in `docs/library-queue.md`.
+- FileMaker is a separate build, not a dependency or integration wave for this Sargam project. The next Sargam step is browser acceptance of Library and Queue with real project recordings. The binding contract is recorded in `docs/library-queue.md`.
 - Verification at this checkpoint: **621 checks passed, 0 failed**, and the production build succeeded with 120 modules transformed. The existing large-chunk advisory remains non-blocking.
 
 ## August 10–19 print, rhythm, and playback checkpoint
@@ -147,7 +163,7 @@ The Sargam Player archive route and waveform infrastructure are working:
 - source recordings remain untouched;
 - the target archive browser remains Chrome 109 on Windows 8.1 unless the real host changes.
 
-The FileMaker/archive catalog remains authoritative. Future integrations should pass stable library IDs or controlled URLs rather than treating raw filesystem paths as durable identity.
+The FileMaker-backed catalog/player is a separate build and is not part of this Sargam roadmap. Shared player boundaries should still pass stable recording IDs or controlled URLs rather than treating raw filesystem paths as durable identity.
 
 ### EQ & Restoration
 
@@ -189,15 +205,14 @@ The product mock was approved and the first pure controller and shell slice is i
 - Queue operations should eventually cover reorder, remove, clear, next/previous, repeat track, and repeat queue.
 - Infinite A–B loops need an explicit exit policy before automatic queue advance.
 - Selecting a recording should restore its saved workspace, including EQ, loop, markers, position, and waveform view.
-- FileMaker/archive integration should use stable record identity.
+- FileMaker integration belongs to its separate build and must not be added as a dependency here.
 
 ### Remaining implementation order
 
-1. Connect the real archive/FileMaker adapter through stable record IDs and controlled same-origin URLs.
-2. Browser-accept Library, reconnection, queue order, A–B exit, repeat, and workspace restoration against the real archive host.
+1. Browser-accept Library, reconnection, queue order, A–B exit, repeat, and workspace restoration with real Sargam project recordings.
+2. Fix any interaction or restoration issues found during that acceptance pass.
 3. Add durable named playlists only after the transient queue feels correct.
 4. Build Practice Sets on the same sequencing foundation: excerpts, repetitions, timed steps, rests, and speed ladders.
-5. Consider authenticated community EQ submission/voting only after the LAN archive workflow and ownership rules are established.
 
 ## Binding architecture and working rules
 

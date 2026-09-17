@@ -13,7 +13,8 @@ export function rhythmGridIdentity(cell) {
   return {
     sourceLine,
     matraIndex,
-    cycleMatra: Number.isInteger(cycleMatra) ? cycleMatra : null,
+    cycleMatra: Number.isFinite(cycleMatra) && cycleMatra >= 1 ? cycleMatra : null,
+    ...(cell.getAttribute?.('data-beat-duration') === '0.5' ? { duration: 0.5 } : {}),
     subdivisions: Math.max(1, subdivisions),
   };
 }
@@ -24,7 +25,7 @@ export function rhythmGridLabel(identity) {
     ? `written matra ${identity.matraIndex + 1}`
     : `tala matra ${identity.cycleMatra}`;
   const division = identity.subdivisions === 1
-    ? 'one beat cell'
+    ? (identity.duration === 0.5 ? 'half-beat cell' : 'one beat cell')
     : `${identity.subdivisions} subdivisions`;
   return `${beat}, ${division}, source line ${identity.sourceLine}`;
 }

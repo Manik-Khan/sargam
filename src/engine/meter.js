@@ -1,3 +1,5 @@
+import { isReturnCueToken } from './return-cue.js';
+import { writtenDuration } from './performed-time.js';
 import { scanRepeatedSlideAt } from './repeated-slide.js';
 // src/engine/meter.js — local meter/layakari spans authored from a text
 // selection. The written music remains the tala authority, while meter spans
@@ -264,12 +266,31 @@ export function scanMusicLine(source) {
   const attacks = [];
   let time = rational(0, 1);
   let i = 0;
-  const prefix = text.slice(i).match(/^\s*@\d+\s*/);
+  let previousStart = time;
+  let previousAttackCount = 0;
+  const prefix = text.slice(i).match(/^\s*@\d+(?:\.5)?\s*/);
   if (prefix) i += prefix[0].length;
   if (text.slice(i).startsWith('||:')) i += 3;
 
   while (i < text.length) {
     const c = text[i];
+    if (text.slice(i).startsWith(':||')) { i += 3; continue; }
+    if (c === ':') {
+      const suffix = text.slice(i).match(/^:1(\/2)?(?=$|[\s/|()[\]{}])/);
+      if (!suffix || i === 0 || /\s/.test(text[i - 1]) || compareRational(subRational(time, previousStart), rational(1)) !== 0) {
+        return { attacks, duration: time, error: 'Use :1/2 directly after one cell.' };
+      }
+      if (suffix[1]) {
+        for (let k = previousAttackCount; k < attacks.length; k++) {
+          attacks[k].time = addRational(previousStart, mulRational(subRational(attacks[k].time, previousStart), rational(1, 2)));
+        }
+        time = addRational(previousStart, rational(1, 2));
+      }
+      i += suffix[0].length;
+      continue;
+    }
+    previousStart = time;
+    previousAttackCount = attacks.length;
     if (/\s/.test(c) || c === '/' || c === '|' || c === '(' || c === ')' || c === '~') { i++; continue; }
     if (c === 'x' && /^x\d+/.test(text.slice(i))) {
       i += text.slice(i).match(/^x\d+/)[0].length;
@@ -316,10 +337,10 @@ export function scanMusicLine(source) {
     }
 
     let j = i;
-    while (j < text.length && !' \t/|[](){}'.includes(text[j])) j++;
+    while (j < text.length && !' \t/|[](){}:'.includes(text[j])) j++;
     if (j === i) { i++; continue; }
     const token = text.slice(i, j).replace(/:\|\|$/, '');
-    if (/^gat(?:@\d+(?:\.\.@\d+)?|!)?$/i.test(token) || token === ':||' || token === '') { i = j; continue; }
+    if (isReturnCueToken(token) || token === ':||' || token === '') { i = j; continue; }
     if (token === '.') {
       time = addRational(time, rational(1, 1));
       i = j;
@@ -507,9 +528,11 @@ export function structuralMeterSpans(laneSpans = [], anchorMarks = []) {
  * Exact local subdivision positions inside one written matra. Matra heads are
  * omitted because the tala scheduler already owns that tick.
  */
-export function meterTicksForMatra(spans, sourceLine, matraIndex) {
-  const head = rational(matraIndex, 1);
-  const tail = rational(matraIndex + 1, 1);
+export function meterTicksForMatra(spans, sourceLine, matraIndex, line = null) {
+  const start = line ? writtenDuration(line, 0, matraIndex) : { num: matraIndex, den: 1 };
+  const duration = line?.matras?.[matraIndex]?.duration || { num: 1, den: 1 };
+  const head = rational(start.num, start.den);
+  const tail = addRational(head, rational(duration.num, duration.den));
   const ticks = new Map();
   for (const span of spans || []) {
     if (Number(span?.sourceLine) !== Number(sourceLine) || span.valid === false || !span.unit) continue;

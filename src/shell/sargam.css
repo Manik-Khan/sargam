@@ -4103,3 +4103,7 @@
 .sr-alternate-ending-system > .sr-alternate-ending-second > .sr-line-block {
   padding-inline: 0;
 }
+
+/* Explicit half-beat cells remain legible in both the score and print. */
+.sr-cell[data-beat-duration="0.5"] { position: relative; }
+.sr-half-beat { position: absolute; right: 0.15em; top: 0; font-size: 0.65em; line-height: 1; font-weight: 600; color: currentColor; }

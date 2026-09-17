@@ -28,11 +28,14 @@ export function buildLineGeometry(line) {
   const attacks = [];
   const matras = [];
   let ordinal = 0;
+  let lineTime = frac(0);
 
   for (let matraIndex = 0; matraIndex < (line?.matras || []).length; matraIndex++) {
     const events = line.matras[matraIndex]?.events || [];
     const slots = [];
-    let cursor = frac(matraIndex, 1);
+    const duration = line.matras[matraIndex].duration || frac(1);
+    const cellStart = lineTime;
+    let cursor = cellStart;
     let slotIndex = 0;
 
     for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
@@ -40,7 +43,8 @@ export function buildLineGeometry(line) {
       if (event?.grace) continue;
 
       const eventStart = cursor;
-      const eventDur = event?.dur || frac(0, 1);
+      const relativeDur = event?.dur || frac(0, 1);
+      const eventDur = fracReduce(frac(relativeDur.num * duration.num, relativeDur.den * duration.den));
       const eventEnd = fracAdd(eventStart, eventDur);
       const writtenSlots = Math.max(1, Number(event?.writtenSlots) || 1);
       const slotDur = divideFrac(eventDur, writtenSlots);
@@ -90,21 +94,22 @@ export function buildLineGeometry(line) {
       cursor = eventEnd;
     }
 
+    lineTime = fracAdd(cellStart, duration);
     matras.push({
       sourceLine,
       matraIndex,
-      start: frac(matraIndex, 1),
-      startLabel: String(matraIndex),
-      end: frac(matraIndex + 1, 1),
-      endLabel: String(matraIndex + 1),
+      start: cellStart,
+      startLabel: formatFrac(cellStart),
+      end: lineTime,
+      endLabel: formatFrac(lineTime),
       slots,
     });
   }
 
   return {
     sourceLine,
-    duration: frac((line?.matras || []).length, 1),
-    durationLabel: String((line?.matras || []).length),
+    duration: lineTime,
+    durationLabel: formatFrac(lineTime),
     attacks,
     matras,
   };

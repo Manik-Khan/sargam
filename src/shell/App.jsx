@@ -6,6 +6,7 @@
 // (Safari download fallback, autosave restore). Save writes the editor text
 // verbatim plus the surgical identity edit — never serialize(parse(text)).
 
+import { createDraftAutosave } from './draft-autosave.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
@@ -1006,12 +1007,23 @@ export default function App() {
   useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
 
   // Debounced autosave: raw text only, never mutated (M2 decision).
-  const autosaveTimer = useRef(null);
+  const draftAutosave = useMemo(() => createDraftAutosave(store, {
+    onFailure: () => setNotice('Draft recovery could not be saved in this browser. Save your notation to a file to keep your changes.'),
+  }), [store]);
   useEffect(() => {
-    clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => store.saveCurrent(text), 500);
-    return () => clearTimeout(autosaveTimer.current);
-  }, [text, store]);
+    draftAutosave.schedule(text);
+  }, [text, draftAutosave]);
+  useEffect(() => {
+    const flush = () => { draftAutosave.flush(); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+      flush();
+    };
+  }, [draftAutosave]);
 
   const suggestName = () => {
     if (fileName) return fileName;

@@ -529,7 +529,7 @@ export default function GridEditor({
                         )}
                         <span className="app-grid-write-coordinate">
                           <b>{cell.marker || ''}</b>
-                          <i>{cell.cycleMatra ?? cell.matraIndex + 1}</i>
+                          <i>{cell.cycleMatra ?? cell.matraIndex + 1}{cell.duration === 0.5 ? " · ½" : ""}</i>
                         </span>
                         <input
                           value={value}

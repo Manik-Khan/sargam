@@ -24,7 +24,7 @@ import {
   visualGridSpanForMatra,
 } from './layout.js';
 import { buildLineGeometry } from './notation-geometry.js';
-import { performedOffsetAt } from './performed-time.js';
+import { performedOffsetAt, matraDuration, phraseRepeatLength } from './performed-time.js';
 import { buildBolPlan } from './bol-lane.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -978,7 +978,7 @@ function renderLineBlock(line, tal, ctx) {
   if (tal && ctx.activeLine !== undefined && ctx.activeLine === line.sourceLine) {
     for (const pr of line.phraseRepeats) {
       const startAbs = wrapMatra(tal, line.startMatra + performedOffsetAt(line, pr.fromMatra));
-      const l = landing(tal, startAbs, pr.toMatra - pr.fromMatra + 1, pr.times);
+      const l = landing(tal, startAbs, phraseRepeatLength(pr, line), pr.times, matraDuration(line, pr.toMatra));
       const where = l.isSam ? 'sam' : l.isKhali ? 'khali' : l.marker ? `marker ${l.marker}` : null;
       const note = lastStruckNote(line, pr);
       const subject = note ? `${ordinal(pr.times)} ${note}` : `${ordinal(pr.times)} repetition`;
@@ -1130,6 +1130,8 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   const globalMatraIndex = (Number(line._matraOffset) || 0) + k;
   const geometryMatra = ctx.geometry?.matras?.[globalMatraIndex] || null;
   cell.setAttribute('data-matra', String(globalMatraIndex));
+  cell.setAttribute('data-beat-duration', String(matraDuration(line, k)));
+  if (matraDuration(line, k) === 0.5) cell.appendChild(h('span', 'sr-half-beat', '½'));
   if (tal) {
     cell.setAttribute(
       'data-cycle-matra',
