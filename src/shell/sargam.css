@@ -2813,7 +2813,7 @@
   opacity: 0.72;
 }
 .app-rhythm-grid .sr-cell::before {
-  content: attr(data-cycle-matra);
+  content: attr(data-grid-coordinate);
   position: absolute;
   z-index: 2;
   top: 0.2em;
@@ -4107,3 +4107,6 @@
 /* Explicit half-beat cells remain legible in both the score and print. */
 .sr-cell[data-beat-duration="0.5"] { position: relative; }
 .sr-half-beat { position: absolute; right: 0.15em; top: 0; font-size: 0.65em; line-height: 1; font-weight: 600; color: currentColor; }
+
+/* The grid coordinate already includes duration; avoid two labels overlapping. */
+.app-rhythm-grid .sr-half-beat { display: none; }

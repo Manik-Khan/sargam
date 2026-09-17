@@ -17,30 +17,39 @@ Jhampak uses the existing tala click fallback.
 ## Writing and hearing a cycle
 
 Choose **jhampak · 8½ beats** in New composition, or write `tal: jhampak`.
-The suffix `:1/2` makes one written cell half a beat. A single note, hold (`-`),
-rest (`.`), bracketed group, or ornamented cell can carry it. At 60 BPM it lasts
-half a second. Other cells remain one full beat: selecting a tala never silently
-compresses written music.
+After eight full beats, the final cell is **automatically half a beat**. It is
+labelled **½**, followed by **1 / sam**. This replaces the initial explicit-only
+implementation, following Manik's correction and approval on September 16.
 
-This is a timing example, not a prescribed raga or melody:
+Manik's unchanged phrase now works directly:
 
 ```text
-tal: jhampak
-tempo: 60
-
-S R | G m P | D N | S:1/2 R:1/2 S:1/2
-S R | G m P | D N | S:1/2 R:1/2 S:1/2
+@3 ||: G - Gm | R- S | .N.D .N|S - :||
 ```
 
-Each line lasts 8½ seconds at 60 BPM. The next sam falls at 8½ seconds, then 17.
-The ending starts at cycle positions 8, 8.5, and 9; the position is the onset,
-not the cycle length. Sam follows the final half-beat at absolute position 9.5.
-Fractional entry such as `@8.5` is accepted. Holds to a division (`_`) stop at
-its exact boundary, including a remaining half-beat.
+| Cycle position | 3 | 4 | 5 | 6 | 7 | 8 | ½ | 1 / sam | 2 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Written cell | G | - | Gm | R- | S | .N.D | .N | S | - |
+| Duration in beats | 1 | 1 | 1 | 1 | 1 | 1 | ½ | 1 | 1 |
 
-Both score and print show a **½** on a half-beat cell. Grid Write keeps `:1/2`
-when its note changes; use an explicit `:1` to change that cell back to a full
-beat. Subdivisions inside a half-beat cell divide its half beat equally.
+`.N.D` supplies two equal half-beat notes within beat 8; the next `.N` supplies
+the final half-beat. The following `S` is sam. At 60 BPM the repeated passage
+lasts 17 seconds, with this S on sam at 6.5 and 15 seconds after starting at @3.
+
+No `:1/2` suffix is needed for that final cell. The same default applies to
+rests, sustains, bracketed groups, and ornaments in that position. Editing its
+note in Grid Write preserves the automatic behavior without adding syntax.
+Other talas retain their existing full-beat defaults.
+
+Explicit `:1/2` remains available for a half-beat anywhere, and `:1` deliberately
+overrides a cell to one full beat. Explicit durations survive canonicalization.
+A pair of explicit half-cells within beat 8 is labelled **8** and **8+**; the
+cycle's final half is **½**. Reader-facing labels never imply a ninth full beat.
+The internal position 9 still denotes the onset of that final half for `@9`
+and existing return-cue coordinates; it is a coordinate, not a displayed count.
+
+Both score and print show **½** on a half-beat cell. The Graph Grid coordinate
+includes its duration once, avoiding the old overlap between position and ½.
 
 Phrase repeats, line repeats, first/second endings, source anchors, local meter
 clicks, and continuation count actual duration. Staff export represents the

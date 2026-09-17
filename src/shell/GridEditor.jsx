@@ -529,11 +529,11 @@ export default function GridEditor({
                         )}
                         <span className="app-grid-write-coordinate">
                           <b>{cell.marker || ''}</b>
-                          <i>{cell.cycleMatra ?? cell.matraIndex + 1}{cell.duration === 0.5 ? " · ½" : ""}</i>
+                          <i>{cell.cycleLabel ?? cell.matraIndex + 1}{cell.duration === 0.5 && cell.cycleLabel !== "½" ? " · ½" : ""}</i>
                         </span>
                         <input
                           value={value}
-                          aria-label={`Line ${row.sourceLine}, written matra ${cell.matraIndex + 1}, cycle matra ${cell.cycleMatra ?? cell.matraIndex + 1}`}
+                          aria-label={`Line ${row.sourceLine}, written matra ${cell.matraIndex + 1}, cycle position ${cell.cycleLabel ?? cell.matraIndex + 1}`}
                           aria-invalid={error ? 'true' : 'false'}
                           data-grid-cell="true"
                           onFocus={() => {
@@ -689,7 +689,7 @@ export default function GridEditor({
           <div className="app-grid-cell-menu-head">
             <span>
               <strong>Matra {menuCell.matraIndex + 1}</strong>
-              <small>line {menuRow.sourceLine}{menuCell.cycleMatra ? ` · cycle ${menuCell.cycleMatra}` : ''}</small>
+              <small>line {menuRow.sourceLine}{menuCell.cycleMatra ? ` · cycle ${menuCell.cycleLabel}` : ''}</small>
             </span>
             <button type="button" aria-label="Close matra menu" onClick={() => setCellMenu(null)}>×</button>
           </div>

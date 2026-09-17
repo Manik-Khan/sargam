@@ -6,6 +6,14 @@
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
 
+## September 16 Jhampak correction — automatic final half-beat
+
+- Manik approved the display `[8: .N.D] [½: .N] | [1 / sam: S]` and automatic half-beat timing at the end of Jhampak. This supersedes the explicit-only rule in the earlier checkpoint below.
+- His unchanged phrase `@3 ||: G - Gm | R- S | .N.D .N|S - :||` now lasts 8½ beats per pass; the final S lands on sam on both passes. Reader-facing positions are `3,4,5,6,7,8,½,1,2`.
+- Only an unqualified cell in Jhampak's final half position receives the inferred duration. Explicit `:1/2` and `:1` overrides remain available. Inferred duration is not written back as a suffix; canonical text and Grid Write preserve the distinction.
+- Source anchors, local meter selection, and audio-link selection use the parsed duration when converting source positions to time. Numeric internal cycle positions remain stable; display labels use ½ for the final half and + for a half-offset within a numbered beat.
+- Exact-phrase regressions cover repeats, continuations, holds/rests/subdivisions, render/print, Grid Write, canonicalization, anchors, local meter, audio selection, and MusicXML. **649 checks passed; production build succeeded.** Visual/aural acceptance remains with Manik; no commit, push, or deployment performed in this correction.
+
 ## September 16 Jhampak and audit checkpoint
 
 - Jhampak is 8½ beats, grouped 2 + 3 + 2 + 1½. Manik confirmed Dhi Na | Dhi Dhi Na | Tun Na | Di Di Na with three equal half-beat ending strokes. Khali on 6 remains provisional.

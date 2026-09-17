@@ -8,7 +8,7 @@ import {
   formatRational,
   parseMeterValue,
   parseRational,
-  scanMusicLine,
+  scanDocumentMusicLine,
 } from './meter.js';
 
 export const ANCHOR_VERSION = 1;
@@ -98,8 +98,8 @@ export function attacksForLine(text, sourceLine) {
   const line = lines[sourceLine - 1] ?? '';
   // Repeat closers are structure, not attacks. The older meter scanner
   // predates score-side anchors and can otherwise report ':' as a token.
-  const scanLine = line.replace(/\|\|:|:\|\|/g, ' ');
-  const scanned = scanMusicLine(scanLine);
+  const scanLine = line.replace(/\|\|:|:\|\|/g, token => ' '.repeat(token.length));
+  const scanned = scanDocumentMusicLine(text, sourceLine, scanLine);
   if (scanned.error) return { line, attacks: [], duration: scanned.duration, error: scanned.error };
   const notes = scanned.attacks.map((attack, ordinal, all) => ({
     ...attack,

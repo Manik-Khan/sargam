@@ -255,6 +255,23 @@ function looksLikeMusic(trimmed) {
 // Music line
 // ---------------------------------------------------------------------------
 
+function appendMatra(line, tal, matra) {
+  if (tal?.name === 'jhampak' && !matra.duration) {
+    const position = wrapMatra(tal, line.startMatra + performedOffsetAt(line, line.matras.length));
+    if (tal.matras + 1 - position === 0.5) {
+      matra.duration = frac(1, 2);
+      matra.implicitDuration = true;
+    }
+  }
+  line.matras.push(matra);
+}
+
+function setExplicitDuration(matra, half) {
+  // Preserve :1 as well: a deliberate full beat must survive canonicalization.
+  matra.duration = frac(1, half ? 2 : 1);
+  delete matra.implicitDuration;
+}
+
 function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStart = null) {
   const line = {
     kind: 'music',
@@ -382,7 +399,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     if (c === ':' && body[i + 1] !== '|') {
       const suffix = body.slice(i).match(/^:1(\/2)?(?=$|[\s/|()[\]{}])/);
       if (suffix && durationTarget && i > 0 && !/\s/.test(body[i - 1])) {
-        if (suffix[1]) line.matras.at(-1).duration = frac(1, 2);
+        setExplicitDuration(line.matras.at(-1), Boolean(suffix[1]));
         i += suffix[0].length;
       } else {
         problems.push({ line: lineNo, col: i + 1, msg: 'Use :1/2 directly after one note, hold, rest, or [group] for a half-beat cell.' });
@@ -450,7 +467,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
             msg: 'a scoped slide needs at least two notes inside ~(...)',
           });
         }
-        line.matras.push({ events });
+        appendMatra(line, tal, { events });
       }
       i += scopedSlide[0].length;
       continue;
@@ -538,7 +555,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     const repeatedSlide = scanRepeatedSlideAt(body, i);
     if (repeatedSlide) {
       const matraIndex = line.matras.length;
-      line.matras.push({ events: repeatedSlide.events });
+      appendMatra(line, tal, { events: repeatedSlide.events });
       repeatedSlide.events.forEach((event, eventIndex) => {
         if (event.type === 'note') clusterCtx.notePlaced({ matraIndex, eventIndex });
       });
@@ -595,7 +612,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
         const combined = [...pend, ...graceAtoms, ...destAtoms];
         combined._tilde = destAtoms._tilde; // trailing tilde still crosses matras
         const events = weightAndBuild(combined, pend.length + graceAtoms.length, i + 1, clusterCtx);
-        if (events && events.length > 0) line.matras.push({ events });
+        if (events && events.length > 0) appendMatra(line, tal, { events });
       }
       i = j;
       continue;
@@ -741,7 +758,7 @@ function parseTokenRun(text, colBase, ctx, bars) {
     if (text[j] === ':') {
       const suffix = text.slice(j).match(/^:1(\/2)?(?=$|[\s/|])/);
       if (suffix && ctx.line.matras.length === before + 1) {
-        if (suffix[1]) ctx.line.matras.at(-1).duration = frac(1, 2);
+        setExplicitDuration(ctx.line.matras.at(-1), Boolean(suffix[1]));
         j += suffix[0].length;
       } else {
         ctx.problems.push({ line: ctx.lineNo, col: colBase + j + 1, msg: 'Use :1/2 directly after one krintan cell.' });
@@ -794,14 +811,14 @@ function parseToken(tok, col, ctx) {
 
   // Standalone rest.
   if (tok === '.') {
-    line.matras.push({ events: [{ type: 'rest', dur: frac(1, 1) }] });
+    appendMatra(line, tal, { events: [{ type: 'rest', dur: frac(1, 1) }] });
     return;
   }
 
   // Whole-matra sustains, counting by hyphen.
   if (/^-+$/.test(tok)) {
     for (let k = 0; k < tok.length; k++) {
-      line.matras.push({ events: [{ type: 'sustain', dur: frac(1, 1) }] });
+      appendMatra(line, tal, { events: [{ type: 'sustain', dur: frac(1, 1) }] });
     }
     return;
   }
@@ -820,7 +837,7 @@ function parseToken(tok, col, ctx) {
     for (let k = 0; k < Math.ceil(count); k++) {
       const ev = { type: 'sustain', dur: frac(1, 1) };
       if (k === 0) ev.holdToVibhag = true;
-      line.matras.push({ events: [ev], ...(count - k < 1 ? { duration: frac(1, 2) } : {}) });
+      appendMatra(line, tal, { events: [ev], ...(count - k < 1 ? { duration: frac(1, 2) } : {}) });
     }
     return;
   }
@@ -837,7 +854,7 @@ function parseToken(tok, col, ctx) {
   // Silently, this used to insert an empty matra and shift the rest of the
   // line — the cause of phantom vibhag errors. M, 2026-07-16.
   if (events && events.length > 0) {
-    line.matras.push({ events });
+    appendMatra(line, tal, { events });
   } else if (events) {
     problems.push({
       line: lineNo,
@@ -945,7 +962,7 @@ function buildSlottedMatra(inner, col, ctx) {
   if (!events) return;
 
   const matraIndex = ctx.line.matras.length;
-  ctx.line.matras.push({ events });
+  appendMatra(ctx.line, ctx.tal, { events });
 
   // A scoped [[...]] is an articulation inside this beat, not a wrapper
   // around another matra. Event order mirrors note-atom order even though

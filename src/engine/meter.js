@@ -1,3 +1,4 @@
+import { parseDocument } from './parse.js';
 import { isReturnCueToken } from './return-cue.js';
 import { writtenDuration } from './performed-time.js';
 import { scanRepeatedSlideAt } from './repeated-slide.js';
@@ -360,6 +361,31 @@ export function scanMusicLine(source) {
   return { attacks, duration: time, error: null };
 }
 
+/** Context-aware source scan: keep text indexes, share parser-derived timing. */
+export function scanDocumentMusicLine(text, sourceLine, sourceOverride = null) {
+  const source = String(text ?? '');
+  const raw = sourceOverride ?? source.split(/\r?\n/)[sourceLine - 1] ?? '';
+  const scanned = scanMusicLine(raw);
+  if (scanned.error) return scanned;
+  const parsed = parseDocument(source).doc.sections.flatMap(section => section.lines)
+    .find(line => line.sourceLine === sourceLine);
+  if (!parsed?.matras.some(matra => matra.implicitDuration)) return scanned;
+  let sourceTime = rational(0);
+  let targetTime = rational(0);
+  const intervals = parsed.matras.map(matra => {
+    const actual = matra.duration ? rational(matra.duration.num, matra.duration.den) : rational(1);
+    const written = matra.implicitDuration ? rational(1) : actual;
+    const interval = { sourceTime, targetTime, end: addRational(sourceTime, written), scale: divRational(actual, written) };
+    sourceTime = interval.end;
+    targetTime = addRational(targetTime, actual);
+    return interval;
+  });
+  return { ...scanned, duration: targetTime, attacks: scanned.attacks.map(attack => {
+    const interval = intervals.find(cell => compareRational(attack.time, cell.sourceTime) >= 0 && compareRational(attack.time, cell.end) < 0);
+    return interval ? { ...attack, time: addRational(interval.targetTime, mulRational(subRational(attack.time, interval.sourceTime), interval.scale)) } : attack;
+  }) };
+}
+
 export function selectionToMeterRange(text, selectionStart, selectionEnd) {
   const a = Math.min(selectionStart, selectionEnd);
   const b = Math.max(selectionStart, selectionEnd);
@@ -372,7 +398,7 @@ export function selectionToMeterRange(text, selectionStart, selectionEnd) {
   if (lineA.text.trim().startsWith('>>')) {
     return { ok: false, message: 'Select notes in the music line, not the generated meter line.' };
   }
-  const scanned = scanMusicLine(lineA.text);
+  const scanned = scanDocumentMusicLine(text, lineA.line);
   if (scanned.error) return { ok: false, message: scanned.error };
   const localA = a - lineA.start;
   const localB = b - lineA.start;
@@ -423,12 +449,12 @@ function spanOverlap(a, b) {
   return compareRational(a.start, b.end) < 0 && compareRational(b.start, a.end) < 0;
 }
 
-function parseLaneEntries(raw, sourceLine, laneLine, sourceText) {
+function parseLaneEntries(raw, sourceLine, laneLine, sourceText, documentText = null) {
   const entries = String(raw ?? '').trim().replace(/^>>\s*/, '');
   if (!entries) return { spans: [], problems: [] };
   const spans = [];
   const problems = [];
-  const scanned = scanMusicLine(sourceText);
+  const scanned = documentText == null ? scanMusicLine(sourceText) : scanDocumentMusicLine(documentText, sourceLine, sourceText);
   if (scanned.error) problems.push({ line: laneLine, col: null, msg: scanned.error });
   for (const piece of entries.split(';')) {
     const item = piece.trim();
@@ -486,7 +512,7 @@ export function parseMeterDocument(text) {
       problems.push({ line: i + 1, col: null, msg: 'meter line has no music line above it' });
       continue;
     }
-    const parsed = parseLaneEntries(lines[i], musicIndex + 1, i + 1, lines[musicIndex]);
+    const parsed = parseLaneEntries(lines[i], musicIndex + 1, i + 1, lines[musicIndex], text);
     spans.push(...parsed.spans);
     problems.push(...parsed.problems);
   }
@@ -559,7 +585,7 @@ function updateLane(text, sourceLine, updater) {
   const musicIndex = sourceLine - 1;
   if (musicIndex < 0 || musicIndex >= lines.length) return { ok: false, message: 'Could not locate the selected music line.' };
   const laneIndex = musicIndex + 1 < lines.length && lines[musicIndex + 1].trim().startsWith('>>') ? musicIndex + 1 : -1;
-  const existing = laneIndex === -1 ? [] : parseLaneEntries(lines[laneIndex], sourceLine, laneIndex + 1, lines[musicIndex]).spans;
+  const existing = laneIndex === -1 ? [] : parseLaneEntries(lines[laneIndex], sourceLine, laneIndex + 1, lines[musicIndex], text).spans;
   const next = updater(existing).sort((a, b) => compareRational(a.start, b.start));
   if (next.length === 0) {
     if (laneIndex !== -1) lines.splice(laneIndex, 1);

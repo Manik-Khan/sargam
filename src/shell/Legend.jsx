@@ -22,7 +22,8 @@ const SECTIONS = [
     [
       ['S R g m', 'spaces separate beats — one token per matra'],
       ['SRg', 'notes together share one beat, split evenly'],
-      ['S:1/2', 'half-beat cell — also works on a hold, rest, or [group]'],
+      ['S:1/2', 'explicit half-beat cell — also works on a hold, rest, or [group]'],
+      ['tal: jhampak', '8½ beats: the final ½ cell is automatic, then sam'],
       ['[m - g]', 'uneven beat: m holds two-thirds, g the last third'],
       ['-', 'sustain — the previous note keeps ringing'],
       ['.', 'rest (silence) when written alone on a beat'],

@@ -139,7 +139,7 @@ function decorateMusicItems(line, items) {
     if (span.type !== 'meend' || span.ranged) continue;
     if (span.from.matraIndex === span.to.matraIndex) continue; // handled in matraToken
     const item = items.find((it) => it.from <= span.from.matraIndex && span.from.matraIndex <= it.to);
-    if (item && !item.text.endsWith('~')) item.text = item.text.replace(/(:1\/2)?$/, '~$1');
+    if (item && !item.text.endsWith('~')) item.text = item.text.replace(/(:1(?:\/2)?)?$/, '~$1');
   }
 
   // 3. Ranged multi-matra meend. The parentheses preserve spaces/matras;
@@ -269,7 +269,9 @@ function lcm(a, b) {
 
 function matraToken(line, k) {
   const token = wholeMatraToken(line, k);
-  return token + (matraDuration(line, k) === 0.5 ? ':1/2' : '');
+  const matra = line.matras[k];
+  if (matra.implicitDuration || !matra.duration) return token;
+  return token + (matraDuration(line, k) === 0.5 ? ':1/2' : ':1');
 }
 
 function wholeMatraToken(line, k) {

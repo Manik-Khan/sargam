@@ -78,7 +78,8 @@ export function fracToNumber(a) {
  *
  * @typedef {Object} Matra
  * @property {Event[]} events   — event durs sum to exactly 1, relative to the cell
- * @property {Frac} [duration]  — explicit cell duration in beats; absent means 1
+ * @property {Frac} [duration]  — cell duration in beats; absent means 1
+ * @property {boolean} [implicitDuration] — tala-derived final half; omit its suffix on serialization
  *
  * @typedef {Object} Event
  * @property {'note'|'rest'|'sustain'} type

@@ -1,3 +1,4 @@
+import { cycleMatraLabel } from './tala.js';
 // SARGAM_NOTATION_STRUCTURE_WAVE_2026_07_18
 // src/engine/render.js — Sargam engine: model → DOM.
 // Plain JS. Produces DOM but never imports React (plan global constraint);
@@ -1133,10 +1134,11 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
   cell.setAttribute('data-beat-duration', String(matraDuration(line, k)));
   if (matraDuration(line, k) === 0.5) cell.appendChild(h('span', 'sr-half-beat', '½'));
   if (tal) {
-    cell.setAttribute(
-      'data-cycle-matra',
-      String(wrapMatra(tal, line.startMatra + performedOffsetAt(line, k)))
-    );
+    const position = wrapMatra(tal, line.startMatra + performedOffsetAt(line, k));
+    const label = cycleMatraLabel(tal, position);
+    cell.setAttribute('data-cycle-matra', String(position));
+    cell.setAttribute('data-cycle-label', label);
+    cell.setAttribute('data-grid-coordinate', label + (matraDuration(line, k) === 0.5 && label !== '½' ? ' · ½' : ''));
   }
 
   // Build timed slots before the upper lanes. Repeated local approaches need

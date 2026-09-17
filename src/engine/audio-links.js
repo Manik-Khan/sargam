@@ -4,7 +4,7 @@
 // exact seconds, and the same repairable musical endpoints used by anchors.
 
 import { endpointFromGesture, metadataRange as anchorMetadataRange, resolveEndpoint } from './anchors.js';
-import { scanMusicLine } from './meter.js';
+import { scanDocumentMusicLine } from './meter.js';
 import { sourceAssetIdFromReference } from './project-media.js';
 
 export const AUDIO_LINK_VERSION = 1;
@@ -179,7 +179,7 @@ export function selectionToAudioAnchorRange(text, selectionStart, selectionEnd) 
     return { ok: false, message: 'Select notes in a music line.' };
   }
   const scanLine = lineA.text.replace(/\|\|:|:\|\|/g, (token) => ' '.repeat(token.length));
-  const scanned = scanMusicLine(scanLine);
+  const scanned = scanDocumentMusicLine(text, lineA.line, scanLine);
   if (scanned.error) return { ok: false, message: scanned.error };
   const localA = a - lineA.start;
   const localB = b - lineA.start;

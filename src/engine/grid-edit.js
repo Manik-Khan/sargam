@@ -6,7 +6,7 @@
 import { parseDocument } from './parse.js';
 import { serializeGridCells, serializeGridLine, serializeMusicLine } from './serialize.js';
 import { performedOffsetAt, matraDuration } from './performed-time.js';
-import { getTal, markerAtMatra, wrapMatra } from './tala.js';
+import { getTal, markerAtMatra, wrapMatra, cycleMatraLabel } from './tala.js';
 import { buildBolPlan } from './bol-lane.js';
 
 function musicLineAt(doc, sourceLine) {
@@ -66,7 +66,7 @@ export function replaceGridCellToken(text, sourceLine, matraIndex, value) {
     return { ok: false, message: 'That matra is no longer present in this line.' };
   }
   let token = normalizeGridCellToken(value);
-  if (matraDuration(found.line, index) === 0.5 && !/:1(?:\/2)?$/.test(token)) token += ":1/2";
+  if (matraDuration(found.line, index) === 0.5 && !found.line.matras[index].implicitDuration && !/:1(?:\/2)?$/.test(token)) token += ":1/2";
   if (!token || token === ":1/2") return { ok: false, message: 'A matra cannot be blank. Use - for a hold or . for a rest.' };
 
   const cells = serializeGridCells(found.line, found.tal);
@@ -233,6 +233,7 @@ export function gridLines(doc) {
         return {
           ...cell,
           cycleMatra,
+          cycleLabel: tal && cycleMatra != null ? cycleMatraLabel(tal, cycleMatra) : null,
           duration: matraDuration(line, cell.matraIndex),
           marker: tal && cycleMatra != null ? markerAtMatra(tal, cycleMatra) : null,
           attacks: bolPlan.attacks

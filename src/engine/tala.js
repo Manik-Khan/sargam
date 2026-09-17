@@ -102,6 +102,14 @@ export function wrapMatra(tal, n) {
   return m;
 }
 
+/** Reader-facing Jhampak tail: eight full beats, then its final half, then sam. */
+export function cycleMatraLabel(tal, position) {
+  if (tal?.name !== 'jhampak') return String(position);
+  const wrapped = wrapMatra(tal, position);
+  if (wrapped === 9) return '½';
+  return Number.isInteger(wrapped) ? String(wrapped) : `${Math.floor(wrapped)}+`;
+}
+
 /** 1-based matra numbers at which each vibhag starts. */
 function vibhagStarts(tal) {
   const starts = [];

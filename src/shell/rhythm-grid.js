@@ -15,13 +15,14 @@ export function rhythmGridIdentity(cell) {
     matraIndex,
     cycleMatra: Number.isFinite(cycleMatra) && cycleMatra >= 1 ? cycleMatra : null,
     ...(cell.getAttribute?.('data-beat-duration') === '0.5' ? { duration: 0.5 } : {}),
+    ...(cell.getAttribute?.('data-cycle-label') === '½' ? { cycleLabel: '½' } : {}),
     subdivisions: Math.max(1, subdivisions),
   };
 }
 
 export function rhythmGridLabel(identity) {
   if (!identity) return '';
-  const beat = identity.cycleMatra == null
+  const beat = identity.cycleLabel === '½' ? 'final half-beat of the tala' : identity.cycleMatra == null
     ? `written matra ${identity.matraIndex + 1}`
     : `tala matra ${identity.cycleMatra}`;
   const division = identity.subdivisions === 1
