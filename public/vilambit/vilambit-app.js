@@ -82,9 +82,27 @@ let waveformPollGeneration = 0;
 let sourceGeneration = 0;
 const GRAIN = 4096, RB_SIZE = 1 << 16, RB_MASK = RB_SIZE - 1;
 
-async function buildGraph(){
-  if (actx) return;
-  actx = new (window.AudioContext || window.webkitAudioContext)();
+let graphBuild = null;
+let playRequest = null;
+
+function buildGraph(){
+  if (graphBuild) return graphBuild;
+  if (state.engine !== 'none') return Promise.resolve(true);
+  const generation = sourceGeneration;
+  const pending = initializeAudioGraph(generation).catch(error => {
+    if (generation === sourceGeneration) disposeAudioGraph();
+    throw error;
+  }).finally(() => {
+    if (graphBuild === pending) graphBuild = null;
+  });
+  graphBuild = pending;
+  return pending;
+}
+
+async function initializeAudioGraph(generation){
+  // A media element can be bound to only one MediaElementAudioSourceNode.
+  // Keep its context and source for the lifetime of this mounted player.
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
   master = actx.createGain();
   master.gain.value = parseFloat($('vol').value);
   master.connect(actx.destination);
@@ -93,18 +111,25 @@ async function buildGraph(){
   if (!state.isVideo && state.decoded){
     // Engine A: buffer playback through the stretch worklet
     try {
-      stretch = await SignalsmithStretch(actx, { numberOfInputs: 0, outputChannelCount: [2] });
+      const candidate = await SignalsmithStretch(actx, { numberOfInputs: 0, outputChannelCount: [2] });
+      if (generation !== sourceGeneration) { disconnectNode(candidate); return false; }
+      stretch = candidate;
       stretch.addBuffers(bufferChannels(state.decoded));
       stretch.setUpdateInterval(0.05);
       stretch.connect(eqInput);
       state.engine = 'buffer';
       setBadge('engine: full-quality');
-      return;
-    } catch (e) { console.warn('stretch worklet unavailable, falling back', e); }
+      return true;
+    } catch (e) {
+      if (generation !== sourceGeneration) return false;
+      disconnectNode(stretch);
+      stretch = null;
+      console.warn('stretch worklet unavailable, falling back', e);
+    }
   }
 
   // Engine B / C: media element drives playback
-  srcNode = actx.createMediaElementSource(media);
+  if (!srcNode) srcNode = actx.createMediaElementSource(media);
   waveAnalyser = actx.createAnalyser();
   waveAnalyser.fftSize = 2048;
   waveAnalyser.smoothingTimeConstant = 0.15;
@@ -118,7 +143,9 @@ async function buildGraph(){
   let liveOk = false;
   if (window.SignalsmithStretch){
     try {
-      stretch = await SignalsmithStretch(actx, { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
+      const candidate = await SignalsmithStretch(actx, { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
+      if (generation !== sourceGeneration) { disconnectNode(candidate); return false; }
+      stretch = candidate;
       dryGain = actx.createGain(); wetGain = actx.createGain();
       dryGain.gain.value = 1; wetGain.gain.value = 0;
       srcNode.connect(dryGain);  dryGain.connect(eqInput);
@@ -129,7 +156,12 @@ async function buildGraph(){
       setBadge(state.archive
         ? 'engine: archive streaming + live pitch'
         : (state.isVideo ? 'engine: video + live pitch' : 'engine: streamed audio + live pitch'));
-    } catch (e) { console.warn('live stretch unavailable', e); }
+    } catch (e) {
+      if (generation !== sourceGeneration) return false;
+      [stretch, dryGain, wetGain].forEach(disconnectNode);
+      stretch = null;
+      console.warn('live stretch unavailable', e);
+    }
   }
   if (!liveOk){
     buildGranular();
@@ -137,6 +169,7 @@ async function buildGraph(){
     setBadge(state.archive ? 'engine: archive compatibility' : 'engine: compatibility');
   }
   applyPitch();
+  return true;
 }
 
 function buildEqGraph(){
@@ -244,17 +277,18 @@ function disposeAudioGraph(){
   if (state.playing && stretch) {
     try { stretch.schedule({ active: false }); } catch (_) {}
   }
-  [stretch, srcNode, granular, dryGain, wetGain, waveAnalyser, waveAnalyserSilent, eqInput]
+  if (granular?.node) granular.node.onaudioprocess = null;
+  [stretch, srcNode, granular?.node, dryGain, wetGain, waveAnalyser, waveAnalyserSilent, eqInput]
     .forEach(disconnectNode);
   if (eqNodes) Object.values(eqNodes).forEach(disconnectNode);
   disconnectNode(master);
-  const closing = actx;
-  actx = null;
+  graphBuild = null;
+  playRequest = null;
+  state.engine = 'none';
   master = null;
   eqInput = null;
   eqNodes = null;
   stretch = null;
-  srcNode = null;
   granular = null;
   dryGain = null;
   wetGain = null;
@@ -262,7 +296,7 @@ function disposeAudioGraph(){
   waveAnalyserData = null;
   waveAnalyserBytes = null;
   waveAnalyserSilent = null;
-  if (closing && closing.state !== 'closed') closing.close().catch(() => {});
+  // Do not close actx or discard srcNode: disconnecting does not unbind media.
 }
 
 function bufferChannels(ab){
@@ -373,7 +407,7 @@ async function captureMediaRangeRealtime(startTime, endTime){
 
   realtimeCaptureActive = true;
   try {
-    if (!actx || !srcNode) await buildGraph();
+    if (!await buildGraph()) throw new Error('The recording changed before clip capture was ready.');
     if (!actx || !srcNode) throw new Error('Vilambit could not prepare the recording for real-time clip capture.');
     if (actx.state === 'suspended') await actx.resume();
 
@@ -587,11 +621,35 @@ function seekTo(t){
   if (state.duration) drawWave();
 }
 
-async function togglePlay(){
-  if (!state.fileURL) return;
-  const first = !actx; // buildGraph() chooses the engine on the first play
-  await buildGraph();
-  if (actx.state === 'suspended') await actx.resume();
+function togglePlay(){
+  if (!state.fileURL) return Promise.resolve(false);
+  if (playRequest) return playRequest;
+  const generation = sourceGeneration;
+  const pending = performTogglePlay(generation).catch(error => {
+    if (generation !== sourceGeneration) return false;
+    state.playing = false;
+    media.pause();
+    const message = error?.name === 'NotAllowedError'
+      ? 'Playback was blocked by the browser. Press Play again to allow sound.'
+      : 'Playback could not start. Try Play again, or choose the recording again.';
+    showSourceNotice(message, 'err');
+    console.warn('Recording playback failed', error);
+    paintPlayBtn();
+    return false;
+  }).finally(() => {
+    if (playRequest === pending) playRequest = null;
+  });
+  playRequest = pending;
+  return pending;
+}
+
+async function performTogglePlay(generation){
+  const first = state.engine === 'none';
+  const ready = buildGraph();
+  // Request resume during the user's click, before worklet setup yields.
+  const resumed = actx?.state === 'suspended' ? actx.resume() : Promise.resolve();
+  const [built] = await Promise.all([ready, resumed]);
+  if (!built || generation !== sourceGeneration) return false;
   // The engine has just been chosen; a seek made before now was written to
   // BOTH stores (see seekTo), so hand the media element the position the
   // buffer store carries — and vice versa — rather than starting from 0.
@@ -616,8 +674,11 @@ async function togglePlay(){
     }
     paintPlayBtn();
   } else {
-    if (media.paused) media.play(); else media.pause();
+    if (media.paused) await media.play(); else media.pause();
   }
+  if (generation !== sourceGeneration) return false;
+  if (!media.error) showSourceNotice('');
+  return true;
 }
 function paintPlayBtn(){
   const on = state.engine === 'buffer' ? state.playing : !media.paused;
@@ -851,7 +912,7 @@ function resetSourceState(source){
     archive: Boolean(source.archive),
     engine: 'none',
     fileSize: Number.isFinite(Number(source.size)) ? Number(source.size) : null,
-    duration: 0, isVideo: false,
+    duration: 0, isVideo: Boolean(source.isVideo),
     fileLastModified: Number.isFinite(Number(source.lastModified)) ? Number(source.lastModified) : null,
     peaks: null, waveformMode: 'none', decoded: null, detected: null,
     loopA: null, loopB: null, loopOn: false, markers: [],
@@ -905,7 +966,11 @@ function resetSourceState(source){
 
   media.addEventListener('error', () => {
     if (generation !== sourceGeneration) return;
-    const message = 'The archive recording could not be loaded. Check that its URL is reachable from this computer.';
+    const message = state.archive
+      ? 'The archive recording could not be loaded. Check that its URL is reachable from this computer.'
+      : (media.error?.code === 3 || media.error?.code === 4)
+        ? 'This browser could not read the audio or video format in this local file. Try a compatible copy such as AAC audio or H.264/AAC video.'
+        : 'The local recording could not be read. Choose it again and check that the file is fully downloaded on this computer.';
     showSourceNotice(message, 'err');
     $('exportStatus').textContent = message;
   }, { once: true });
@@ -915,9 +980,8 @@ function resetSourceState(source){
 function decodeSource(arrayBuffer, generation = sourceGeneration){
   return Promise.resolve(arrayBuffer).then(buf => {
     const dctx = new (window.AudioContext || window.webkitAudioContext)();
-    return dctx.decodeAudioData(buf.slice(0)).then(ab => {
+    return Promise.resolve().then(() => dctx.decodeAudioData(buf.slice(0))).then(ab => {
       if (generation !== sourceGeneration) {
-        dctx.close().catch(() => {});
         return;
       }
       state.decoded = ab;
@@ -935,8 +999,7 @@ function decodeSource(arrayBuffer, generation = sourceGeneration){
         stretch.addBuffers(bufferChannels(ab));
       }
       invalidateWaveCache(); drawWave();
-      return dctx.close();
-    });
+    }).finally(() => dctx.close().catch(() => {}));
   }).catch(() => {
     if (generation !== sourceGeneration) return;
     ensureLiveWaveform(state.isVideo
@@ -955,6 +1018,7 @@ function loadFile(file){
     revocable: true,
     id: null,
     name: file.name,
+    isVideo: file.type?.startsWith('video/') || /\.(mp4|m4v|mov|webm|ogv|avi|mkv)$/i.test(file.name),
     size: file.size,
     lastModified: file.lastModified,
     archive: false,

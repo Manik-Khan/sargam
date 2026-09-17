@@ -33,6 +33,10 @@ The command must end with every smoke check passing and a successful production 
 
 ## Playback
 
+- In Music, load and play a local MP4; replace it with a second MP4, then a local audio file, then the first MP4. Each must play with audible sound without refreshing the page. Check play/pause, seek-before-first-play, speed/pitch, and A–B looping after replacement.
+- Click Play twice quickly while setup is pending, and replace a recording during setup. No old recording or unfinished processing graph may take over the new source.
+- Load an unreadable local recording. Its message must identify a local-file/format problem, not an archive URL problem; a subsequent valid recording must remain playable.
+
 - Play from the beginning and from a clicked matra.
 - Confirm melody, tanpura, and tala toggles work independently.
 - Confirm editing stops stale playback instead of continuing against changed notation.

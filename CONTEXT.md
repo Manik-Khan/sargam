@@ -6,6 +6,14 @@
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
 
+## September 17 recording playback repair
+
+- Local recording replacement previously closed the AudioContext and discarded its MediaElementAudioSourceNode while retaining the same media element. A later media-engine start attempted to bind that element again and failed. Keep one context/source binding for the mounted player and rebuild only the downstream processing graph.
+- Graph setup and Play now share pending work, discard obsolete worklet results after source changes, await media.play(), and show recoverable playback errors. Local-file load errors no longer claim an archive URL failure. Temporary decoding contexts close on failure too.
+- The user-supplied `m2-res_854p-2.mp4` is 31.07 seconds of H.264 Main video and AAC-LC stereo audio; ffmpeg decoded the complete file without errors. This establishes file decodability, not browser acceptance or the cause of the earlier unsupplied M4A failure.
+- Eight lifecycle regressions cover repeated video replacement, video/audio/video transitions, stale setup, repeated clicks, rejected playback and retry, fallback playback, and local/archive errors. **657 checks passed, 0 failed; production build succeeded.**
+- Chrome computer-use access was not approved, so live video/audio playback acceptance remains pending. Test the supplied MP4, then another recording, then the MP4 again; include play/pause, seeking, speed/pitch, A–B looping, and audible output. Changes are local; no commit, push, or deployment performed.
+
 ## September 16 Jhampak correction — automatic final half-beat
 
 - Manik approved the display `[8: .N.D] [½: .N] | [1 / sam: S]` and automatic half-beat timing at the end of Jhampak. This supersedes the explicit-only rule in the earlier checkpoint below.
