@@ -2,6 +2,7 @@
 // controls kept in a settings popover. Presentational: playback and preference
 // behavior remains owned by App.
 
+import WorkspaceMenu from './WorkspaceMenu.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   isSoundfontVoice,
@@ -117,8 +118,6 @@ export default function Transport({
   chikari,
   droneMode,
   talaSound,
-  followEditing = true,
-  followPlayback = true,
   onPlayPause,
   onStop,
   onBpm,
@@ -130,8 +129,6 @@ export default function Transport({
   onChikariChange,
   onDroneMode,
   onTalaSound,
-  onFollowEditing,
-  onFollowPlayback,
 }) {
   const [bpmDraft, setBpmDraft] = useState(String(bpm));
   const lastDroneMode = useRef(droneMode === 'off' ? 'sa-pa' : droneMode);
@@ -205,20 +202,15 @@ export default function Transport({
         title="Playback speed — writes the tempo: directive"
       />
       <span className="tp-sep" />
-      <span className="tp-label">Loop</span>
-      <span className="tp-seg tp-loop" role="group" aria-label="Loop mode">
-        {['off', 'line', 'section'].map((mode) => (
-          <button
-            key={mode}
-            className={loopMode === mode ? 'on' : ''}
-            aria-pressed={loopMode === mode}
-            onClick={() => onLoopMode(mode)}
-          >
-            {mode}
-          </button>
-        ))}
-      </span>
-      <span className="tp-sep" />
+      <WorkspaceMenu label="Repeat">
+        <span className="tp-seg tp-loop" role="group" aria-label="Loop mode">
+          {['off', 'line', 'section'].map(mode => <button type="button" key={mode}
+            className={loopMode === mode ? 'on' : ''} aria-pressed={loopMode === mode}
+            onClick={() => onLoopMode(mode)}>{mode === 'off' ? 'Off' : mode === 'line' ? 'Current line' : 'Section'}</button>)}
+        </span>
+      </WorkspaceMenu>
+      <WorkspaceMenu label="Sounds" wide>
+        <div className="tp-settings-menu" aria-label="Sound settings">
       <div className="tp-quick-group" role="group" aria-label="Quick sound toggles">
         <button
           type="button"
@@ -248,34 +240,6 @@ export default function Transport({
           <span aria-hidden="true" /> Tala
         </button>
       </div>
-      <details className="tp-settings" onKeyDown={(event) => event.stopPropagation()}>
-        <summary title="Playback and workspace settings" aria-label="Sound settings">
-          <span aria-hidden="true">⚙</span> Settings
-        </summary>
-        <div className="tp-settings-menu">
-          <section className="tp-settings-section">
-            <div className="tp-settings-heading">
-              <strong>Live workspace</strong>
-              <span>The score keeps rendering while the editor stays anchored.</span>
-            </div>
-            <label className="tp-setting-check">
-              <input
-                type="checkbox"
-                checked={followEditing}
-                onChange={(event) => onFollowEditing?.(event.target.checked)}
-              />
-              Keep the measure I am editing visible
-            </label>
-            <label className="tp-setting-check">
-              <input
-                type="checkbox"
-                checked={followPlayback}
-                onChange={(event) => onFollowPlayback?.(event.target.checked)}
-              />
-              Follow the measure being played
-            </label>
-          </section>
-
           <section className="tp-settings-section">
             <div className="tp-settings-heading">
               <strong>Chikari sound</strong>
@@ -468,7 +432,7 @@ export default function Transport({
             />
           </section>
         </div>
-      </details>
+      </WorkspaceMenu>
     </div>
   );
 }

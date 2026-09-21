@@ -167,7 +167,7 @@ export const smokes = [
 
       const app = await readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       const preview = await readFile(new URL('../src/shell/PreviewPane.jsx', import.meta.url), 'utf8');
-      const commandBar = await readFile(new URL('../src/shell/CommandBar.jsx', import.meta.url), 'utf8');
+      const commandBar = await readFile(new URL('../src/shell/NotationViewControls.jsx', import.meta.url), 'utf8');
       const gridEditor = await readFile(new URL('../src/shell/GridEditor.jsx', import.meta.url), 'utf8');
       assert.match(app, /getPref\('rhythmGrid', false\)/);
       assert.match(app, /setPref\('rhythmGrid', value\)/);

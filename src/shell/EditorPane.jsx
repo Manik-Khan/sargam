@@ -2,7 +2,7 @@
 // facade for the existing shell. Clean mode visually folds generated anchor
 // metadata while preserving the exact underlying Markdown and selection maps.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/state';
 import {
   Decoration,
@@ -29,7 +29,7 @@ class HiddenStructureWidget extends WidgetType {
     const span = document.createElement('span');
     span.className = 'cm-sargam-fold';
     span.textContent = '⋯ generated structure';
-    span.title = 'Turn on Structure to inspect stored anchors and audio links';
+    span.title = 'Choose View → Show metadata to inspect stored anchors and audio links';
     return span;
   }
 }
@@ -105,6 +105,7 @@ export default function EditorPane({
   bolCapture,
   bolMessage,
   onToggleBolCapture,
+  showStructure = false,
   onBolCaptureKey,
   editorRef,
 }) {
@@ -117,7 +118,6 @@ export default function EditorPane({
   const clickRef = useRef(onNotationClick);
   const beforeRef = useRef(onBeforeEdit);
   const bolKeyRef = useRef(onBolCaptureKey);
-  const [showStructure, setShowStructure] = useState(false);
   const structureCompartment = useMemo(() => new Compartment(), []);
 
   changeRef.current = onChange;
@@ -242,17 +242,7 @@ export default function EditorPane({
 
   return (
     <div className="app-editor-shell">
-      <div className="app-editor-mode" role="group" aria-label="Editor structure visibility">
-        <button
-          type="button"
-          className={!showStructure ? 'active' : ''}
-          onClick={() => setShowStructure(false)}
-        >Clean</button>
-        <button
-          type="button"
-          className={showStructure ? 'active' : ''}
-          onClick={() => setShowStructure(true)}
-        >Structure</button>
+      {bolCapture && <div className="app-editor-mode" role="group" aria-label="Bol capture">
         <button
           type="button"
           className={`app-bol-capture-toggle${bolCapture ? ' active' : ''}`}
@@ -269,7 +259,7 @@ export default function EditorPane({
             ? `BOL PASS ${bolCapture.pass || 1} · 1–9 switch pass · holds/repeats mirror notes · ↓ da · ↑ ra · v diri (2 strokes on this note) · ^/c chikari · ←/→ move · Delete erase · Esc direct edit — ${bolMessage || ''}`
             : (showStructure ? 'Generated anchors and audio links are editable.' : 'Generated anchors and audio links are folded.')}
         </span>
-      </div>
+      </div>}
       <div className="app-editor" ref={mount} />
     </div>
   );

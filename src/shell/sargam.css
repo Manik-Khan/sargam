@@ -4156,3 +4156,107 @@
 .notation-help { margin-top:6px; }
 @media (pointer:coarse) { .notation-ornaments .cmd-btn, .notation-bol-controls select { min-height:44px; } }
 @media (max-width:600px) { .notation-bol-controls select { font-size:16px; } }
+
+/* Approved compact arrangement, retaining the existing AACM palette, artwork,
+   typefaces and paper treatment. Navigation has a single home in the header. */
+:root { --workspace-rail-width: 38px; }
+.workspace-topbar { grid-template-columns: minmax(130px, 1fr) auto minmax(0, 1fr); gap: 18px; padding-inline: 18px; }
+.workspace-primary-nav { display: flex; gap: 20px; }
+.workspace-top-actions { min-width: 0; }
+.workspace-menu-toggle { padding-inline: 8px; }
+.workspace-rail { display: flex; }
+.workspace-rail-intro { flex: 1; padding: 18px 0; border: 0; }
+.workspace-rail-title { font-size: 12px; }
+.workspace-rail-number { font-family: var(--workspace-serif); font-size: 15px; }
+.workspace-quote { display: none; }
+.workspace-more-drawer { width: 260px; padding: 12px; }
+.workspace-more-drawer > button { display: block; width: 100%; border: 0; padding: 10px; text-align: left; color: var(--sr-ink); background: transparent; font: inherit; }
+.workspace-more-drawer > button:hover { background: var(--sr-paper); }
+.workspace-about { border-top: 1px solid var(--sr-line); padding: 12px 10px 0; color: var(--sr-ink-soft); font-family: var(--workspace-serif); }
+.app-stage > .app-panes { margin: 14px 18px 18px; }
+.app-workspace-split > .app-panes { margin-right: 0; }
+.app-stage > .app-vilambit { grid-column: 2; }
+.app-workspace-split > .app-vilambit { grid-column: 4; }
+.app-workspace-controls { flex-wrap: wrap; }
+.app-workspace-controls .transport { flex: 0 1 auto; flex-wrap: wrap; overflow: visible; }
+.app-workspace-controls .app-practice-bar { flex: 1 1 480px; }
+
+/* Popovers live outside pane overflow. Native controls stay reachable by
+   keyboard and touch, and opening a menu cannot move the source text. */
+.workspace-tool-toggle, .workspace-tool-popover button {
+  min-height: 30px; border: 1px solid var(--sr-line); border-radius: 4px;
+  padding: 5px 9px; color: var(--sr-ink); background: var(--sr-paper-raised); font: inherit; font-size: 12px;
+}
+.workspace-tool-toggle { white-space: nowrap; }
+.workspace-tool-toggle[aria-expanded="true"], .workspace-tool-popover button[aria-pressed="true"] {
+  background: var(--sr-ink); color: var(--sr-paper-raised);
+}
+.workspace-tool-popover {
+  position: fixed; z-index: 150; overflow: auto; overscroll-behavior: contain;
+  display: grid; gap: 10px; padding: 12px; border: 1px solid var(--sr-line); border-radius: 7px;
+  color: var(--sr-ink); background: var(--sr-paper-raised); box-shadow: 0 14px 36px rgba(3,29,16,.24);
+  font: 13px/1.5 var(--workspace-sans); box-sizing: border-box;
+}
+.workspace-tool-popover > label { display: flex; align-items: center; gap: 8px; }
+.workspace-tool-popover button { cursor: pointer; }
+.workspace-tool-popover .cmdbar { display: grid; padding: 0; border: 0; background: transparent; }
+.workspace-tool-popover .cmdbar .cmd-btn { text-align: left; }
+.workspace-tool-popover .cmd-grid-style { flex-wrap: wrap; border: 0; padding: 0; }
+.workspace-tool-popover .tp-settings-menu { position: static; width: auto; max-height: none; overflow: visible; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.workspace-tool-popover .tp-quick-group { flex-wrap: wrap; }
+.workspace-tool-popover .tp-settings-section { padding-inline: 0; }
+.workspace-tool-popover .tp-setting-row, .workspace-tool-popover .tp-mix-row { flex-wrap: wrap; }
+.workspace-tool-popover .workspace-tool-close { justify-self: end; }
+.app-write-mode { align-items: center; flex-wrap: wrap; }
+.app-write-mode > button, .app-write-mode .workspace-tool-toggle { min-height: 30px; }
+.app-editor-col.has-note-tools { min-height: min(290px, 65vh); }
+.app-note-tools {
+  flex: 0 0 auto; height: clamp(100px, 20vh, 180px); min-height: 0; overflow: auto;
+  scrollbar-gutter: stable; overscroll-behavior: contain; overflow-anchor: none;
+  padding: 8px 12px; border-top: 1px solid var(--sr-line); background: var(--sr-paper-raised);
+}
+.app-note-tools[hidden] { display: none; }
+.app-note-tools .notation-controls { height: auto; overflow: visible; padding: 0 0 10px; border: 0; }
+.app-note-tools .cmdbar { padding: 8px 0; background: transparent; border: 0; }
+.app-note-tools .cmd-anchor-tools { margin: 0; padding: 0; border: 0; }
+.app-note-tools .cmd-meter-message { padding-inline: 0; }
+.app-writing-focus .app-workspace-controls { display: none; }
+.app-writing-focus .app-note-tools-toggle { display: none; }
+
+@media (max-width: 1180px) {
+  .workspace-topbar { grid-template-columns: auto minmax(0,1fr); row-gap: 0; }
+  .workspace-primary-nav { justify-self: center; }
+  .workspace-top-actions { grid-column: 1 / -1; justify-self: end; padding-bottom: 4px; }
+  .app-workspace-controls .transport { flex: 0 1 auto; }
+}
+@media (max-width: 980px) {
+  .app-stage { grid-template-columns: var(--workspace-rail-width) minmax(0,1fr); grid-template-rows: minmax(0,1fr); }
+  .app-stage > .workspace-rail { grid-column: 1; grid-row: 1 / -1; }
+  .workspace-rail-intro { display: flex; }
+  .app-stage > .app-panes { grid-column: 2; grid-row: 1; }
+  .app-stage > .app-vilambit { grid-column: 2; grid-row: 1; }
+  .app-stage.app-workspace-split { grid-template-columns: var(--workspace-rail-width) minmax(0,1fr); grid-template-rows: minmax(0,1fr) minmax(0,1fr); }
+  .app-workspace-split > .app-panes { grid-column: 2; grid-row: 1; margin-right: 18px; margin-bottom: 6px; }
+  .app-workspace-split > .app-vilambit { grid-column: 2; grid-row: 2; visibility: visible; pointer-events: auto; }
+  .app-workspace-split .app-editor-col, .app-workspace-split .notation-resize-divider,
+  .app-workspace-split > .workspace-split-divider { display: none; }
+}
+@media (max-width: 600px) {
+  :root { --workspace-rail-width: 0px; }
+  .workspace-rail { display: none; }
+  .workspace-topbar { padding-inline: 10px; gap: 8px; }
+  .workspace-primary-nav { gap: 12px; justify-self: end; }
+  .workspace-primary-nav button { font-size: 10px; letter-spacing: .07em; min-height: 46px; }
+  .workspace-menu-toggle { font-size: 10px; }
+  .workspace-open-recording { display: inline-block; font-size: 10px; }
+  .workspace-top-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .app-stage > .app-panes, .app-workspace-split > .app-panes { margin: 8px; }
+  .workspace-tool-popover .tp-tone-row { grid-template-columns: 65px minmax(0,1fr) 34px; }
+  .workspace-tool-popover .tp-tone-edge { display: none; }
+  .workspace-tool-popover .tp-tone-row input { min-width: 0; }
+}
+@media (pointer: coarse) {
+  .workspace-tool-toggle, .workspace-tool-popover button, .app-write-mode > button { min-height: 44px; }
+  .workspace-tool-popover input, .workspace-tool-popover select { font-size: 16px; }
+}
+@media print { .workspace-tool-popover, .app-note-tools { display: none !important; } }

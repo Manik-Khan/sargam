@@ -5,8 +5,9 @@ Approved by Manik after the interactive control proposal. Implementation base:
 September 21 checkpoint: this implementation is now in matching local/tracking/live
 main at `5139fb4431a4`. Deployment is unverified.
 
-Text Write remains the source of truth. Select notes in its editor, then choose
-Slide, Krintan, Kan / grace, or None in **Selected notes**. Select the complete
+Text Write remains the source of truth. Open **Note tools** in the Text/Grid
+toolbar. Select notes in the editor, then choose
+Slide, Krintan, Kan / grace, or Remove ornament in **Note tools → Selected notes**. Select the complete
 written ornament to replace or remove it. The written-shorthand preview shows
 the actual music line and its editable bol lanes. These buttons act inside
 Sargam; the earlier conversation mock does not modify compositions.
@@ -23,8 +24,10 @@ Sargam; the earlier conversation mock does not modify compositions.
 
 Existing compact spellings remain supported. No parser grammar was removed or
 redefined. Grid Write retains its editable cells and existing per-note bol
-menus. The new selection panel lives in Text Write; Writing focus hides it
-alongside the other secondary controls.
+menus. The selection panel lives in Text mode, in a manually opened inspector below
+the source. Focus mode hides it alongside the other secondary controls. See
+[the compact workspace layout](compact-workspace-layout.md) for the new toolbar
+locations. Selection itself never opens or expands the inspector.
 
 September 21 selection regression repair (base `face6d601d62`): the panel now
 reserves the same compact height for empty, short and long selections, with
@@ -58,8 +61,8 @@ Ornament and bol control edits use one isolated CodeMirror history transaction.
 Undo restores the notes, bol lanes and selection together. Direct source typing
 keeps ordinary CodeMirror undo behavior.
 
-Completed verification: `npm run verify` — **712 checks passed, 0 failed;
-production build passed (128 modules)**. Regressions exercise direct-typed/control
+Completed verification: `npm run verify` — **718 checks passed, 0 failed;
+production build passed (131 modules)**. Regressions exercise direct-typed/control
 parity, replacing/removing wrappers, per-pass bol remapping, surviving diri
 endpoints, Jhampak duration, invalid partial selections, gap-chikari protection,
 atomic undo/redo, real React button/select interactions in jsdom, and pointer

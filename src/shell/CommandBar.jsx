@@ -27,6 +27,7 @@ const TOOLS = [
 
 export default function CommandBar({
   onApply,
+  mode = 'annotations',
   anchorTool,
   onAnchorTool,
   anchorMeter,
@@ -34,10 +35,6 @@ export default function CommandBar({
   onApplyMeter,
   onRemoveSelectedMark,
   anchorMessage,
-  rhythmGrid = false,
-  onRhythmGrid,
-  rhythmGridStyle = 'cells',
-  onRhythmGridStyle,
 }) {
   const [customMeter, setCustomMeter] = useState(anchorMeter || '');
   const chooseMeter = (value) => {
@@ -48,10 +45,10 @@ export default function CommandBar({
   return (
     <div className="cmdbar-wrap">
       <div className="cmdbar">
-        {COMMANDS.map(([label, title, fn]) => (
+        {mode === 'insert' && COMMANDS.map(([label, title, fn]) => (
           <button key={label} type="button" className="cmd-btn" title={title} onMouseDown={event => event.preventDefault()} onClick={() => onApply(fn)}>{label}</button>
         ))}
-        <div className="cmd-anchor-tools" role="group" aria-label="Score annotations">
+        {mode === 'annotations' && <div className="cmd-anchor-tools" role="group" aria-label="Score annotations">
           <span className="cmd-anchor-label">Annotate</span>
           {TOOLS.map(([kind, glyph, title]) => (
             <button
@@ -87,38 +84,13 @@ export default function CommandBar({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onApplyMeter?.(customMeter)}
           >Apply Meter</button>
-          <button type="button" className="cmd-btn" onClick={() => onRemoveSelectedMark?.()}>Remove</button>
-          <button
-            type="button"
-            className={`cmd-btn cmd-rhythm-grid${rhythmGrid ? ' active' : ''}`}
-            aria-pressed={rhythmGrid}
-            aria-label="Graph-paper rhythm grid"
-            title="Use every matra as a numbered graph-paper cell, with subdivisions inside it"
-            onClick={() => onRhythmGrid?.(!rhythmGrid)}
-          >Graph Grid</button>
-          {rhythmGrid && (
-            <div className="cmd-grid-style" role="group" aria-label="Grid appearance">
-              <span>Look</span>
-              <button
-                type="button"
-                className={`cmd-btn${rhythmGridStyle === 'cells' ? ' active' : ''}`}
-                aria-pressed={rhythmGridStyle === 'cells'}
-                onClick={() => onRhythmGridStyle?.('cells')}
-              >Cells</button>
-              <button
-                type="button"
-                className={`cmd-btn${rhythmGridStyle === 'paper' ? ' active' : ''}`}
-                aria-pressed={rhythmGridStyle === 'paper'}
-                onClick={() => onRhythmGridStyle?.('paper')}
-              >Graph Paper</button>
-            </div>
-          )}
+          <button type="button" className="cmd-btn" onClick={() => onRemoveSelectedMark?.()}>Remove selected mark</button>
           {anchorTool && <button type="button" className="cmd-btn" onClick={() => onAnchorTool?.(null)}>Done</button>}
-        </div>
+        </div>}
       </div>
-      <div className="cmd-meter-message" aria-live="polite">
-        {anchorMessage || 'Choose a mark, then click or drag directly on the rendered notation.'}
-      </div>
+      {mode === 'annotations' && (anchorTool || anchorMessage) && <div className="cmd-meter-message" aria-live="polite">
+        {anchorMessage || 'Click or drag on the score to place this mark.'}
+      </div>}
     </div>
   );
 }

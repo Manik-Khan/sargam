@@ -1,10 +1,20 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-09-21, after the Selected notes drag-selection stability repair. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
+**Updated:** 2026-09-21, after the approved compact workspace layout. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
 
 **What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with [the September 21 handoff](SARGAM_NEXT_SESSION_CONTEXT_2026-09-21_NOTATION_CHECKPOINT.md) and the historical July 30 print checkpoint, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
+
+## September 21 compact workspace layout
+
+- Manik approved the mock's arrangement while explicitly preferring the existing site's visuals. Preserve Sargam's existing palette, typography, AACM logo, artwork and paper treatment; the mock is not a replacement visual identity.
+- One slim identity rail replaces the three left strips. Top navigation provides Notation, Music and explicit Split view. File and Library remain primary; More contains Linked phrases and Queue. Narrow split view stacks both surfaces.
+- Repeat and Sounds consolidate notation playback settings. Empty recording controls are hidden without removing their bridge listener. The Music iframe remains mounted across views.
+- Text/Grid and editing menus share one source toolbar. Note tools opens manually below the editor, has bounded scrolling, and cannot expand in response to selection. Insert groups structural shorthand actions; View owns appearance, follow, metadata, naming and layout options. Focus mode hides notation transport and the inspector. Direct shorthand remains essential and supported.
+- **718 checks passed, 0 failed; production build passed (131 modules)**. New real-component regressions cover menus, navigation, callbacks, recording readiness and inspector visibility. Browser visual/aural acceptance remains pending. See [compact layout](docs/compact-workspace-layout.md) for the acceptance sequence.
+- Base: canonical clone, clean matching `main` at `19bbb77e3277`. This layout is local and uncommitted at handoff; no push or deployment.
+- Additional musical ruling from this conversation: the final Jhampak `.N` occupies its own ½-beat space before S on sam. Do not automatically join them with a rhythmic grouping curve. An intended meend is a separate explicit marking; this layout pass does not change that musical behavior.
 
 ## September 21 selection stability repair
 

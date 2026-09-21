@@ -193,8 +193,8 @@ export const smokes = [
       const app = await readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       const editor = await readFile(new URL('../src/shell/GridEditor.jsx', import.meta.url), 'utf8');
       assert.match(app, /getPref\('writeMode', 'text'\)/);
-      assert.match(app, />Text Write<\/button>/);
-      assert.match(app, />Grid Write<\/button>/);
+      assert.match(app, />Text<\/button>/);
+      assert.match(app, />Grid<\/button>/);
       assert.match(app, /<GridEditor/);
       assert.match(editor, /replaceGridCellToken/);
       assert.match(editor, /appendGridCellToken/);

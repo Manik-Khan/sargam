@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { describeNotationSelection, prepareOrnamentEdit } from './notation-authoring.js';
 
-const ORNAMENTS = [['slide', 'Slide', '~(Gm)'], ['krintan', 'Krintan', '[[Gm]]'], ['kan', 'Kan / grace', '{G}m'], ['none', 'None', 'Gm']];
+const ORNAMENTS = [['slide', 'Slide', '~(Gm)'], ['krintan', 'Krintan', '[[Gm]]'], ['kan', 'Kan / grace', '{G}m'], ['none', 'Remove ornament', 'Gm']];
 const BOLS = [['', 'No bol'], ['da', 'Da'], ['ra', 'Ra'], ['diri', 'Diri · same note'], ['diri-span', 'Diri · next note'], ['chikari', 'Chikari']];
 
 export default function NotationControls({ text, doc, selection, onEdit, onBol, message }) {

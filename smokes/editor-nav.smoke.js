@@ -73,7 +73,7 @@ export const smokes = [
       assert.match(app, /pendingTarget !== null[\s\S]*?sourceLine !== pendingTarget\) return[\s\S]*?editorSyncTargetRef\.current = null/);
       assert.match(app, /writeMode === 'grid'[\s\S]*?setGridSelection[\s\S]*?activeSelection=\{gridSelection\}/);
       assert.match(app, /modeSwitchTargetRef[\s\S]*?previewSourceLine[\s\S]*?focusSourceLine/);
-      assert.match(app, /goToNotationBeginning[\s\S]*?↑ Beginning/);
+      assert.match(app, /goToNotationBeginning[\s\S]*?↑ Go to beginning/);
       assert.match(gridEditor, /activeSelection[\s\S]*?centeredElementScrollTop[\s\S]*?preventScroll/);
       assert.match(gridEditor, /data-source-line=\{row\.sourceLine\}[\s\S]*?data-matra-index=\{cell\.matraIndex\}/);
       assert.match(preview, /syncRevision[\s\S]*?activeLine,\s*syncRevision/);

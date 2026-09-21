@@ -95,6 +95,10 @@ export default function PracticeBar({
     });
   };
 
+  // Keep the bridge subscribed even without a recording. Hide only its UI;
+  // readiness/error messages and selected linked phrases must still work.
+  if (!player.loaded && !player.source && !selectedLink && !player.error) return null;
+
   return (
     <div className="app-practice-bar" aria-label="Sargam Music recording controls">
       <div className="app-practice-source" title={sourceName}>

@@ -186,8 +186,9 @@ export const smokes = [
       assert.match(command, /placeholder="3, 6, 5\/7, 4\/3"/);
       assert.match(command, />Apply Meter</);
       assert.match(command, /onApplyMeter\?\.\(customMeter\)/);
-      assert.match(command, />Graph Grid</);
-      assert.match(command, /numbered graph-paper cell/);
+      const viewControls = await read('../src/shell/NotationViewControls.jsx');
+      assert.match(viewControls, /Show beat grid/);
+      assert.match(viewControls, /onRhythmGrid\(event.target.checked\)/);
       assert.match(preview, /mountMeterOverlays/);
       assert.match(preview, /app-rhythm-grid/);
       assert.doesNotMatch(await read('../src/engine/meter.js'), /scheduleDocument|createPlayer|AudioContext/);

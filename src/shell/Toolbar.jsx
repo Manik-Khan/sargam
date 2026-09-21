@@ -6,7 +6,6 @@ export default function Toolbar({
   fileName,
   dirty,
   recents,
-  layout,
   onNew,
   onOpen,
   onSave,
@@ -21,13 +20,8 @@ export default function Toolbar({
   onExportPortable,
   onExport,
   onExportXML,
-  noteNames,
-  onToggleNoteNames,
-  onDictate,
-  onLegend,
   view,
   onView,
-  onToggleLayout,
   onOpenRecent,
   onRemoveRecent,
   sourceName,
@@ -52,6 +46,7 @@ export default function Toolbar({
   const libraryRef = useRef(null);
   const linkedRef = useRef(null);
   const queueRef = useRef(null);
+  const moreRef = useRef(null);
 
   useEffect(() => {
     if (!openMenu) return undefined;
@@ -61,8 +56,9 @@ export default function Toolbar({
         library: libraryRef,
         linked: linkedRef,
         queue: queueRef,
+        more: moreRef,
       }[openMenu];
-      if (!activeRef.current?.contains(event.target)) setOpenMenu(null);
+      if (!activeRef?.current?.contains(event.target)) setOpenMenu(null);
     };
     const escape = (event) => {
       if (event.key === 'Escape') setOpenMenu(null);
@@ -96,7 +92,7 @@ export default function Toolbar({
       <nav className="workspace-primary-nav" aria-label="Workspace">
         <button
           type="button"
-          className={view === 'notation' || view === 'split' ? 'is-active' : ''}
+          className={view === 'notation' ? 'is-active' : ''}
           aria-current={view === 'notation' ? 'page' : undefined}
           onClick={() => onView('notation')}
         >
@@ -104,12 +100,14 @@ export default function Toolbar({
         </button>
         <button
           type="button"
-          className={view === 'vilambit' || view === 'split' ? 'is-active' : ''}
+          className={view === 'vilambit' ? 'is-active' : ''}
           aria-current={view === 'vilambit' ? 'page' : undefined}
           onClick={() => onView('vilambit')}
         >
           Music
         </button>
+        <button type="button" className={view === 'split' ? 'is-active' : ''}
+          aria-current={view === 'split' ? 'page' : undefined} onClick={() => onView('split')}>Split view</button>
       </nav>
 
       <div className="workspace-top-actions">
@@ -153,6 +151,9 @@ export default function Toolbar({
                   <strong>{sourceName || 'No recording loaded'}</strong>
                   <span>Music remains on this device</span>
                 </p>
+                <button className="workspace-drawer-primary" type="button" onClick={() => run(onOpenRecording)}>
+                  {sourceName ? 'Change recording' : 'Open recording'}
+                </button>
                 <button className="workspace-drawer-primary" type="button" onClick={() => run(() => onView('vilambit'))}>
                   Open Music
                 </button>
@@ -183,20 +184,6 @@ export default function Toolbar({
                   <button type="button" disabled={!projectName} onClick={() => run(onExportPortable)}>
                     Export Portable .sargam…
                   </button>
-                </div>
-              </section>
-
-              <section className="workspace-drawer-section">
-                <span className="workspace-drawer-label">Notation tools</span>
-                <div className="workspace-drawer-actions">
-                  <button type="button" onClick={() => run(onToggleLayout)}>
-                    {layout === 'stacked' ? 'Side-by-side editor' : 'Notation on top'}
-                  </button>
-                  <button type="button" onClick={() => run(onToggleNoteNames)}>
-                    {noteNames === 'western' ? 'Show SRG' : 'Show CDE'}
-                  </button>
-                  <button type="button" onClick={() => run(onDictate)}>Dictate</button>
-                  <button type="button" onClick={() => run(onLegend)}>Notation key</button>
                 </div>
               </section>
 
@@ -250,15 +237,19 @@ export default function Toolbar({
           )}
         </div>
 
+        <div className="workspace-menu-wrap" ref={moreRef}>
+          <button type="button" className="workspace-menu-toggle" aria-expanded={openMenu === 'more'}
+            onClick={() => toggleMenu('more')}>More <span aria-hidden="true">▾</span></button>
+          {openMenu === 'more' && <div className="workspace-drawer workspace-more-drawer">
+            <button type="button" onClick={() => toggleMenu('linked')}>Linked phrases</button>
+            <button type="button" onClick={() => toggleMenu('queue')}>Queue
+              {queueSession?.upcoming?.length > 0 && <b className="workspace-queue-count">{queueSession.upcoming.length}</b>}
+            </button>
+            <p className="workspace-about">Ali Akbar College of Music<br /><em>Listen &amp; learn first. Then notate.</em></p>
+          </div>}
+        </div>
+
         <div className="workspace-menu-wrap" ref={linkedRef}>
-          <button
-            type="button"
-            className={'workspace-menu-toggle' + (openMenu === 'linked' ? ' is-open' : '')}
-            aria-expanded={openMenu === 'linked'}
-            onClick={() => toggleMenu('linked')}
-          >
-            Linked phrases <span aria-hidden="true">▾</span>
-          </button>
           {openMenu === 'linked' && (
             <div className="workspace-drawer workspace-linked-drawer">
               <div className="workspace-drawer-heading">
@@ -292,16 +283,6 @@ export default function Toolbar({
         </div>
 
         <div className="workspace-menu-wrap" ref={queueRef}>
-          <button
-            type="button"
-            className={'workspace-menu-toggle' + (openMenu === 'queue' ? ' is-open' : '')}
-            aria-expanded={openMenu === 'queue'}
-            onClick={() => toggleMenu('queue')}
-          >
-            Queue
-            {queueSession?.upcoming?.length > 0 && <b className="workspace-queue-count">{queueSession.upcoming.length}</b>}
-            <span aria-hidden="true">▾</span>
-          </button>
           {openMenu === 'queue' && (
             <QueueDrawer
               session={queueSession}

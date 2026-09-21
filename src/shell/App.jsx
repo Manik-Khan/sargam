@@ -10,6 +10,9 @@ import { createQueueLoader, rebaseQueueTransition } from './queue-loader.js';
 import { createSerialWrites } from './save-coordinator.js';
 import { createWorkspacePersistence } from './workspace-persistence.js';
 import { createDraftAutosave } from './draft-autosave.js';
+import WorkspaceMenu from './WorkspaceMenu.jsx';
+import NoteToolsPanel from './NoteToolsPanel.jsx';
+import NotationViewControls from './NotationViewControls.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
@@ -200,7 +203,7 @@ export default function App() {
   const [sourceSyncRevision, setSourceSyncRevision] = useState(0);
   const [showNew, setShowNew] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [layout, setLayout] = useState(() => store.getPref('layout', 'side'));
+  const [layout, setLayout] = useState(() => store.getPref('layout', 'stacked'));
   const [editorHeight, setEditorHeight] = useState(() => {
     const saved = Number(store.getPref('editorHeight', 0));
     return Number.isFinite(saved) && saved >= 140 ? saved : null;
@@ -214,6 +217,8 @@ export default function App() {
   const [noteNames, setNoteNames] = useState(() => store.getPref('noteNames', 'sargam'));
   const [showDictate, setShowDictate] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
+  const [noteToolsOpen, setNoteToolsOpen] = useState(false);
+  const [showStructure, setShowStructure] = useState(false);
   // 'notation' | 'vilambit' | 'split' — the practice player remains mounted
   // in every mode so a recording can keep looping while notation is visible.
   const [view, setView] = useState('notation');
@@ -2035,7 +2040,7 @@ export default function App() {
         return;
       }
       if (e.key === ' ' && view === 'notation'
-          && !/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)
+          && !/^(TEXTAREA|INPUT|SELECT|BUTTON|SUMMARY)$/.test(e.target.tagName)
           && !e.target.isContentEditable
           && !e.target.closest?.('.cm-editor')) {
         e.preventDefault();
@@ -2170,6 +2175,7 @@ export default function App() {
   const changeWritingFocus = () => {
     const next = !writingFocus;
     setWritingFocus(next);
+    if (next) setAnchorTool(null);
     store.setPref('writingFocus', next);
   };
 
@@ -2188,8 +2194,17 @@ export default function App() {
     seekNotation(sourceLine, matraIndex);
   };
 
+  const notationViewControls = <NotationViewControls
+    rhythmGrid={rhythmGrid} onRhythmGrid={changeRhythmGrid}
+    rhythmGridStyle={rhythmGridStyle} onRhythmGridStyle={changeRhythmGridStyle}
+    followEditing={followEditing} onFollowEditing={changeFollowEditing}
+    followPlayback={followPlayback} onFollowPlayback={changeFollowPlayback}
+    layout={layout} onToggleLayout={toggleLayout} noteNames={noteNames} onToggleNoteNames={toggleNoteNames}
+    showStructure={showStructure} onShowStructure={setShowStructure}
+    onLegend={() => setShowLegend(value => !value)} />;
+
   return (
-    <div className={'app-root' + (showExport ? ' is-exporting' : '') + (writingFocus ? ' app-writing-focus' : '')}>
+    <div className={'app-root' + (showExport ? ' is-exporting' : '') + (writingFocus && view === 'notation' ? ' app-writing-focus' : '')}>
       {showExport && (
         <ExportView
           doc={doc}
@@ -2235,7 +2250,6 @@ export default function App() {
         fileName={fileName || doc.directives.title || null}
         dirty={dirty}
         recents={recents}
-        layout={layout}
         onNew={doNew}
         onOpen={doOpen}
         onSave={doSave}
@@ -2250,13 +2264,8 @@ export default function App() {
         onExportPortable={doExportPortable}
         onExport={() => setShowExport(true)}
         onExportXML={doExportXML}
-        noteNames={noteNames}
-        onToggleNoteNames={toggleNoteNames}
-        onDictate={() => setShowDictate((v) => !v)}
-        onLegend={() => setShowLegend((v) => !v)}
         view={view}
         onView={setView}
-        onToggleLayout={toggleLayout}
         onOpenRecent={openRecent}
         onRemoveRecent={removeRecent}
         sourceName={vilambitState.source?.name || null}
@@ -2306,8 +2315,6 @@ export default function App() {
           chikari={chikariSettings}
           droneMode={droneMode}
           talaSound={talaSound}
-          followEditing={followEditing}
-          followPlayback={followPlayback}
           onPlayPause={doPlayPause}
           onStop={doStop}
           onBpm={doBpm}
@@ -2319,9 +2326,8 @@ export default function App() {
           onChikariChange={doChikariChange}
           onDroneMode={doDroneMode}
           onTalaSound={doTalaSound}
-          onFollowEditing={changeFollowEditing}
-          onFollowPlayback={changeFollowPlayback}
           />
+          {view === 'split' && notationViewControls}
           {view === 'notation' && (
             <PracticeBar
               frameRef={vilambitRef}
@@ -2360,7 +2366,7 @@ export default function App() {
         className={`app-stage app-workspace-${view}`}
         style={workspaceSplit == null ? undefined : { '--workspace-notation-width': `${workspaceSplit}px` }}
       >
-        <WorkspaceRail view={view} raga={doc.directives.raga} onView={setView} />
+        <WorkspaceRail />
         <iframe
           ref={vilambitRef}
           title="Sargam Music — practice and archive audio"
@@ -2413,7 +2419,6 @@ export default function App() {
             onGridSelection={setGridSelection}
             followEditing={followEditing}
             followPlayback={followPlayback}
-          
           />
           <button
             type="button"
@@ -2436,47 +2441,35 @@ export default function App() {
           >
             <span aria-hidden="true" />
           </button>
-          <div className="app-editor-col">
+          <div className={'app-editor-col' + (noteToolsOpen && !writingFocus ? ' has-note-tools' : '')}>
             <div className="app-write-mode" role="group" aria-label="Notation writing mode">
               <button
                 type="button"
                 className={writeMode === 'text' ? 'active' : ''}
                 aria-pressed={writeMode === 'text'}
                 onClick={() => changeWriteMode('text')}
-              >Text Write</button>
+              >Text</button>
               <button
                 type="button"
                 className={writeMode === 'grid' ? 'active' : ''}
                 aria-pressed={writeMode === 'grid'}
                 onClick={() => changeWriteMode('grid')}
-              >Grid Write</button>
+              >Grid</button>
               <span className="app-write-spacer" />
-              <button type="button" onClick={goToNotationBeginning}>↑ Beginning</button>
-              <button
-                type="button"
-                className={writingFocus ? 'active' : ''}
-                aria-pressed={writingFocus}
-                onClick={changeWritingFocus}
-              >{writingFocus ? 'Show tools' : 'Writing focus'}</button>
+              <button type="button" className="app-note-tools-toggle" aria-expanded={noteToolsOpen && !writingFocus}
+                aria-controls="notation-note-tools" onClick={() => {
+                  setNoteToolsOpen(open => !open);
+                  if (noteToolsOpen) setAnchorTool(null);
+                }}>Note tools</button>
+              {writeMode === 'text' && <WorkspaceMenu label="Insert">{close => <>
+                <CommandBar mode="insert" onApply={fn => { doCommand(fn); close(); }} />
+                <button type="button" onClick={() => { setShowDictate(value => !value); close(); }}>Dictate notation</button>
+              </>}</WorkspaceMenu>}
+              {notationViewControls}
+              <button type="button" onClick={goToNotationBeginning}>↑ Go to beginning</button>
+              <button type="button" className={writingFocus ? 'active' : ''} aria-pressed={writingFocus}
+                onClick={changeWritingFocus}>{writingFocus ? 'Exit focus' : 'Focus mode'}</button>
             </div>
-            {writeMode === 'text' && <NotationControls
-              text={text} doc={doc} selection={notationSelection}
-              onEdit={applyNotationEdit} onBol={doSelectedBol} message={notationMessage}
-            />}
-            <CommandBar
-            onApply={doCommand}
-            anchorTool={anchorTool}
-            onAnchorTool={setAnchorTool}
-            anchorMeter={anchorMeter}
-            onAnchorMeter={setAnchorMeter}
-            onApplyMeter={doMeterApply}
-            onRemoveSelectedMark={doRemoveSelectedMark}
-            anchorMessage={anchorMessage}
-            rhythmGrid={rhythmGrid}
-            onRhythmGrid={changeRhythmGrid}
-            rhythmGridStyle={rhythmGridStyle}
-            onRhythmGridStyle={changeRhythmGridStyle}
-          />
             {writeMode === 'grid' ? (
               <GridEditor
                 text={text}
@@ -2502,8 +2495,25 @@ export default function App() {
                 onToggleBolCapture={doToggleBolCapture}
                 onBolCaptureKey={doBolCaptureKey}
                 editorRef={editorRef}
+                showStructure={showStructure}
               />
             )}
+            <NoteToolsPanel open={noteToolsOpen && !writingFocus}>
+              {writeMode === 'text' && <>
+                <NotationControls text={text} doc={doc} selection={notationSelection}
+                  onEdit={applyNotationEdit} onBol={doSelectedBol} message={notationMessage} />
+                <button type="button" className="cmd-btn" aria-pressed={Boolean(bolCapture)}
+                  onMouseDown={event => event.preventDefault()} onClick={doToggleBolCapture}>
+                  {bolCapture ? 'Stop bol capture' : 'Keyboard bol capture'}
+                </button>
+              </>}
+                <CommandBar
+                  anchorTool={anchorTool} onAnchorTool={setAnchorTool}
+                  anchorMeter={anchorMeter} onAnchorMeter={setAnchorMeter}
+                  onApplyMeter={doMeterApply} onRemoveSelectedMark={doRemoveSelectedMark}
+                  anchorMessage={anchorTool ? anchorMessage : ''}
+                />
+            </NoteToolsPanel>
           </div>
         </div>
         <aside className="workspace-quote" aria-label="Listening note">

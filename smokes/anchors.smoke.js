@@ -127,7 +127,7 @@ export const smokes = [
       const exportView = await read('../src/shell/ExportView.jsx');
       assert.match(parse, /SARGAM_ANCHOR_METADATA_SKIP/);
       assert.match(editor, /CodeMirror|EditorView/);
-      assert.match(editor, /Clean/);
+      assert.match(editor, /showStructure/);
       assert.match(editor, /Structure/);
       assert.match(preview, /stampAnchorTargets/);
       assert.match(command, /Diri/);

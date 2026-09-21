@@ -1,6 +1,9 @@
 # Sargam release checklist
 
 Run this short audit after a change to notation, playback, the editor, or printing.
+For the compact workspace, also follow [the layout acceptance sequence](compact-workspace-layout.md).
+Text Write / Grid Write below refer to the **Text / Grid** tabs. Open **Note tools**
+for ornaments, bols and annotations; display preferences now live in **View**.
 
 ## Automated gate
 
@@ -16,12 +19,12 @@ The command must end with every smoke check passing and a successful production 
 - In a line near the top, middle, and bottom, type notes, holds, `|`, and an ornament.
 - Confirm the active score line—or selected Grid Write matra—remains at the same visual height while typing, deleting, and changing a matra causes the notation to reflow.
 - Click a rendered matra and confirm its corresponding Markdown note is selected and centered.
-- Turn **Graph Grid** on. Confirm each matra has one cell, its tala-matra coordinate is visible, subdivisions stay inside the cell, and the selected cell remains highlighted after an edit.
+- Turn **View → Show beat grid** on. Confirm each matra has one cell, its tala-matra coordinate is visible, subdivisions stay inside the cell, and the selected cell remains highlighted after an edit.
 - Switch to **Grid Write**. Change a note, enter a spaced subdivision such as `S R`, add a hold or rest, and append one matra. Confirm the Markdown-backed score and playback duration update immediately.
 - While Grid Write is showing the beginning of a long composition, click a matra on a much later rendered score line. Confirm the matching source line and exact matra are centered and focused in the editor. Then click an early score matra and confirm the editor returns to it.
 - Enter an invalid multi-matra draft such as `S/R`. Confirm the box reports the problem without changing the score, then press Escape to restore the source value.
-- On a late line, switch between Text Write and Grid Write several times. Confirm the same musical line remains visible and Grid Write retains the exact matra when possible; neither mode may return to the top. Use **Beginning** and confirm that it intentionally selects the first notation line.
-- Toggle **Writing focus**. Confirm secondary annotation tools hide, score/editor margins contract, both writing surfaces remain usable, and **Show tools** restores the controls without losing position.
+- On a late line, switch between Text Write and Grid Write several times. Confirm the same musical line remains visible and Grid Write retains the exact matra when possible; neither mode may return to the top. Use **Go to beginning** and confirm that it intentionally selects the first notation line.
+- Toggle **Focus mode**. Confirm secondary annotation tools hide, score/editor margins contract, both writing surfaces remain usable, and **Exit focus** restores the controls without losing position.
 - Toggle the grid look between **Cells** and **Paper**. Confirm Paper continues each musical row through unused width with empty matra-sized boxes (no smaller background grid), the choice survives reload, and a kan such as `{m}g` remains legible.
 - In Grid Write, click the `+` beneath a note attack near the left, right, and bottom edges. Confirm the complete floating da/ra/diri/chikari/remove menu remains inside the viewport and above pane boundaries. Choose one bol and verify the menu closes, the ordinary editable `>` lane changes, and the bol appears in the matching rendered cell strip. Reopen that note's symbol and remove it. **diri · same note** must remain under one note and sound two strokes on its pitch. **diri · next note** must write `di-ri`, label the paired Grid Write slots `di` / `ri`, preserve and sound both written pitches, and render/print one continuous V aligned to the two attacks. Across a matra boundary there must be no second or faded V, and printing must not insert a system break between the connected attacks.
 - Write a matra such as `-S`. Confirm Grid Write exposes two bol targets: the empty first subdivision and the attacked S. Add chikari to the gap and da to S. The source must read `> ^da`, the notation/print bol strip must show `^` then `|`, and removing either mark must not disturb the other.

@@ -45,7 +45,7 @@ export const smokes = [{ name: 'writing UI: real buttons, typed wrappers and des
     selection={start:text.indexOf('[['),end:text.indexOf(']]')+2};
     act(render);
     assert.equal(button('Krintan').getAttribute('aria-pressed'),'true','directly typed shorthand is reflected in controls');
-    act(() => button('None').click());
+    act(() => button('Remove ornament').click());
     assert.ok(text.endsWith('Gm R S'));
     selection={start:0,end:3};
     act(render);

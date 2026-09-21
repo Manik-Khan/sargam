@@ -27,12 +27,13 @@ export const smokes = [
     },
   },
   {
-    name: 'workspace shell: notation click is single view while drag opens split',
+    name: 'workspace shell: slim identity rail and explicit split navigation',
     async fn() {
       const rail = await read('../src/shell/WorkspaceRail.jsx');
-      assert.match(rail, /onView\('notation'\)/);
-      assert.match(rail, /event\.clientX - drag\.current\.startX < 28/);
-      assert.match(rail, /onView\('split'\)/);
+      const toolbar = await read('../src/shell/Toolbar.jsx');
+      assert.doesNotMatch(rail, /workspace-rail-tab|onPointerDown/);
+      assert.match(toolbar, /onView\('notation'\)/);
+      assert.match(toolbar, /onView\('split'\)/);
       assert.match(rail, /Ali Akbar College of Music/);
     },
   },
@@ -64,8 +65,9 @@ export const smokes = [
       const css = await read('../src/shell/sargam.css');
       assert.match(app, /app-workspace-controls[\s\S]*?<Transport[\s\S]*?<PracticeBar/);
       assert.match(transport, /Quick sound toggles/);
-      assert.match(transport, /Keep the measure I am editing visible/);
-      assert.match(transport, /Follow the measure being played/);
+      const viewControls = await read('../src/shell/NotationViewControls.jsx');
+      assert.match(viewControls, /Keep the measure I am editing visible/);
+      assert.match(viewControls, /Follow the measure being played/);
       assert.match(preview, /followEditing[\s\S]*?followPlayback/);
       assert.match(app, /notation-resize-divider/);
       assert.match(css, /\.app-workspace-controls\s*\{[\s\S]*?min-height:\s*48px/);
