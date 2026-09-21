@@ -1,10 +1,21 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-09-08, after adding the authoritative-repository preflight. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
+**Updated:** 2026-09-21, after notation playback/layout repairs and named writing controls. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
 
-**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with `SARGAM_NEXT_SESSION_CONTEXT_2026-07-30_PRINT_PLAYER_CHECKPOINT.md`, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
+**What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with [the September 21 handoff](SARGAM_NEXT_SESSION_CONTEXT_2026-09-21_NOTATION_CHECKPOINT.md) and the historical July 30 print checkpoint, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
+
+## September 21 current checkpoint — writing, playback and layout
+
+- Manik confirmed that **direct shorthand typing remains essential**. The approved controls are optional editing shortcuts inside Sargam; the conversation mock does not change a score. Text/Markdown is still the source of truth.
+- Text Write now has Selected notes controls for Slide, Krintan, Kan / grace, None, per-note bols and existing bol passes, with a live shorthand preview. Examples: `~(Gm)`, `~(G m)`, `[[Gm]]`, `{G}m`, and `> da ra . diri`. Existing spellings remain supported; Grid Write retains its cell inputs and bol menus.
+- Selecting a whole ornament lets controls replace/remove its wrapper. Edits are parser-validated, preserve cell durations including Jhampak's half-beat, remap surviving bols across passes, and preserve gap chikari on its written slot. Newly untimed grace-note bols are removed with a message. One Undo restores notation, bols and selection together. See [writing controls](docs/notation-writing-controls.md) for scope and scanner limits.
+- **Approved click behavior:** select and move playback there; continue only if already playing. Markdown, rendered subdivisions, Grid Write and Beginning share this behavior. Selection drags and programmatic reveals do not scrub. Seeking/pausing cancels native voices already queued at the old position.
+- Preview sizing excludes padding. Graph rows grow for extra bol/lyric lanes; cross-cell diri spans include expanded columns and align to measured attacks in preview/export. Ornament anchors use their destination glyph. Dense logical matras may span multiple physical columns; the print lifecycle stays unchanged. See [notation repairs](docs/notation-repairs-2026-09-20.md).
+- **708 checks passed, 0 failed; production build passed (127 modules)** in the completed implementation pass. Real React interactions and atomic undo/redo are tested; audible playback, browser layout, accessibility and real multipage PDF acceptance remain pending. Passing tests are not a visual or audio sign-off.
+- Repository state was rechecked September 21: clean `main`, local/tracking/live GitHub all at `5139fb4431a4` (`updating bols and writing`). The earlier `ca7629efd5f0` notation fixes and latest writing controls are now committed in matching main. Prior uncommitted-status notes below describe their original handoffs, not today's Git state. Deployment is unverified; this documentation pass does not authorize a commit, push or deployment.
+- Next work is the live acceptance sequence in [the current handoff](SARGAM_NEXT_SESSION_CONTEXT_2026-09-21_NOTATION_CHECKPOINT.md) and [release checklist](docs/release-checklist.md), then fixes for observed failures. Preserve the on-device/no-recording-upload requirement and Jhampak's automatic final half-beat. FileMaker remains a separate project.
 
 ## September 20 audit repairs
 

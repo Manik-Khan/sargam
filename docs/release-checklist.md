@@ -15,7 +15,7 @@ The command must end with every smoke check passing and a successful production 
 - Open the Bageshri reference composition.
 - In a line near the top, middle, and bottom, type notes, holds, `|`, and an ornament.
 - Confirm the active score line—or selected Grid Write matra—remains at the same visual height while typing, deleting, and changing a matra causes the notation to reflow.
-- Click a rendered matra and confirm its Markdown source line is selected and centered.
+- Click a rendered matra and confirm its corresponding Markdown note is selected and centered.
 - Turn **Graph Grid** on. Confirm each matra has one cell, its tala-matra coordinate is visible, subdivisions stay inside the cell, and the selected cell remains highlighted after an edit.
 - Switch to **Grid Write**. Change a note, enter a spaced subdivision such as `S R`, add a hold or rest, and append one matra. Confirm the Markdown-backed score and playback duration update immediately.
 - While Grid Write is showing the beginning of a long composition, click a matra on a much later rendered score line. Confirm the matching source line and exact matra are centered and focused in the editor. Then click an early score matra and confirm the editor returns to it.
@@ -31,6 +31,15 @@ The command must end with every smoke check passing and a successful production 
 - On lines with delayed attacks or leading holds, confirm `0`, `1`, `2`, `3`, and `+` tala markers remain inset at the upper-left of their cells and never overlap a vibhag divider, repeat sign, octave dot, or ornament.
 - Resize the score/editor divider and confirm neither surface jumps to another line.
 
+## Selected notes controls and direct typing
+
+- Type `~(Gm)`, `[[Gm]]`, and `{G}m` directly in Text Write. Select each complete wrapper and confirm the corresponding control is active; replace it or choose None. Select plain `Gm` and apply each ornament by button. The source and score must agree in both directions.
+- Select `Gm R S` and confirm the panel remains bounded, scrollable and keyboard-usable without hiding the source editor at small window sizes. Writing focus must hide the panel with the other secondary controls.
+- On `Gm R S` with `> da ra diri chikari` and a second bol pass, turn `Gm` into Kan. The destination m and following notes must keep their bols; the newly untimed G loses its bol with an explanatory message. One Undo must restore both notation and every bol pass, and Redo must reapply the complete change.
+- Change a bol using the per-note selector, including Diri · same note and Diri · next note. Type directly in the resulting `>` lane too; confirm the controls reflect the written result when those notes are selected again.
+- Try an empty selection, one-note Kan, partial octave prefix and incomplete wrapper. Invalid button edits must be disabled with an explanation, while deliberate source typing remains possible.
+- On `Gm -S` with `> da ra ^da`, apply Kan to `Gm`. Chikari must remain on the leading hold before S, and da must remain on S. Undo/Redo must preserve both positions.
+
 ## Playback
 
 - Open a local audio recording that the browser cannot decode (for example a confirmed unsupported ALAC M4A). Confirm automatic preparation with Cancel, then audible playback with the original name, markers, loops, and source identity. Confirm native-playable audio does not load the optional decoder.
@@ -41,7 +50,9 @@ The command must end with every smoke check passing and a successful production 
 - Click Play twice quickly while setup is pending, and replace a recording during setup. No old recording or unfinished processing graph may take over the new source.
 - Load an unreadable local recording. Its message must identify a local-file/format problem, not an archive URL problem; a subsequent valid recording must remain playable.
 
-- Play from the beginning and from a clicked matra.
+- Play from the beginning and from a clicked matra. Click G and m within `Gm` in both Markdown and rendered notation: the two positions must differ by half a beat. A paused/stopped player remains silent; an already-playing player continues from the selected position without queued sounds from its old location.
+- Drag a source selection and trigger programmatic source/Grid Write reveals; these must not scrub or rewind playback. Click an already-focused Grid Write cell to seek it again.
+- In Jhampak at 60 BPM, use `@3 ||: G - Gm | R- S | .N.D .N|S - :||`. The last S must be sam at 6.5 seconds from the written line's beginning, after the automatic half-beat cell; each pass lasts 8.5 beats.
 - Confirm melody, tanpura, and tala toggles work independently.
 - Confirm editing stops stale playback instead of continuing against changed notation.
 - Test line and section looping, then turn looping off.
@@ -54,12 +65,13 @@ The command must end with every smoke check passing and a successful production 
 
 - Open **File → Print / PDF**.
 - Check Clean, Matra cells, and Graph paper; Color and Printer B&W; and each typeface.
-- Confirm Graph Paper is composed of real, equal matra cells plus real empty trailing cells; it must not be a repeating background image behind independently positioned notation.
-- Confirm a ten-matra line containing dense four- or eight-strike beats still occupies ten graph cells (plus any repeat/cue cells), uses the available printable width, and never folds early because the contents of one cell are visually dense.
+- Confirm Graph Paper is composed of real logical matra cells (dense cells may span two or three physical columns) plus real empty trailing cells; it must not be a repeating background image behind independently positioned notation.
+- Confirm a ten-matra line still has ten logical selectable cells, with dense cells occupying their required physical columns. Repeats/cues have separate structural cells. Planning must charge every physical column, use the available width, and fold only at safe musical boundaries.
 - Place prose descriptions, section names, and numbered cues between music lines. Confirm they print as compact inter-row strips, preserve authored capitalization, and their ruled background ends at the paper margin rather than creating implicit columns beyond it.
 - Confirm kan runs, approach slides, four-to-eight-slot matras, and phrase-repeat endings remain inside the cell that owns their matra. Dense subdivisions may wrap internally but must not claim a neighboring matra or touch the stronger vibhag boundary.
 - Print a line beginning with `||:` and ending with `:||`. Each repeat sign must occupy its own full-size, non-musical structural grid position outside the first/last note cells. It must not overlap, shrink, or obscure a note, including beside a dense phrase-repeat ending such as `(Dm g -)x3`.
 - Print an alternate ending in Clean, Matra cells, and Graph Paper. Confirm the shared phrase appears once, both ending grids start beneath the same final-line coordinate, real empty graph cells continue after each shorter branch, and the paired ending block never splits across a page boundary. No `@N` source marker should be needed to understand the printed route.
+- Print lyrics with multiple bol passes; the row must grow so their lanes do not cover notes, octave marks or each other. Check a diri that ends inside an expanded cell and verify that both endpoints line up with the actual attacks.
 - Print a line with attached bols and confirm each matra's bol strip shares the cell's internal attack subdivisions without covering its notes or crossing a cell boundary.
 - Confirm graph-paper section descriptions and written cues have a light neutral backing that masks grid lines behind the text and remains legible in Printer B&W.
 - Confirm a long composition uses every required page and no ornament or cell is cut at a page edge.

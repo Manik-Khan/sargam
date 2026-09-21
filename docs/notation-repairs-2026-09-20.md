@@ -3,7 +3,9 @@
 Repository: `/Users/khansolo/Documents/GitHub/sargam`
 Branch: `main`
 Base HEAD: `18a3d876a656`
-Status: local changes; no commit, push, or deployment.
+Original handoff status: local changes; no commit, push, or deployment by that repair pass.
+September 21 update: these repairs are in commit `ca7629efd5f0`, and the subsequent
+writing controls are in current matching main `5139fb4431a4`. Deployment is unverified.
 
 ## Implemented
 
@@ -15,7 +17,7 @@ Status: local changes; no commit, push, or deployment.
 - Graph rows grow for additional bol passes and lyrics. Lyrics reserve a lane above bols instead of sharing their lower position.
 - Cross-cell diri spans include every physical column in expanded graph cells. After layout, preview and export align the span endpoints with the actual attacks, including unequal cell widths. Ornament anchors use the timed destination rather than the first grace glyph.
 
-## Writing controls proposal
+## Writing controls proposal — subsequently implemented
 
 The interactive proposal keeps established syntax and adds no new notation language:
 
@@ -24,11 +26,11 @@ The interactive proposal keeps established syntax and adds no new notation langu
 - Kan: `{G}m`, with m as destination.
 - Bols: the existing `>` lane, independently assigned to timed notes.
 
-The proposed controls show the selected notes, their beat duration, the resulting marking, and live shorthand. Kan makes the grace-note bol unavailable while retaining the destination's bol. This is a reviewable proposal, not an installed UI change. The repository requires mock → approval → build for new product controls.
+The proposed controls show the selected notes, their beat duration, the resulting marking, and live shorthand. Kan makes the grace-note bol unavailable while retaining the destination's bol. Manik subsequently approved building these controls while preserving direct shorthand typing. They are now implemented in Text Write; see [the writing guide](notation-writing-controls.md). The conversation mock remains a demonstration only.
 
 ## Verification and acceptance
 
-Automated verification: `npm run verify` (smoke suite and production build). The proposal's local interactions were also exercised with jsdom; all ornament/bol choices parsed successfully and preserved the example's three beats.
+Repair-pass verification: **697 checks passed, 0 failed; production build passed**. The subsequent writing-control implementation passed **708 checks** and its build. The proposal's local interactions were also exercised with jsdom; all ornament/bol choices parsed successfully and preserved the example's three beats.
 
 Remaining live browser checks:
 

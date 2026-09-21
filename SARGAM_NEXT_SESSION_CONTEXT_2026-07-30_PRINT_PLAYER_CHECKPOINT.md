@@ -1,5 +1,7 @@
 # Sargam — Next Session Context & Handoff
 
+> Historical checkpoint: start new work with the [September 21 handoff](SARGAM_NEXT_SESSION_CONTEXT_2026-09-21_NOTATION_CHECKPOINT.md). The accepted shell and print rulings below still apply unless explicitly superseded; old test counts and next-phase plans are historical.
+
 **Updated:** 2026-07-30  
 **Checkpoint:** accepted Sargam shell, Music workspace, waveform/archive work, EQ, editor synchronization, and multi-page print  
 **Next product phase:** Library and Queue architecture  

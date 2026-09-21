@@ -2,6 +2,8 @@
 
 Approved by Manik after the interactive control proposal. Implementation base:
 `/Users/khansolo/Documents/GitHub/sargam`, `main`, `ca7629efd5f0`.
+September 21 checkpoint: this implementation is now in matching local/tracking/live
+main at `5139fb4431a4`. Deployment is unverified.
 
 Text Write remains the source of truth. Select notes in its editor, then choose
 Slide, Krintan, Kan / grace, or None in **Selected notes**. Select the complete
@@ -47,7 +49,8 @@ Ornament and bol control edits use one isolated CodeMirror history transaction.
 Undo restores the notes, bol lanes and selection together. Direct source typing
 keeps ordinary CodeMirror undo behavior.
 
-Verification: run `npm run verify`. Regressions exercise direct-typed/control
+Completed verification: `npm run verify` — **708 checks passed, 0 failed;
+production build passed (127 modules)**. Regressions exercise direct-typed/control
 parity, replacing/removing wrappers, per-pass bol remapping, surviving diri
 endpoints, Jhampak duration, invalid partial selections, gap-chikari protection,
 atomic undo/redo, and real React button/select interactions in jsdom.
