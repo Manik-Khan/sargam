@@ -1,10 +1,19 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-09-21, after the approved compact workspace layout. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
+**Updated:** 2026-09-21, after the inline ornament and slide-hold repair. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
 
 **What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with [the September 21 handoff](SARGAM_NEXT_SESSION_CONTEXT_2026-09-21_NOTATION_CHECKPOINT.md) and the historical July 30 print checkpoint, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
+
+## September 21 inline ornaments and preview proposal
+
+- Base: canonical clone, clean matching `main` at `f0d5043e4b3e`. Manik reported that `G{P}m` split a beat and that a hold after a slide wrapper became a separate beat.
+- `G{P}m` now keeps the `Gm` timed skeleton, puts the small P and kan curve at m, and takes grace playback time from m. `G{P~}m` uses the existing approach-slide model: m approaches from P without a separate P strike. Bracketed beats and ordered multiple grace runs are supported. Canonical saves retain the destination, durations and holds.
+- `~(Gm | R)-` and `~(Gm | R-)` now match; a spaced `~(Gm | R) -` still adds a beat. Bare parentheses remain `(phrase)xN` repeat syntax. No `G(P)m` alias was approved or added.
+- Scoped slides such as `G~(Pm)` draw over P/m, not over the preceding G. Source selection, meter scanning and seek positions share the inline ornament scan. The Jhampak final half-cell and S on sam remain unchanged.
+- Manik's next preference is a dynamic command list for highlighted notation showing the rendered result, written shorthand and intention before applying. A contained interactive mock was prepared; the live Note tools panel has **not** been replaced. Keep it manually opened and stable during selection. Follow mock approval before building the new panel; do not infer approval of a new parenthesis grammar.
+- **726 checks passed, 0 failed; production build passed (132 modules).** Regression coverage includes parser, playback, save roundtrips, renderer scope, direct source navigation, partial-cluster Kan controls and the complete Jhampak phrase. Browser visual/aural acceptance remains pending; no commit, push or deployment.
 
 ## September 21 compact workspace layout
 

@@ -559,6 +559,9 @@ function renderLineBlock(line, tal, ctx) {
     // ornament cluster in the destination slot. A row-wide arc would falsely
     // imply that the complete beat is part of the pull-off.
     if (span.type === 'krintan' && span.scoped) continue;
+    if (span.type === 'meend' && span.scoped && span.from.matraIndex === span.to.matraIndex) continue;
+    // A kan inside a cluster belongs only over its grace/destination slot.
+    if (span.type === 'kan' && span.from.matraIndex === span.to.matraIndex && span.from.eventIndex > 0) continue;
     const fromCol = colOf[span.from.matraIndex];
     const toCol = colOf[span.to.matraIndex];
     if (fromCol === undefined || toCol === undefined) continue;
@@ -1179,6 +1182,12 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
       visualSlots.push({ event: { type: 'sustain' }, hold: true, geometry: geometryMatra?.slots?.[geometrySlotIndex++] || null });
     }
   }
+  const localMeends = line.spans.filter(span => span.type === 'meend' && span.scoped &&
+    span.from.matraIndex === k && span.to.matraIndex === k);
+  const localKanFor = item => !item.hold && line.spans.some(span =>
+    span.type === 'kan' && span.from.matraIndex === k && span.to.matraIndex === k &&
+    span.from.eventIndex > 0 && span.to.eventIndex === item.eventIndex &&
+    item.graces?.some(grace => grace.eventIndex === span.from.eventIndex));
   const hasLocalApproach = visualSlots.some((item) => item.event?.approachSlide && !item.hold);
   // A regular matra occupies one grid unit. Dense rhythmic clusters, kan
   // ornaments, approach slides, and repeat endings reserve more horizontal
@@ -1197,17 +1206,29 @@ function renderCell(line, k, tal, prefix, suffix, repeatLanding, ctx) {
         .join(' ')
     : `repeat(${visualSlots.length}, minmax(0.84em, max-content))`;
 
-  if (hasLocalApproach) {
+  if (hasLocalApproach || visualSlots.some(localKanFor) || localMeends.length) {
     const approachLane = h('div', 'sr-local-approach-lane');
     approachLane.style.gridTemplateColumns = slotColumns;
-    for (const item of visualSlots) {
+    for (const [slotIndex, item] of visualSlots.entries()) {
       const arcSlot = h('span', 'sr-local-approach-arc-slot');
-      if (item.event?.approachSlide && !item.hold) {
+      arcSlot.style.gridRow = '1';
+      arcSlot.style.gridColumn = String(slotIndex + 1);
+      if ((item.event?.approachSlide && !item.hold) || localKanFor(item)) {
         const arc = h('span', 'sr-local-approach-arc sr-arc-kan');
         arc.appendChild(meendSvg());
         arcSlot.appendChild(arc);
       }
       approachLane.appendChild(arcSlot);
+    }
+    for (const span of localMeends) {
+      const start = visualSlots.findIndex(item => !item.hold && item.eventIndex === span.from.eventIndex);
+      const end = visualSlots.findIndex(item => !item.hold && item.eventIndex === span.to.eventIndex);
+      if (start < 0 || end < start) continue;
+      const arc = h('span', 'sr-local-approach-arc sr-arc-meend sr-scoped-meend');
+      arc.style.gridRow = '1';
+      arc.style.gridColumn = `${start + 1} / ${end + 2}`;
+      arc.appendChild(meendSvg());
+      approachLane.appendChild(arc);
     }
     cell.appendChild(approachLane);
   }

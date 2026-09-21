@@ -15,6 +15,7 @@
 //   - Directives are legal mid-document and apply forward; tal: free =
 //     unmetered (no validation, no markers).
 
+import { scanOrnamentClusterAt, normalizeSlideHolds } from './inline-ornament.js';
 import { frac, fracReduce, fracAdd } from './model.js';
 import { getTal, wrapMatra, vibhagOfMatra } from './tala.js';
 import { scanRepeatedSlideAt } from './repeated-slide.js';
@@ -301,7 +302,7 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
     enumerable: false,
   });
 
-  let body = text;
+  let body = normalizeSlideHolds(text).text;
 
   // @N start offset (before ||: when both are present) — the explicit
   // override. Without it, a metered line CONTINUES its section's cycle
@@ -542,6 +543,19 @@ function parseMusicLine(text, lineNo, tal, problems, isFree = false, defaultStar
       }
       bracketTilde = false;
       i = close + 1;
+      continue;
+    }
+
+    // Attached ornaments are part of the surrounding cluster: G{P}m has
+    // the same timed skeleton as Gm, and G{P~}m approaches m without a strike.
+    const inlineOrnament = scanOrnamentClusterAt(body, i);
+    if (inlineOrnament) {
+      const pending = clusterCtx.takePendingGraces() || [];
+      const atoms = [...pending.map(atom => ({ ...atom, grace: true, kan: true })), ...inlineOrnament.atoms];
+      atoms._tilde = inlineOrnament.atoms._tilde;
+      const events = weightAndBuild(atoms, -1, i, clusterCtx);
+      if (events?.length) appendMatra(line, tal, { events });
+      i = inlineOrnament.next;
       continue;
     }
 
@@ -913,6 +927,7 @@ function buildSlottedMatra(inner, col, ctx) {
   for (let si = 0; si < slotParts.length; si++) {
     const { text: s, offset } = slotParts[si];
     const slotCol = col + offset;
+    const ornament = scanOrnamentClusterAt(s);
     if (s === '.') {
       perSlot.push([{ type: 'rest', w: 1 }]);
     } else if (/^-+$/.test(s)) {
@@ -921,8 +936,8 @@ function buildSlottedMatra(inner, col, ctx) {
       const atoms = inlineKrintanAtoms(s, slotCol, ctx);
       if (!atoms) return;
       perSlot.push(atoms);
-    } else if (CLUSTER_RE.test(s)) {
-      const atoms = clusterAtoms(s, slotCol, ctx);
+    } else if (CLUSTER_RE.test(s) || ornament?.next === s.length) {
+      const atoms = ornament?.next === s.length ? ornament.atoms : clusterAtoms(s, slotCol, ctx);
       if (!atoms) return; // problem already recorded
       const t = atoms._tilde;
       if (t) {
@@ -997,6 +1012,13 @@ function splitBeatSlots(inner) {
   let start = -1;
   let i = 0;
   while (i < inner.length) {
+    if (inner[i] === '{') {
+      if (start === -1) start = i;
+      const close = inner.indexOf('}', i + 1);
+      if (close === -1) { i = inner.length; break; }
+      i = close + 1;
+      continue;
+    }
     if (inner[i] === '[' && inner[i + 1] === '[') {
       if (start === -1) start = i;
       const close = inner.indexOf(']]', i + 2);
@@ -1103,8 +1125,8 @@ function buildClusterEvents(tok, col, ctx) {
 function weightAndBuild(atoms, kanBoundary, col, ctx) {
   const { lineNo, problems } = ctx;
   if (kanBoundary <= 0) {
-    const total = atoms.reduce((a, x) => a + x.w, 0);
-    const weighted = atoms.map((a) => ({ ...a, num: a.w, den: total }));
+    const total = atoms.reduce((a, x) => a + (x.grace ? 0 : x.w), 0);
+    const weighted = atoms.map((a) => ({ ...a, num: a.grace ? 0 : a.w, den: a.grace ? 1 : total }));
     weighted._tilde = atoms._tilde;
     return atomsToEvents(weighted, ctx);
   }
@@ -1194,6 +1216,7 @@ function atomsToEvents(atoms, ctx) {
   const { line } = ctx;
   const matraIndex = line.matras.length;
   const events = [];
+  const kanEventIndices = new Set();
   for (const a of atoms) {
     const dur = fracReduce(frac(a.num, a.den));
     if (a.type === 'note') {
@@ -1204,6 +1227,8 @@ function atomsToEvents(atoms, ctx) {
       if (!a.grace && a.w > 1) ev.writtenSlots = a.w;
       if (a.grace) ev.grace = true;
       if (a.preBeat) ev.preBeat = true;
+      if (a.approachSlide) ev.approachSlide = { ...a.approachSlide };
+      if (a.kan) kanEventIndices.add(events.length);
       events.push(ev);
       // Graces never resolve a pending cross-matra meend — a slide written
       // before an ornament lands on the ornament's destination, not its
@@ -1238,6 +1263,15 @@ function atomsToEvents(atoms, ctx) {
       });
     }
   }
+
+  let kanStart = null;
+  events.forEach((event, index) => {
+    if (kanEventIndices.has(index) && kanStart === null) kanStart = index;
+    if (!event.grace && kanStart !== null) {
+      line.spans.push({ type: 'kan', from: { matraIndex, eventIndex: kanStart }, to: { matraIndex, eventIndex: index } });
+      kanStart = null;
+    }
+  });
 
   const t = atoms._tilde;
   if (t) {

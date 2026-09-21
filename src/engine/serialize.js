@@ -285,11 +285,27 @@ function wholeMatraToken(line, k) {
   // The tilde shorthand parses IN but braces come OUT — one canonical
   // spelling, and the curve is encoded by the braces, not a span mark.
   const pre = all.filter((e) => e.grace && e.preBeat);
-  const graces = all.filter((e) => e.grace && !e.preBeat);
   const evs = all.filter((e) => !e.grace);
-  // Spaced form = cross-beat (sounds before the beat); attached = same-beat.
-  const spacedPrefix = pre.length ? `{${pre.map(noteAtom).join('')}} ` : '';
-  const gracePrefix = spacedPrefix + (graces.length ? `{${graces.map(noteAtom).join('')}}` : '');
+  const decorations = new Map();
+  let pending = [];
+  for (const event of all) {
+    if (event.preBeat) continue;
+    if (event.grace) pending.push(event);
+    else {
+      const grace = pending.length ? `{${pending.map(noteAtom).join('')}}` : '';
+      const approach = event.approachSlide ? `{${noteAtom(event.approachSlide)}~}` : '';
+      decorations.set(event, grace + approach);
+      pending = [];
+    }
+  }
+  const decoratedNote = event => (decorations.get(event) || '') + noteAtom(event);
+  const eventIndices = evs.map(event => all.indexOf(event));
+  const gracePrefix = pre.length ? `{${pre.map(noteAtom).join('')}} ` : '';
+  const wholeBeatSlide = line.spans.some(span => span.type === 'meend' && !span.ranged && !span.scoped &&
+    span.from.matraIndex === k && span.to.matraIndex === k &&
+    span.from.eventIndex === all.findIndex(event => event.type === 'note') &&
+    span.to.eventIndex === all.findLastIndex(event => event.type === 'note'));
+  const bracketWithSlide = token => (wholeBeatSlide ? '~' : '') + token;
 
   // Single whole-matra event. Explicit in-beat hold slots survive even
   // when their fractions reduce to 1/1 (`g---` must not serialize as `g`).
@@ -297,8 +313,8 @@ function wholeMatraToken(line, k) {
     const e = evs[0];
     const writtenSlots = Math.max(1, Number(e.writtenSlots) || 1);
     if (e.type === 'note') {
-      const atom = noteAtom(e) + '-'.repeat(writtenSlots - 1);
-      return gracePrefix + withinMatraTilde(line, matraIndex, [atom], [0]);
+      const atom = decoratedNote(e) + '-'.repeat(writtenSlots - 1);
+      return gracePrefix + withinMatraTilde(line, matraIndex, [atom], eventIndices);
     }
     if (e.type === 'rest') {
       if (writtenSlots === 1) return '.';
@@ -315,11 +331,20 @@ function wholeMatraToken(line, k) {
   const hasRest = evs.some((e) => e.type === 'rest');
   const hasSustain = evs.some((e) => e.type === 'sustain');
 
+  if (explicitHolds && !hasRest) {
+    const totalSlots = evs.reduce((sum, event) => sum + (event.writtenSlots || 1), 0);
+    const proportional = evs.every(event => event.dur.num * totalSlots === (event.writtenSlots || 1) * event.dur.den);
+    if (!proportional) {
+      const grouped = bracketFromDurations(evs, decoratedNote, true);
+      if (grouped) return gracePrefix + bracketWithSlide(grouped);
+    }
+  }
+
   if (explicitHolds || hasSustain) {
     if (hasRest) {
       const entries = [];
       evs.forEach((e) => {
-        entries.push(e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-');
+        entries.push(e.type === 'note' ? decoratedNote(e) : e.type === 'rest' ? '.' : '-');
         for (let slot = 1; slot < Math.max(1, Number(e.writtenSlots) || 1); slot++) {
           entries.push('-');
         }
@@ -327,7 +352,7 @@ function wholeMatraToken(line, k) {
       return gracePrefix + `[${entries.join(' ')}]`;
     }
     const atoms = evs.map((e) => {
-      const base = e.type === 'note' ? noteAtom(e) : '-';
+      const base = e.type === 'note' ? decoratedNote(e) : '-';
       return base + '-'.repeat(Math.max(1, Number(e.writtenSlots) || 1) - 1);
     });
     return (
@@ -336,7 +361,7 @@ function wholeMatraToken(line, k) {
         line,
         matraIndex,
         atoms,
-        evs.map((_, i) => pre.length + graces.length + i)
+        eventIndices
       )
     );
   }
@@ -345,26 +370,26 @@ function wholeMatraToken(line, k) {
     (e) => e.dur.num * evs[0].dur.den === evs[0].dur.num * e.dur.den
   );
   if (sameDuration && !hasRest) {
-    const atoms = evs.map((e) => (e.type === 'note' ? noteAtom(e) : '-'));
+    const atoms = evs.map((e) => (e.type === 'note' ? decoratedNote(e) : '-'));
     return (
       gracePrefix +
       withinMatraTilde(
         line,
         matraIndex,
         atoms,
-        evs.map((_, i) => pre.length + graces.length + i)
+        eventIndices
       )
     );
   }
   if (sameDuration && hasRest) {
-    const entries = evs.map((e) => (e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-'));
+    const entries = evs.map((e) => (e.type === 'note' ? decoratedNote(e) : e.type === 'rest' ? '.' : '-'));
     return gracePrefix + `[${entries.join(' ')}]`;
   }
 
   // Unequal durations without written holds came from bracket hierarchy,
   // e.g. `[SR g]`: two equal outer slots, the first divided into S/R.
-  const hierarchical = bracketFromDurations(evs);
-  if (hierarchical) return gracePrefix + hierarchical;
+  const hierarchical = bracketFromDurations(evs, decoratedNote);
+  if (hierarchical) return gracePrefix + bracketWithSlide(hierarchical);
 
   // Defensive fallback for a hand-built model: preserve timing even when it
   // cannot be expressed as equal bracket groups. This is not reached by the
@@ -374,16 +399,16 @@ function wholeMatraToken(line, k) {
   if (hasRest) {
     const entries = [];
     evs.forEach((e, i) => {
-      entries.push(e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-');
+      entries.push(e.type === 'note' ? decoratedNote(e) : e.type === 'rest' ? '.' : '-');
       for (let slot = 1; slot < slots[i]; slot++) entries.push('-');
     });
     return gracePrefix + `[${entries.join(' ')}]`;
   }
   const atoms = evs.map((e, i) => {
-    const base = e.type === 'note' ? noteAtom(e) : '-';
+    const base = e.type === 'note' ? decoratedNote(e) : '-';
     return base + '-'.repeat(slots[i] - 1);
   });
-  return gracePrefix + withinMatraTilde(line, matraIndex, atoms, evs.map((_, i) => i));
+  return gracePrefix + withinMatraTilde(line, matraIndex, atoms, eventIndices);
 
 }
 
@@ -440,7 +465,7 @@ function scopedKrintanToken(line, matraIndex, events) {
 
 /** Recover equal outer bracket slots from exact event durations.
  * `[SR g]` → groups [SR, g], while explicit holds are handled earlier. */
-function bracketFromDurations(evs) {
+function bracketFromDurations(evs, atom = noteAtom, holds = false) {
   const L = evs.reduce((acc, e) => lcm(acc, e.dur.den), 1);
   const units = evs.map((e) => (e.dur.num * L) / e.dur.den);
   for (let slotCount = 2; slotCount <= L; slotCount++) {
@@ -463,7 +488,8 @@ function bracketFromDurations(evs) {
           valid = false;
           break;
         }
-        if (group.length > 1 && group.some((idx) => evs[idx].type !== 'note')) {
+        if (group.length > 1 && group.some((idx) => evs[idx].type !== 'note' ||
+          (holds && (evs[idx].writtenSlots || 1) !== (evs[group[0]].writtenSlots || 1)))) {
           valid = false;
           break;
         }
@@ -476,9 +502,10 @@ function bracketFromDurations(evs) {
     const tokens = groups.map((indices) => {
       if (indices.length === 1) {
         const e = evs[indices[0]];
-        return e.type === 'note' ? noteAtom(e) : e.type === 'rest' ? '.' : '-';
+        const base = e.type === 'note' ? atom(e) : e.type === 'rest' ? '.' : '-';
+        return base + (holds ? '-'.repeat(Math.max(1, Number(e.writtenSlots) || 1) - 1) : '');
       }
-      return indices.map((idx) => noteAtom(evs[idx])).join('');
+      return indices.map((idx) => atom(evs[idx]) + (holds ? '-'.repeat(Math.max(1, Number(evs[idx].writtenSlots) || 1) - 1) : '')).join('');
     });
     return `[${tokens.join(' ')}]`;
   }

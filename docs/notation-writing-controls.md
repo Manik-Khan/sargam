@@ -18,9 +18,29 @@ Sargam; the earlier conversation mock does not modify compositions.
 | Slide across beats | `~(G m)` |
 | Krintan | `[[Gm]]` |
 | Grace G into destination m | `{G}m` |
+| Grace P into m inside Gm | `G{P}m` |
+| Approach m from P without a separate P strike | `G{P~}m` |
+| Slide across a bar; hold stays in R’s beat | `~(Gm | R)-` or `~(Gm | R-)` |
 | Scoped krintan inside a beat | `[-[[RS]]-.n]` |
 | Per-note bols | `> da ra . diri` |
 | Diri across two successive attacks | `> di-ri` |
+
+September 21 inline-ornament repair (base `f0d5043e4b3e`): an attached
+brace ornament no longer starts a new beat in the middle of a cluster. The
+small grace and curve belong at their destination. Each grace run borrows
+playback time from its own destination; a dense run cannot make the destination
+negative. Saved notation retains each grace's position, including multiple
+runs and bracketed subdivisions. Scoped slide curves and source indices follow
+the selected notes inside a beat.
+
+An attached dash after `~(...)` extends the last cluster inside the slide;
+a space before the dash still creates a separate beat. Bare `(…)` remains
+phrase-repeat syntax requiring `xN`; `G(P)m` is not an alias.
+
+**Next UI proposal:** replace the immediate-action ornament row with a command
+list and preview of the highlighted notation. Show the actual rendered result,
+its musical intention and exact shorthand, then Apply. This is a mock awaiting
+review, not a shipped panel. Preserve selection stability and direct typing.
 
 Existing compact spellings remain supported. No parser grammar was removed or
 redefined. Grid Write retains its editable cells and existing per-note bol
@@ -61,8 +81,8 @@ Ornament and bol control edits use one isolated CodeMirror history transaction.
 Undo restores the notes, bol lanes and selection together. Direct source typing
 keeps ordinary CodeMirror undo behavior.
 
-Completed verification: `npm run verify` — **718 checks passed, 0 failed;
-production build passed (131 modules)**. Regressions exercise direct-typed/control
+Completed verification: `npm run verify` — **726 checks passed, 0 failed;
+production build passed (132 modules)**. Regressions exercise direct-typed/control
 parity, replacing/removing wrappers, per-pass bol remapping, surviving diri
 endpoints, Jhampak duration, invalid partial selections, gap-chikari protection,
 atomic undo/redo, real React button/select interactions in jsdom, and pointer

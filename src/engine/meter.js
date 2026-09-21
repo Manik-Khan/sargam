@@ -1,3 +1,4 @@
+import { scanOrnamentClusterAt, normalizeSlideHolds } from './inline-ornament.js';
 import { parseDocument } from './parse.js';
 import { isReturnCueToken } from './return-cue.js';
 import { writtenDuration } from './performed-time.js';
@@ -133,8 +134,20 @@ function atomAttacks(token, baseIndex, matraStart, scale = rational(1, 1)) {
   return { attacks };
 }
 
+function ornamentAttacks(scanned, matraStart, scale = rational(1)) {
+  const total = scanned.atoms.reduce((sum, atom) => sum + (atom.grace ? 0 : atom.w), 0);
+  let cursor = rational(0);
+  const attacks = [];
+  for (const atom of scanned.atoms) {
+    if (atom.grace) continue;
+    if (atom.type === 'note') attacks.push({ index: atom.index, ch: atom.ch, time: addRational(matraStart, mulRational(cursor, scale)) });
+    cursor = addRational(cursor, rational(atom.w, total));
+  }
+  return { attacks };
+}
+
 function scanBracket(inner, innerBase, matraStart) {
-  const matches = [...inner.matchAll(/[^\s/]+/g)];
+  const matches = [...inner.matchAll(/(?:\{[^{}]*\}|[^\s/{}])+/g)];
   if (matches.length === 0) return { attacks: [] };
   const attacks = [];
   const slotScale = rational(1, matches.length);
@@ -142,7 +155,10 @@ function scanBracket(inner, innerBase, matraStart) {
     const token = matches[slot][0];
     if (token === '.' || /^-+$/.test(token)) continue;
     const start = addRational(matraStart, rational(slot, matches.length));
-    const scanned = token.includes('[[')
+    const ornament = scanOrnamentClusterAt(token);
+    const scanned = ornament?.next === token.length
+      ? ornamentAttacks({ atoms: ornament.atoms.map(atom => ({ ...atom, index: innerBase + matches[slot].index + atom.index })) }, start, slotScale)
+      : token.includes('[[')
       ? inlineKrintanAttacks(token, innerBase + matches[slot].index, start, slotScale)
       : atomAttacks(token, innerBase + matches[slot].index, start, slotScale);
     if (scanned.error) return scanned;
@@ -264,7 +280,12 @@ function inlineKrintanAttacks(token, baseIndex, matraStart, scale) {
  * and whole-matra sustains. It rejects `_` because that duration depends on tal.
  */
 export function scanMusicLine(source) {
-  const text = String(source ?? '');
+  const normalized = normalizeSlideHolds(String(source ?? ''));
+  const result = scanNormalizedMusicLine(normalized.text);
+  return { ...result, attacks: result.attacks.map(attack => ({ ...attack, index: normalized.indices[attack.index] })) };
+}
+
+function scanNormalizedMusicLine(text) {
   const attacks = [];
   let time = rational(0, 1);
   let i = 0;
@@ -293,6 +314,16 @@ export function scanMusicLine(source) {
     }
     previousStart = time;
     previousAttackCount = attacks.length;
+    // A slide around the tail of a cluster does not create a second beat.
+    const scoped = text.slice(i).match(/^([SrRgGmMPdDnN.'-]+)~\(([SrRgGmMPdDnN.'-]+)\)/);
+    if (scoped) {
+      const scanned = atomAttacks(scoped[1] + scoped[2], 0, time);
+      attacks.push(...scanned.attacks.map(attack => ({ ...attack,
+        index: i + attack.index + (attack.index >= scoped[1].length ? 2 : 0) })));
+      time = addRational(time, rational(1));
+      i += scoped[0].length;
+      continue;
+    }
     if (/\s/.test(c) || c === '/' || c === '|' || c === '(' || c === ')' || c === '~') { i++; continue; }
     if (c === 'x' && /^x\d+/.test(text.slice(i))) {
       i += text.slice(i).match(/^x\d+/)[0].length;
@@ -308,6 +339,13 @@ export function scanMusicLine(source) {
       attacks.push(...scanned.attacks);
       time = addRational(time, rational(1, 1));
       i = close + 1;
+      continue;
+    }
+    const ornament = scanOrnamentClusterAt(text, i);
+    if (ornament) {
+      attacks.push(...ornamentAttacks(ornament, time).attacks);
+      time = addRational(time, rational(1));
+      i = ornament.next;
       continue;
     }
     // SARGAM_REPEATED_SLIDE_ANCHOR_SCAN_2026_07_20 — keep score anchors and meter selections aware

@@ -305,10 +305,22 @@ export function scheduleDocument(doc, opts = {}) {
         // trimming whatever rings — the destination keeps its whole beat.
         // Either way, the grid never moves.
         const preGraces = evs.filter((e) => e.grace && e.preBeat);
-        const sameGraces = evs.filter((e) => e.grace && !e.preBeat);
+        // Charge each grace run to its own following destination, not to the
+        // first note in the beat. Cap it against that destination's duration.
+        const graceSlivers = new Map();
+        let pendingGraces = [];
+        for (const event of evs) {
+          if (event.grace && !event.preBeat) pendingGraces.push(event);
+          else if (!event.grace && pendingGraces.length) {
+            const sliver = Math.min(GRACE_FRACTION, GRACE_CAP / pendingGraces.length,
+              (event.dur.num / event.dur.den) / (2 * pendingGraces.length)) * cellSeconds;
+            for (const grace of pendingGraces) graceSlivers.set(grace, sliver);
+            pendingGraces = [];
+          }
+        }
         const sliverOf = (n) => (n > 0 ? Math.min(GRACE_FRACTION, GRACE_CAP / n) * cellSeconds : 0);
         const preSliver = sliverOf(preGraces.length);
-        const sliver = sliverOf(sameGraces.length);
+
 
         if (preGraces.length > 0) {
           const total = preGraces.length * preSliver;
@@ -336,11 +348,13 @@ export function scheduleDocument(doc, opts = {}) {
         }
 
         let cursor = matraStart;
-        let graceTotal = sameGraces.length * sliver;
+        let graceTotal = 0;
         evs.forEach((e, eventIndex) => {
           if (e.grace && e.preBeat) return; // already placed above
           const frac = e.dur.num / e.dur.den;
           if (e.type === 'note' && e.grace) {
+            const sliver = graceSlivers.get(e) || 0;
+            graceTotal += sliver;
             const ev = {
               kind: 'note',
               t: cursor,
