@@ -89,6 +89,7 @@ export function scheduleDocument(doc, opts = {}) {
   const sa = parseSa(doc?.directives?.sa ?? DEFAULT_SA);
 
   const events = [];
+  const notationCells = [];
   const lineStarts = [];
   const sections = doc?.sections || [];
   const meterSpans = opts.meterSpans || [];
@@ -238,6 +239,13 @@ export function scheduleDocument(doc, opts = {}) {
         const beatDuration = matraDuration(line, matraIndex);
         const cellSeconds = spm * beatDuration;
         const cycleOffset = passOffset + entryOrderOffset + playedOffset;
+        if (opts.includeNotation) notationCells.push({
+          events: line.matras[matraIndex].events,
+          duration: beatDuration,
+          tal: tal?.name || 'free',
+          cycleMatra: tal ? wrapMatra(tal, (line.startMatra || 1) + cycleOffset) : null,
+          resetRinging: playedOffset === 0,
+        });
         playedOffset += beatDuration;
         events.push({
           kind: 'cursor',
@@ -467,7 +475,7 @@ export function scheduleDocument(doc, opts = {}) {
   });
 
   events.sort((a, b) => a.t - b.t);
-  return { events, duration: t, lineStarts, saFreq: sa.freq, saMidi: sa.midi };
+  return { events, duration: t, lineStarts, saFreq: sa.freq, saMidi: sa.midi, ...(opts.includeNotation ? { notationCells } : {}) };
 }
 
 /**

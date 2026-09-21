@@ -6,6 +6,9 @@
 // (Safari download fallback, autosave restore). Save writes the editor text
 // verbatim plus the surgical identity edit — never serialize(parse(text)).
 
+import { createQueueLoader, rebaseQueueTransition } from './queue-loader.js';
+import { createSerialWrites } from './save-coordinator.js';
+import { createWorkspacePersistence } from './workspace-persistence.js';
 import { createDraftAutosave } from './draft-autosave.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from '../engine/parse.js';
@@ -75,7 +78,6 @@ import {
 import {
   SOURCE_WORKSPACE_FILE,
   createEmptySourceWorkspace,
-  serializeSourceWorkspace,
   sourceWorkspaceEntry,
   sourceWorkspaceEntryFromPlayer,
   upsertSourceWorkspaceEntry,
@@ -146,11 +148,24 @@ export default function App() {
   const store = useMemo(() => createStore(window.localStorage, clock), []);
   const fileEnv = useMemo(() => makeEnv(), []);
   const io = useMemo(() => createFileIO(fileEnv), [fileEnv]);
-  const projectIO = useMemo(() => createProjectIO(fileEnv), [fileEnv]);
+  const writes = useMemo(() => createSerialWrites(), []);
+  const saveActions = useMemo(() => createSerialWrites(), []);
+  const projectIO = useMemo(() => {
+    const raw = createProjectIO(fileEnv);
+    return { ...raw, ...Object.fromEntries(['save', 'writeProjectFile', 'writeClip', 'deleteClip'].filter(name => typeof raw[name] === 'function')
+      .map(name => [name, (...args) => writes.run(() => raw[name](...args))])) };
+  }, [fileEnv, writes]);
 
   // Restore-on-load: a crash or accidental close loses nothing (spec §7).
   const restored = useMemo(() => store.loadCurrent(), [store]);
-  const [text, setText] = useState(restored ? restored.text : STARTER);
+  const textRef = useRef(restored ? restored.text : STARTER);
+  const documentSessionRef = useRef(0);
+  const [text, setTextState] = useState(textRef.current);
+  const setText = useCallback(value => {
+    const next = typeof value === 'function' ? value(textRef.current) : value;
+    textRef.current = next;
+    setTextState(next);
+  }, []);
   const [fileName, setFileName] = useState(null);
   const [handle, setHandle] = useState(null);
   const [project, setProject] = useState(null);
@@ -227,19 +242,28 @@ export default function App() {
   const [selectedMarkId, setSelectedMarkId] = useState(null);
   const [bolCapture, setBolCapture] = useState(null);
   const [bolMessage, setBolMessage] = useState('');
-  const textRef = useRef(text);
   const bolCaptureRef = useRef(null);
-  textRef.current = text;
   bolCaptureRef.current = bolCapture;
   const [selectedAudioLinkId, setSelectedAudioLinkId] = useState(null);
   const [vilambitState, setVilambitState] = useState(EMPTY_VILAMBIT_STATE);
   const vilambitStateRef = useRef(EMPTY_VILAMBIT_STATE);
   const [queueSession, setQueueSession] = useState(() => createQueueSession());
   const queueSessionRef = useRef(queueSession);
-  const queueAutoplayRef = useRef(null);
+  const queueLoaderRef = useRef(null);
   const projectWorkspaceRef = useRef(projectWorkspace);
   const workspaceBindingRef = useRef(null);
-  const workspaceWriteRef = useRef({ timer: null, project: null, projectId: null, workspace: null });
+  const workspaceRestoreRef = useRef(null);
+  const projectRef = useRef(project);
+  const projectMediaRef = useRef(projectMedia);
+  const handleRef = useRef(handle);
+  projectRef.current = project;
+  projectMediaRef.current = projectMedia;
+  handleRef.current = handle;
+  const workspacePersistence = useMemo(() => createWorkspacePersistence({
+    storage: window.localStorage,
+    write: (target, json) => projectIO.writeProjectFile(target, SOURCE_WORKSPACE_FILE, json),
+    onError: error => setNotice(`Workspace save failed: ${error.message || error}`),
+  }), [projectIO]);
   projectWorkspaceRef.current = projectWorkspace;
   queueSessionRef.current = queueSession;
   const editorRef = useRef(null);
@@ -273,6 +297,7 @@ export default function App() {
   }, []);
 
   const openRecordingPicker = useCallback(() => {
+    queueLoaderRef.current?.cancel();
     setView('vilambit');
     sendVilambit('open-file');
   }, [sendVilambit]);
@@ -353,56 +378,41 @@ export default function App() {
   );
   const dirty = text !== lastSaved;
 
-  useEffect(() => {
-    const pending = workspaceWriteRef.current;
-    const projectId = project?.manifest?.id || null;
-
-    if (pending.timer && pending.projectId !== projectId) {
-      window.clearTimeout(pending.timer);
-      pending.timer = null;
-      const priorProject = pending.project;
-      const priorWorkspace = pending.workspace;
-      if (priorProject && priorWorkspace) {
-        projectIO.writeProjectFile(
-          priorProject,
-          SOURCE_WORKSPACE_FILE,
-          serializeSourceWorkspace(priorWorkspace),
-        ).catch((error) => setNotice(`Workspace save failed: ${error?.message || error}`));
-      }
-    } else if (pending.timer) {
-      window.clearTimeout(pending.timer);
-      pending.timer = null;
-    }
-
-    if (!project) return;
-    pending.project = project;
-    pending.projectId = projectId;
-    pending.workspace = projectWorkspace;
-    pending.timer = window.setTimeout(() => {
-      const queued = workspaceWriteRef.current;
-      queued.timer = null;
-      if (!queued.project || !queued.workspace) return;
-      projectIO.writeProjectFile(
-        queued.project,
-        SOURCE_WORKSPACE_FILE,
-        serializeSourceWorkspace(queued.workspace),
-      ).catch((error) => setNotice(`Workspace save failed: ${error?.message || error}`));
-    }, 1200);
-  }, [project, projectIO, projectWorkspace]);
-
-  useEffect(() => () => {
-    const pending = workspaceWriteRef.current;
-    if (!pending.timer || !pending.project || !pending.workspace) return;
-    window.clearTimeout(pending.timer);
-    pending.timer = null;
-    projectIO.writeProjectFile(
-      pending.project,
-      SOURCE_WORKSPACE_FILE,
-      serializeSourceWorkspace(pending.workspace),
-    ).catch(() => {});
-  }, [projectIO]);
+  const queueLoader = useMemo(() => createQueueLoader({
+    send: sendVilambit,
+    workspace: (id, item) => sourceWorkspaceEntry(projectWorkspaceRef.current, item.workspaceSourceId || id),
+    onError: setNotice,
+    restored: state => {
+      const currentProject = projectRef.current;
+      if (currentProject) workspaceBindingRef.current = `${currentProject.manifest.id}:${sourceAssetIdFromReference({ ...state.source, duration: state.duration })}`;
+    },
+    commit: (before, after) => {
+      const next = rebaseQueueTransition(before, after, queueSessionRef.current);
+      queueSessionRef.current = next;
+      setQueueSession(next);
+    },
+  }), [sendVilambit]);
+  queueLoaderRef.current = queueLoader;
+  useEffect(() => () => queueLoader.cancel(), [queueLoader]);
 
   useEffect(() => {
+    if (project) workspacePersistence.schedule(project, projectWorkspace);
+  }, [project, projectWorkspace, workspacePersistence]);
+
+  useEffect(() => {
+    const flush = () => { workspacePersistence.flush(); };
+    const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', hidden);
+      flush();
+    };
+  }, [workspacePersistence]);
+
+  useEffect(() => {
+    if (queueLoader.blocksSync(vilambitState)) return;
     if (!project || !vilambitState.loaded || !vilambitState.source || vilambitState.duration <= 0) {
       workspaceBindingRef.current = null;
       return;
@@ -416,7 +426,15 @@ export default function App() {
 
     if (workspaceBindingRef.current !== binding) {
       workspaceBindingRef.current = binding;
-      if (savedEntry) sendVilambit('apply-workspace', savedEntry);
+      if (savedEntry) {
+        const requestId = clock.uuid();
+        workspaceRestoreRef.current = { binding, requestId };
+        if (!sendVilambit('apply-workspace', { ...savedEntry, sourceId: vilambitState.source.id, requestId })) {
+          workspaceBindingRef.current = null;
+          workspaceRestoreRef.current = null;
+          setNotice('Recording settings could not be restored. Reopen the recording to retry.');
+        }
+      }
       else {
         setProjectWorkspace((current) => upsertSourceWorkspaceEntry(
           current,
@@ -427,6 +445,11 @@ export default function App() {
       return;
     }
 
+    const restoring = workspaceRestoreRef.current;
+    if (restoring?.binding === binding) {
+      if (vilambitState.workspaceRequestId !== restoring.requestId) return;
+      workspaceRestoreRef.current = null;
+    }
     const nextEntry = sourceWorkspaceEntryFromPlayer(vilambitState);
     const currentEntry = sourceWorkspaceEntry(projectWorkspaceRef.current, sourceAssetId);
     if (JSON.stringify(currentEntry) === JSON.stringify(nextEntry)) return;
@@ -441,28 +464,7 @@ export default function App() {
 
   const applyQueueEffect = useCallback((effect) => {
     if (!effect || effect.type === 'none' || effect.type === 'blocked') return;
-    if (effect.type === 'load') {
-      const item = effect.item;
-      if (!item?.available || !item.sourceUrl) {
-        queueAutoplayRef.current = null;
-        setView('vilambit');
-        setNotice(`“${item?.title || 'This recording'}” needs reconnection before it can play.`);
-        return;
-      }
-      queueAutoplayRef.current = item.libraryId;
-      setView('vilambit');
-      const sent = sendVilambit('load-library-source', {
-        id: item.libraryId,
-        name: item.title,
-        url: item.sourceUrl,
-        ...(item.eqProfilesUrl ? { eqProfilesUrl: item.eqProfilesUrl } : {}),
-      });
-      if (!sent) {
-        queueAutoplayRef.current = null;
-        setNotice('Sargam Music is not ready to load that Library recording.');
-      }
-      return;
-    }
+    if (effect.type === 'load') return; // readiness is owned by queueLoader
     if (effect.type === 'play') {
       setView('vilambit');
       sendVilambit('play');
@@ -479,10 +481,16 @@ export default function App() {
 
   const commitQueueResult = useCallback((result) => {
     if (!result?.session) return;
+    if (result.effect?.type === 'load') {
+      setView('vilambit');
+      queueLoader.start(queueSessionRef.current, result, clock.uuid());
+      return;
+    }
+    if (queueLoader.pending) return;
     queueSessionRef.current = result.session;
     setQueueSession(result.session);
     applyQueueEffect(result.effect);
-  }, [applyQueueEffect]);
+  }, [applyQueueEffect, queueLoader]);
 
   const doLibraryPlay = useCallback((item) => {
     if (!item) return;
@@ -547,7 +555,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentLibrarySource) return;
+    if (!currentLibrarySource || queueLoader.blocksSync(vilambitState) || vilambitState.error || !vilambitState.readyForPlayback) return;
     if (queueSessionRef.current.current?.libraryId === currentLibrarySource.id) return;
     const catalogItem = libraryItems.find((item) => item.libraryId === currentLibrarySource.id);
     const currentItem = catalogItem
@@ -565,14 +573,6 @@ export default function App() {
     queueSessionRef.current = result.session;
     setQueueSession(result.session);
   }, [currentLibrarySource, libraryItems]);
-
-  useEffect(() => {
-    const pendingId = queueAutoplayRef.current;
-    if (!pendingId || !currentLibrarySource || vilambitState.duration <= 0) return;
-    if (currentLibrarySource.id !== pendingId) return;
-    queueAutoplayRef.current = null;
-    sendVilambit('play');
-  }, [currentLibrarySource, sendVilambit, vilambitState.duration]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1055,45 +1055,56 @@ export default function App() {
   };
 
   const doSaveProject = async ({
-    textOverride = text,
-    mediaOverride = projectMedia,
-    workspaceOverride = projectWorkspace,
+    textOverride = textRef.current,
+    mediaOverride = projectMediaRef.current,
+    workspaceOverride = projectWorkspaceRef.current,
     quiet = false,
   } = {}) => {
     if (!project) {
       if (!quiet) setNotice('Open or create a Project Folder first.');
       return null;
     }
+    const session = documentSessionRef.current;
     const withId = ensureIdentity(textOverride, clock);
+    // Install identity before the asynchronous write. Completion never rewinds
+    // the editor; edits made during the write remain different from lastSaved.
+    if (textRef.current === textOverride) setText(withId.text);
     const media = mediaWithCurrentSources(mediaOverride, parseAudioLinkDocument(withId.text).links);
-    let saved;
-    try {
-      saved = await projectIO.save(project, {
-        text: withId.text,
-        media,
-        workspace: workspaceOverride,
-        manifest: project.manifest,
-        now: clock.now(),
-      });
-    } catch (error) {
-      setNotice(`Project save failed: ${error?.message || error}`);
-      return null;
-    }
-    const nextProject = { ...project, manifest: saved.manifest };
-    setProject(nextProject);
-    setText(withId.text);
-    setLastSaved(withId.text);
-    setFileName('composition.md');
-    setHandle(null);
-    setProjectMedia(media);
-    setProjectWorkspace(saved.workspace);
-    // Project copies keep their Markdown byte-for-byte compatible while the
-    // project manifest supplies an independent recent/snapshot identity.
-    recordSavedDocument(withId, `${project.name}/composition.md`, saved.manifest.id);
-    if (!quiet) setNotice(project.memory
-      ? `Saved changes in the temporary project “${project.name}”. Export a .sargam copy before closing or refreshing.`
-      : `Saved project folder “${project.name}”.`);
-    return { withId, media, manifest: saved.manifest, project: nextProject };
+    return saveActions.run(async () => {
+      if (session !== documentSessionRef.current) return null;
+      const mediaAtStart = projectMediaRef.current;
+      let saved;
+      try {
+        await workspacePersistence.flush();
+        saved = await projectIO.save(project, {
+          text: withId.text,
+          media,
+          workspace: session === documentSessionRef.current ? projectWorkspaceRef.current : workspaceOverride,
+          manifest: project.manifest,
+          now: clock.now(),
+        });
+      } catch (error) {
+        if (session === documentSessionRef.current) setNotice(`Project save failed: ${error?.message || error}`);
+        return null;
+      }
+      if (session !== documentSessionRef.current) return null;
+      workspacePersistence.saved(project, saved.workspace);
+      const nextProject = { ...project, manifest: saved.manifest };
+      setProject(nextProject);
+      setLastSaved(withId.text);
+      setFileName('composition.md');
+      setHandle(null);
+      if (projectMediaRef.current === mediaAtStart) setProjectMedia(media);
+      // Live workspace changes during saving belong to the current session.
+
+      // Project copies keep their Markdown byte-for-byte compatible while the
+      // project manifest supplies an independent recent/snapshot identity.
+      recordSavedDocument(withId, `${project.name}/composition.md`, saved.manifest.id);
+      if (!quiet) setNotice(project.memory
+        ? `Saved changes in the temporary project “${project.name}”. Export a .sargam copy before closing or refreshing.`
+        : `Saved project folder “${project.name}”.`);
+      return { withId, media, manifest: saved.manifest, project: nextProject };
+    });
   };
 
   const doSave = async () => {
@@ -1101,16 +1112,19 @@ export default function App() {
       await doSaveProject();
       return;
     }
-    const withId = ensureIdentity(text, clock);
+    const session = documentSessionRef.current;
+    const withId = ensureIdentity(textRef.current, clock);
+    setText(withId.text);
     let res;
     try {
-      res = await io.save(withId.text, { handle, suggestedName: suggestName() });
+      res = await saveActions.run(() => writes.run(() => session === documentSessionRef.current
+        ? io.save(withId.text, { handle: handleRef.current, suggestedName: suggestName() }) : null));
     } catch (err) {
-      setNotice(`Save failed: ${err && err.message ? err.message : err}`);
+      if (session === documentSessionRef.current) setNotice(`Save failed: ${err && err.message ? err.message : err}`);
       return;
     }
-    if (!res) return; // user cancelled the picker — nothing written, say nothing
-    setText(withId.text);
+    if (!res || session !== documentSessionRef.current) return;
+    handleRef.current = res.handle;
     setLastSaved(withId.text);
     setHandle(res.handle);
     setFileName(res.name);
@@ -1127,7 +1141,9 @@ export default function App() {
       setNotice('Project folders are not available in this browser. Plain Markdown open/save still works.');
       return;
     }
-    const withId = ensureIdentity(text, clock);
+    const session = documentSessionRef.current;
+    const withId = ensureIdentity(textRef.current, clock);
+    setText(withId.text);
     const media = mediaWithCurrentSources(createEmptyMediaManifest());
     const workspace = createEmptySourceWorkspace();
     const projectCreatedAt = clock.now();
@@ -1147,17 +1163,19 @@ export default function App() {
       setNotice(`Could not create project folder: ${error?.message || error}`);
       return;
     }
-    if (!result) return;
+    if (!result || session !== documentSessionRef.current) return;
     if (!result.ok) {
       setNotice(result.message || 'That folder could not be initialized.');
       return;
     }
     stopLinkedPlayback();
+    documentSessionRef.current++;
+    queueLoader.cancel();
+    workspaceRestoreRef.current = null;
     const nextProject = { directory: result.directory, name: result.name, manifest: result.manifest };
     setProject(nextProject);
     setProjectMedia(result.media);
-    setProjectWorkspace(result.workspace);
-    setText(withId.text);
+    setProjectWorkspace(workspacePersistence.recover({ manifest: result.manifest, directory: result.directory, name: result.name, entries: result.entries }, result.workspace));
     setLastSaved(withId.text);
     setFileName('composition.md');
     setHandle(null);
@@ -1180,6 +1198,9 @@ export default function App() {
     }
     if (!result) return;
     stopLinkedPlayback();
+    documentSessionRef.current++;
+    queueLoader.cancel();
+    workspaceRestoreRef.current = null;
     setProject({
       directory: result.directory,
       name: result.name,
@@ -1188,7 +1209,7 @@ export default function App() {
       ...(result.memory ? { memory: true } : {}),
     });
     setProjectMedia(result.media);
-    setProjectWorkspace(result.workspace);
+    setProjectWorkspace(workspacePersistence.recover({ manifest: result.manifest, directory: result.directory, name: result.name, entries: result.entries }, result.workspace));
     setText(result.text);
     setLastSaved(result.text);
     setFileName('composition.md');
@@ -1262,6 +1283,9 @@ export default function App() {
     stopLinkedPlayback();
     setShowClipVault(false);
     setClipEditor(null);
+    documentSessionRef.current++;
+    queueLoader.cancel();
+    workspaceRestoreRef.current = null;
     setProject({
       directory: result.directory,
       name: result.name,
@@ -1270,7 +1294,7 @@ export default function App() {
       ...(result.memory ? { memory: true } : {}),
     });
     setProjectMedia(result.media);
-    setProjectWorkspace(result.workspace);
+    setProjectWorkspace(workspacePersistence.recover({ manifest: result.manifest, directory: result.directory, name: result.name, entries: result.entries }, result.workspace));
     setText(result.text);
     setLastSaved(result.text);
     setFileName(COMPOSITION_FILE);
@@ -1369,6 +1393,9 @@ export default function App() {
     }
     if (!res) return;
     stopLinkedPlayback();
+    documentSessionRef.current++;
+    queueLoader.cancel();
+    workspaceRestoreRef.current = null;
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
     setProjectWorkspace(createEmptySourceWorkspace());
@@ -1388,6 +1415,9 @@ export default function App() {
   const createDoc = (newText) => {
     setShowNew(false);
     stopLinkedPlayback();
+    documentSessionRef.current++;
+    queueLoader.cancel();
+    workspaceRestoreRef.current = null;
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
     setProjectWorkspace(createEmptySourceWorkspace());
@@ -1569,6 +1599,7 @@ export default function App() {
       && !state.playing
       && state.duration > 0
       && state.position >= state.duration - 0.25;
+    queueLoader.observe(state);
     vilambitStateRef.current = state;
     setVilambitState(state);
     if (naturallyEnded) {
@@ -1577,7 +1608,7 @@ export default function App() {
         loopActive: Boolean(state.loop?.on),
       }));
     }
-  }, [commitQueueResult, setLinkedPlaybackState, stopLinkedPlayback]);
+  }, [commitQueueResult, queueLoader, setLinkedPlaybackState, stopLinkedPlayback]);
 
   const doAttachAudioLoop = (playerState = vilambitState) => {
     const el = editorRef.current;
@@ -1699,7 +1730,7 @@ export default function App() {
   ]);
 
   const receiveVilambitError = useCallback((message) => {
-    if (!pendingClipRef.current) return;
+    if (!pendingClipRef.current) { setNotice(message); return; }
     pendingClipRef.current = null;
     setExtractingClip(false);
     setNotice(`Clip extraction failed: ${message}`);
@@ -1724,7 +1755,7 @@ export default function App() {
       return;
     }
     const requestId = clock.uuid();
-    pendingClipRef.current = { requestId, link, extraction };
+    pendingClipRef.current = { requestId, link, extraction, session: documentSessionRef.current };
     setExtractingClip(true);
     setNotice(`Extracting ${extraction.extractionStart.toFixed(1)}–${extraction.extractionEnd.toFixed(1)}s with editable context around the linked phrase…`);
     const sent = sendVilambit('extract-loop', {
@@ -1742,7 +1773,7 @@ export default function App() {
   const receiveExtractedClip = useCallback(async (clipPayload) => {
     const pending = pendingClipRef.current;
     if (!pending || pending.requestId !== clipPayload?.requestId) return;
-    if (!project) {
+    if (!project || pending.session !== documentSessionRef.current) {
       pendingClipRef.current = null;
       setExtractingClip(false);
       setNotice('The project folder closed before the clip was written.');
@@ -1784,21 +1815,14 @@ export default function App() {
         bytes: blob.size,
         createdAt: clock.now(),
       };
-      media = upsertClipAsset(media, clip);
-      const attached = attachClipToAudioLink(text, pending.link.id, clipId);
+      media = upsertClipAsset(upsertSourceAsset(projectMediaRef.current, sourceResult.asset), clip);
+      if (pending.session !== documentSessionRef.current) return;
+      const attached = attachClipToAudioLink(textRef.current, pending.link.id, clipId);
       if (!attached.ok) throw new Error(attached.message);
       const withId = ensureIdentity(attached.text, clock);
-      const saved = await projectIO.save(project, {
-        text: withId.text,
-        media,
-        manifest: project.manifest,
-        now: clock.now(),
-      });
-      const nextProject = { ...project, manifest: saved.manifest };
-      setProject(nextProject);
       setText(withId.text);
-      setLastSaved(withId.text);
-      setProjectMedia(media);
+      const saved = await doSaveProject({ textOverride: withId.text, mediaOverride: media, quiet: true });
+      if (!saved || pending.session !== documentSessionRef.current) return;
       setClipPresence((current) => ({ ...current, [clipId]: true }));
       setSelectedAudioLinkId(pending.link.id);
       recordSavedDocument(withId, `${project.name}/composition.md`, saved.manifest.id);
@@ -1806,10 +1830,12 @@ export default function App() {
     } catch (error) {
       setNotice(`Clip extraction failed: ${error?.message || error}`);
     } finally {
-      pendingClipRef.current = null;
-      setExtractingClip(false);
+      if (pendingClipRef.current === pending) {
+        pendingClipRef.current = null;
+        setExtractingClip(false);
+      }
     }
-  }, [project, projectIO, projectMedia, text]);
+  }, [project, projectIO, projectMedia, doSaveProject]);
 
   const doOpenClipEditor = useCallback(async (link = selectedAudioLink) => {
     if (!project || !link?.clipAssetId) {
@@ -1919,6 +1945,9 @@ export default function App() {
       return;
     }
     stopLinkedPlayback();
+    documentSessionRef.current++;
+    queueLoader.cancel();
+    workspaceRestoreRef.current = null;
     setProject(null);
     setProjectMedia(createEmptyMediaManifest());
     setProjectWorkspace(createEmptySourceWorkspace());

@@ -80,6 +80,8 @@ let lastLiveWaveCapture = 0;
 let realtimeCaptureActive = false;
 let waveformPollGeneration = 0;
 let sourceGeneration = 0;
+let localRecording = null;
+let compatiblePlaybackURL = null;
 const GRAIN = 4096, RB_SIZE = 1 << 16, RB_MASK = RB_SIZE - 1;
 
 let graphBuild = null;
@@ -622,7 +624,7 @@ function seekTo(t){
 }
 
 function togglePlay(){
-  if (!state.fileURL) return Promise.resolve(false);
+  if (!state.fileURL || localRecording?.controller) return Promise.resolve(false);
   if (playRequest) return playRequest;
   const generation = sourceGeneration;
   const pending = performTogglePlay(generation).catch(error => {
@@ -748,6 +750,7 @@ function syncFullscreenButton(){
 
 /* ---------------- source loading ---------------- */
 function showSourceNotice(message, kind){
+  state.sourceError = kind === 'err' ? String(message || '') : null;
   const el = $('sourceNotice');
   if (!el) return;
   el.textContent = message || '';
@@ -901,6 +904,12 @@ function fileNameFromURL(url){
 
 function resetSourceState(source){
   const generation = ++sourceGeneration;
+  localRecording?.controller?.abort();
+  localRecording?.nativeController?.abort();
+  localRecording = null;
+  setPreparationBusy(false);
+  if (compatiblePlaybackURL) URL.revokeObjectURL(compatiblePlaybackURL);
+  compatiblePlaybackURL = null;
   disposeAudioGraph();
   state.playing = false; state.posPaused = 0;
   if (state.fileURL && state.fileURLRevocable) URL.revokeObjectURL(state.fileURL);
@@ -916,6 +925,7 @@ function resetSourceState(source){
     fileLastModified: Number.isFinite(Number(source.lastModified)) ? Number(source.lastModified) : null,
     peaks: null, waveformMode: 'none', decoded: null, detected: null,
     loopA: null, loopB: null, loopOn: false, markers: [],
+    sourceError: null, readyForPlayback: false, loadRequestId: null, workspaceRequestId: null,
     regions: [], bpm: null,
     viewStart: 0, viewEnd: 0, followPlayhead: false,
     eq: Core.normalizeEqSettings(),
@@ -931,7 +941,7 @@ function resetSourceState(source){
   $('exportStatus').textContent = ''; $('exportStatus').className = '';
 
   media.src = state.fileURL;
-  media.preload = 'metadata';
+  media.preload = state.archive ? 'auto' : 'metadata';
   media.load();
   document.body.classList.add('hasSource');
   $('fileName').textContent = state.fileName;
@@ -940,6 +950,10 @@ function resetSourceState(source){
   ['transport','controls','waveWrap'].forEach(id => $(id).classList.add('on'));
   renderEqProfiles();
   paintEq();
+
+  media.addEventListener('canplay', () => {
+    if (generation === sourceGeneration) state.readyForPlayback = true;
+  }, { once: true });
 
   media.addEventListener('loadedmetadata', () => {
     if (generation !== sourceGeneration) return;
@@ -966,6 +980,13 @@ function resetSourceState(source){
 
   media.addEventListener('error', () => {
     if (generation !== sourceGeneration) return;
+    if (localRecording?.generation === generation && (media.error?.code === 3 || media.error?.code === 4)) {
+      localRecording.mediaFailed = true;
+      localRecording.nativeController?.abort();
+      localRecording.native = 'unavailable';
+      maybePrepareLocalRecording(localRecording);
+      if (localRecording.native !== 'pending') return;
+    }
     const message = state.archive
       ? 'The archive recording could not be loaded. Check that its URL is reachable from this computer.'
       : (media.error?.code === 3 || media.error?.code === 4)
@@ -977,14 +998,21 @@ function resetSourceState(source){
   return generation;
 }
 
-function decodeSource(arrayBuffer, generation = sourceGeneration){
+function decodeSource(arrayBuffer, generation = sourceGeneration, signal = null, info = null){
   return Promise.resolve(arrayBuffer).then(buf => {
+    if (signal?.aborted || generation !== sourceGeneration) return false;
     const dctx = new (window.AudioContext || window.webkitAudioContext)();
-    return Promise.resolve().then(() => dctx.decodeAudioData(buf.slice(0))).then(ab => {
-      if (generation !== sourceGeneration) {
+    const close = () => dctx.close().catch(() => {});
+    signal?.addEventListener('abort', close, { once: true });
+    if (info && !window.SargamAudioMetadata?.fits(info, info.duration, dctx.sampleRate || 48000)) {
+      signal?.removeEventListener('abort', close); close(); return false;
+    }
+    return Promise.resolve().then(() => dctx.decodeAudioData(buf)).then(ab => {
+      if (signal?.aborted || generation !== sourceGeneration) {
         return;
       }
       state.decoded = ab;
+      state.readyForPlayback = true;
       if (!state.isVideo){
         state.duration = ab.duration;
         $('dur').textContent = fmt(ab.duration);
@@ -999,13 +1027,15 @@ function decodeSource(arrayBuffer, generation = sourceGeneration){
         stretch.addBuffers(bufferChannels(ab));
       }
       invalidateWaveCache(); drawWave();
-    }).finally(() => dctx.close().catch(() => {}));
+      return true;
+    }).finally(() => { signal?.removeEventListener('abort', close); close(); });
   }).catch(() => {
-    if (generation !== sourceGeneration) return;
+    if (signal?.aborted || generation !== sourceGeneration) return false;
     ensureLiveWaveform(state.isVideo
       ? 'Video waveform builds during playback'
       : 'Waveform builds during playback');
     $('exportStatus').textContent = 'Could not decode audio track — waveform, tuning and export unavailable for this file.';
+    return false;
   });
 }
 
@@ -1023,8 +1053,142 @@ function loadFile(file){
     lastModified: file.lastModified,
     archive: false,
   });
-  decodeSource(file.arrayBuffer(), generation);
+  const record = localRecording = {
+    file, generation, native: 'pending', mediaFailed: false, attempted: false, controller: null,
+    audio: file.type?.startsWith('audio/') || /\.(m4a|m4b|mp3|aac|flac|wav|aiff?|aifc|ogg|oga|opus|wma|caf)$/i.test(file.name),
+  };
+  // Optional waveform decoding has its own deadline and a decoded-size budget.
+  // A media format error aborts this work immediately and starts local fallback.
+  record.nativeController = new AbortController();
+  const signal = record.nativeController.signal;
+  let timeout;
+  const aborted = new Promise(resolve => signal.addEventListener('abort', () => resolve(false), { once: true }));
+  const work = async () => {
+    if (file.size > 32 * 1024 * 1024 || !window.SargamAudioMetadata) return false;
+    const info = await window.SargamAudioMetadata.inspect(file);
+    if (!info || signal.aborted) return false;
+    if (!(info.duration > 0)) {
+      if (!(state.duration > 0)) await new Promise(resolve => {
+        const done = () => { media.removeEventListener('loadedmetadata', done); signal.removeEventListener('abort', done); resolve(); };
+        media.addEventListener('loadedmetadata', done, { once: true });
+        signal.addEventListener('abort', done, { once: true });
+      });
+      info.duration = state.duration;
+    }
+    if (signal.aborted || !window.SargamAudioMetadata.fits(info)) return false;
+    const bytes = await file.arrayBuffer();
+    return decodeSource(bytes, generation, signal, info);
+  };
+  timeout = setTimeout(() => record.nativeController.abort(), 15000);
+  Promise.race([work().catch(() => false), aborted]).then(ok => {
+    clearTimeout(timeout);
+    if (record !== localRecording) return;
+    record.native = ok ? 'ready' : 'unavailable';
+    if (!ok && !record.mediaFailed) {
+      ensureLiveWaveform('Waveform builds during playback');
+      $('exportStatus').textContent = 'Streaming playback is available. Full-waveform tools require a smaller recording with a readable audio layout.';
+    }
+    maybePrepareLocalRecording(record);
+  });
 }
+
+function setPreparationBusy(busy){
+  const cancel = $('audioPreparationCancel');
+  if (cancel) cancel.hidden = !busy;
+  $('playBtn').disabled = busy;
+  if ($('videoPlayBtn')) $('videoPlayBtn').disabled = busy;
+}
+
+function waitForPreparedMedia(signal){
+  return new Promise((resolve, reject) => {
+    let timer;
+    const done = error => {
+      clearTimeout(timer);
+      media.removeEventListener('loadedmetadata', loaded);
+      media.removeEventListener('error', failed);
+      signal.removeEventListener('abort', cancelled);
+      if (error) reject(error); else resolve();
+    };
+    const loaded = () => done();
+    const failed = () => done(new Error('This browser could not play the prepared audio copy. Try a current browser.'));
+    const cancelled = () => done(new DOMException('Preparation cancelled', 'AbortError'));
+    media.addEventListener('loadedmetadata', loaded, { once: true });
+    media.addEventListener('error', failed, { once: true });
+    signal.addEventListener('abort', cancelled, { once: true });
+    timer = setTimeout(() => done(new Error('The prepared recording did not become ready. Choose the recording again to retry.')), 15000);
+  });
+}
+
+async function maybePrepareLocalRecording(record){
+  if (record !== localRecording || !record.mediaFailed || record.native === 'pending' || record.attempted) return;
+  record.attempted = true;
+  if (!record.audio || !window.SargamAudioCompatibility) {
+    showSourceNotice('This browser cannot play this recording. Automatic preparation supports local audio files; for video, use a compatible video copy.', 'err');
+    return;
+  }
+  const controller = record.controller = new AbortController();
+  setPreparationBusy(true);
+  showSourceNotice('Preparing this recording for playback… Everything stays on this device.', 'ok');
+  $('exportStatus').textContent = '';
+  media.pause();
+  try {
+    const result = await window.SargamAudioCompatibility.prepare(record.file, {
+      signal: controller.signal,
+      onProgress: progress => {
+        if (record !== localRecording || controller.signal.aborted) return;
+        showSourceNotice(`Preparing this recording for playback… ${Math.floor(progress * 100)}% · on this device`, 'ok');
+      },
+    });
+    if (record !== localRecording || controller.signal.aborted) return;
+    // Keep state.fileURL and all source identity fields tied to the original.
+    // Only the media element reads the temporary compatible copy.
+    disposeAudioGraph();
+    state.playing = false;
+    compatiblePlaybackURL = URL.createObjectURL(result.blob);
+    const ready = waitForPreparedMedia(controller.signal);
+    media.src = compatiblePlaybackURL;
+    media.load();
+    await ready;
+    if (record !== localRecording || controller.signal.aborted) return;
+    state.isVideo = false;
+    $('videoWrap').classList.remove('on');
+    state.duration = media.duration || result.info.duration;
+    $('dur').textContent = fmt(state.duration);
+    if (!state.viewEnd) resetWaveView();
+    try { media.currentTime = state.posPaused; } catch (_) {}
+    setBadge('Prepared on this device');
+    showSourceNotice('Ready to play. A compatible copy was prepared on this device; your original is unchanged.', 'ok');
+    if (!state.decoded && result.info.decodedBytes <= window.SargamAudioCompatibility.LIMITS.decodedBytes) {
+      // Small copies retain full waveform, stretch, and clip extraction tools.
+      const decodeController = record.nativeController = new AbortController();
+      const decodeTimer = setTimeout(() => decodeController.abort(), 15000);
+      decodeSource(result.blob.arrayBuffer(), record.generation, decodeController.signal, result.info)
+        .finally(() => clearTimeout(decodeTimer));
+    } else if (!state.decoded) {
+      ensureLiveWaveform('Waveform builds during playback');
+    }
+    invalidateWaveCache(); sizeWave(); drawWave();
+  } catch (error) {
+    if (record !== localRecording) return;
+    if (compatiblePlaybackURL) {
+      media.removeAttribute('src');
+      media.load();
+      URL.revokeObjectURL(compatiblePlaybackURL);
+      compatiblePlaybackURL = null;
+    }
+    const message = error?.name === 'AbortError'
+      ? 'Preparation cancelled. Choose the recording again to retry.'
+      : error?.message || 'This recording could not be prepared on this device.';
+    showSourceNotice(message, error?.name === 'AbortError' ? '' : 'err');
+  } finally {
+    if (record === localRecording) {
+      record.controller = null;
+      setPreparationBusy(false);
+    }
+  }
+}
+
+if ($('audioPreparationCancel')) $('audioPreparationCancel').addEventListener('click', () => localRecording?.controller?.abort());
 
 function archiveSourceURL(raw){
   const url = new URL(String(raw || ''), window.location.href);
@@ -1058,6 +1222,7 @@ function renderEqProfiles(){
 }
 
 async function loadArchiveEqProfiles(raw){
+  const generation = sourceGeneration;
   if (!raw) {
     $('eqStatus').textContent =
       'No archive EQ has been published for this recording. You can still save and share My EQ.';
@@ -1074,6 +1239,7 @@ async function loadArchiveEqProfiles(raw){
     if (!payload || payload.kind !== 'sargam-eq-profiles' || payload.version !== 1) {
       throw new Error('Archive EQ manifest is not a supported Sargam profile list.');
     }
+    if (generation !== sourceGeneration) return;
     state.archiveEqProfiles = (Array.isArray(payload.profiles) ? payload.profiles : [])
       .filter((profile) => profile && typeof profile === 'object' && profile.eq)
       .map((profile, index) => {
@@ -1100,6 +1266,7 @@ async function loadArchiveEqProfiles(raw){
       ? `${state.archiveEqProfiles.length} archive/community ${state.archiveEqProfiles.length === 1 ? 'setting is' : 'settings are'} available. Nothing changes until you choose one.`
       : 'The archive EQ manifest is valid, but it does not contain any published settings.';
   } catch (error) {
+    if (generation !== sourceGeneration) return;
     state.archiveEqProfiles = [];
     renderEqProfiles();
     $('eqStatus').textContent = `Archive EQ unavailable: ${error.message || error}`;
@@ -2844,7 +3011,7 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
   }
 
   function bridgeSnapshot(){
-    return Core.createPublicSnapshot({
+    return { ...Core.createPublicSnapshot({
       ready: true,
       fileURL: state.fileURL,
       sourceId: state.sourceId,
@@ -2869,8 +3036,8 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       viewEnd: state.viewEnd,
       followPlayhead: state.followPlayhead,
       eq: state.eq,
-      error: bridgeError,
-    });
+      error: state.sourceError || bridgeError,
+    }), readyForPlayback: Boolean(state.readyForPlayback), loadRequestId: state.loadRequestId, workspaceRequestId: state.workspaceRequestId };
   }
 
   function bridgePublish(type = 'state', force = false){
@@ -2939,10 +3106,14 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       setArchiveMode(true);
       const loaded = loadArchiveURL(payload.url, payload.name, sourceId);
       if (!loaded) throw new Error('The selected archive recording could not be loaded.');
-      await loadArchiveEqProfiles(payload.eqProfilesUrl);
+      state.loadRequestId = payload.requestId || null;
+      loadArchiveEqProfiles(payload.eqProfilesUrl);
       return;
     }
     if (!state.fileURL) throw new Error('Load a recording in Vilambit first.');
+
+    if (payload.sourceId && payload.sourceId !== state.sourceId) throw new Error('The recording changed before this command could run.');
+    if (payload.requestId && type === 'play' && payload.requestId !== state.loadRequestId) return;
 
     if (type === 'apply-workspace') {
       const restored = Core.normalizeWorkspaceState(payload, state.duration);
@@ -2970,12 +3141,13 @@ window.VILAMBIT_TEST = { detectPitchHz, describePitch, encodeWav, interleave16, 
       renderRegions();
       renderBpm();
       seekTo(restored.lastPosition);
+      state.workspaceRequestId = payload.requestId || null;
       drawWave();
       return;
     }
 
     if (type === 'play') {
-      if (!bridgeIsPlaying()) await togglePlay();
+      if (!bridgeIsPlaying() && await togglePlay() === false) throw new Error('Playback did not start. Press Play to retry.');
       return;
     }
     if (type === 'pause') {

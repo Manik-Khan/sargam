@@ -46,6 +46,7 @@ export const TALS = Object.freeze({
     // Manik confirmed 2 + 3 + 2 + 1½ and three equal half-beat ending strokes.
     // Khali on 6 remains provisional, following his stated convention.
     name: 'jhampak',
+    aliases: ['ashtajhaptal', 'ashtajhaptaal'],
     matras: 8.5,
     vibhags: [2, 3, 2, 1.5],
     markers: ['+', '2', '0', '3'],

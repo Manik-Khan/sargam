@@ -755,3 +755,7 @@
     }
     footer{padding-right:15px;padding-left:15px}
   }
+
+/* Visible only while optional local audio preparation is running. */
+#audioPreparationCancel{margin:8px 0 12px}
+#audioPreparationCancel[hidden]{display:none}

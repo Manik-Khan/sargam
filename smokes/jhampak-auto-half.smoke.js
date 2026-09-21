@@ -78,7 +78,7 @@ export const smokes = [
   {name:'jhampak automatic: staff export and other talas keep correct durations',fn(){
     const doc=parse();const xml=new JSDOM(documentToMusicXML(doc),{contentType:'text/xml'}).window.document;
     assert.equal(xml.querySelector('beats').textContent,'17');
-    assert.deepEqual([...xml.querySelectorAll('measure')].map(m=>[...m.querySelectorAll('duration')].reduce((n,e)=>n+Number(e.textContent),0)),[17,17]);
+    assert.deepEqual([...xml.querySelectorAll('measure')].map(m=>[...m.querySelectorAll('duration')].reduce((n,e)=>n+Number(e.textContent),0)),[13,17,4]);
     assert.equal(scheduleDocument(parse(SOURCE.replace('jhampak','jhaptal'))).duration,18);
   }},
 ];

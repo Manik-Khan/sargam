@@ -198,7 +198,7 @@ export const smokes = [
       const app = await read('../src/shell/App.jsx');
       const drawer = await read('../src/shell/QueueDrawer.jsx');
       assert.match(app, /buildLibraryCatalog/);
-      assert.match(app, /load-library-source/);
+      assert.match(app, /createQueueLoader/);
       assert.match(app, /addQueueItem/);
       assert.match(app, /moveQueueItem/);
       assert.match(app, /removeQueueItem/);

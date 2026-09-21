@@ -1,4 +1,3 @@
-import { matraDuration, performedWrittenOrder } from './performed-time.js';
 // western.js — sargam → Western staff notation, via MusicXML.
 //
 // THE SPELLING INSIGHT (the part that needs sargam, not justarithmetic):
@@ -19,7 +18,7 @@ import { matraDuration, performedWrittenOrder } from './performed-time.js';
 //
 // Engine rules: plain JS, no React, no DOM, never throws.
 
-import { parseSa, SEMITONES, DEFAULT_SA } from './schedule.js';
+import { parseSa, SEMITONES, DEFAULT_SA, scheduleDocument } from './schedule.js';
 import { getTal } from './tala.js';
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
@@ -81,70 +80,56 @@ function noteType(durDiv, divisions) {
   return null;
 }
 
-/**
- * Flatten the document into absolute-matra note events, mirroring the
- * rhythm decisions schedule.js makes (repeats unroll; whole-matra sustains
- * lengthen the ringing note; graces carry no time) — but in RHYTHM space
- * rather than seconds, which is what notation needs.
- */
+// Playback owns repeat/ending/Gat traversal. Export consumes its performed
+// cells, retaining written grace notation rather than playback's grace slivers.
 function flatten(doc) {
-  const out = [];
-  let at = 0; // absolute matra position
-  let meterMatras = getTal(doc?.directives?.tal)?.matras ?? (doc?.directives?.tal === 'free' ? 4 : 16);
-  let firstMeterSet = false;
-
-  for (const section of doc?.sections || []) {
-    const tal = section.tal === 'free' ? null : getTal(section.tal);
-    if (!firstMeterSet) {
-      meterMatras = tal ? tal.matras : 4; // free sections flow in 4/4
-      firstMeterSet = true;
+  const { notationCells } = scheduleDocument(doc, { tempo: 60, includeNotation: true });
+  const events = [], measures = [];
+  let at = 0, ringing = null, measure = null, expectedCycle = null;
+  for (const cell of notationCells) {
+    const tal = getTal(cell.tal);
+    const meter = tal?.matras || 4;
+    const cycle = cell.cycleMatra || (measure?.tal === cell.tal ? expectedCycle : 1) || 1;
+    if (measure && (measure.tal !== cell.tal || (tal && Math.abs(cycle - expectedCycle) > 1e-8))) {
+      measure.end = at;
+      measure = null;
     }
-    for (const line of section.lines || []) {
-      if (!line.matras || line.matras.length === 0) continue;
-
-      const order = performedWrittenOrder(line);
-      const passes = line.lineRepeat ? 2 : 1;
-
-      for (let pass = 0; pass < passes; pass++) {
-        let ringing = null;
-        const endingCut = Number.isInteger(line.firstEndingFrom) ? order.indexOf(line.firstEndingFrom) : -1;
-        const passOrder = pass > 0 && endingCut >= 0 ? order.slice(0, endingCut) : order;
-        for (const mi of passOrder) {
-          const duration = matraDuration(line, mi);
-          const evs = line.matras[mi].events;
-          if (evs.length === 1 && evs[0].type === 'sustain') {
-            if (ringing) ringing.dur += duration;
-            else out.push({ kind: 'rest', at, dur: duration });
-            at += duration;
-            continue;
-          }
-          let cursor = at;
-          for (const e of evs) {
-            if (e.grace) {
-              out.push({ kind: 'grace', at: cursor, ch: e.ch, octave: e.octave || 0 });
-              continue;
-            }
-            const frac = duration * e.dur.num / e.dur.den;
-            if (e.type === 'note') {
-              const ev = { kind: 'note', at: cursor, dur: frac, ch: e.ch, octave: e.octave || 0 };
-              out.push(ev);
-              ringing = ev;
-            } else if (e.type === 'rest') {
-              out.push({ kind: 'rest', at: cursor, dur: frac });
-              ringing = null;
-            } else if (ringing) {
-              ringing.dur += frac;
-            } else {
-              out.push({ kind: 'rest', at: cursor, dur: frac });
-            }
-            cursor += frac;
-          }
-          at += duration;
-        }
+    let remaining = cell.duration, position = cycle, cursor = at;
+    while (remaining > 1e-9) {
+      if (!measure) {
+        measure = { start: cursor, end: cursor + meter - position + 1, meter, tal: cell.tal, pickup: position !== 1, notes: [] };
+        measures.push(measure);
       }
+      const take = Math.min(remaining, measure.end - cursor);
+      cursor += take;
+      remaining -= take;
+      position += take;
+      if (Math.abs(cursor - measure.end) < 1e-8) { measure = null; position = 1; }
     }
+    expectedCycle = position;
+    if (cell.resetRinging) ringing = null;
+    let onset = at;
+    for (const e of cell.events) {
+      if (e.grace) { events.push({ kind: 'grace', at: onset, ch: e.ch, octave: e.octave || 0 }); continue; }
+      const dur = cell.duration * e.dur.num / e.dur.den;
+      if (e.type === 'note') {
+        ringing = { kind: 'note', at: onset, dur, ch: e.ch, octave: e.octave || 0 };
+        events.push(ringing);
+      } else if (e.type === 'sustain' && ringing) ringing.dur += dur;
+      else {
+        events.push({ kind: 'rest', at: onset, dur });
+        if (e.type === 'rest') ringing = null;
+      }
+      onset += dur;
+    }
+    at += cell.duration;
   }
-  return { events: out, meterMatras, total: at };
+  if (measure) measure.end = at;
+  if (!measures.length) {
+    const meter = getTal(doc?.directives?.tal)?.matras || (doc?.directives?.tal === 'free' ? 4 : 16);
+    measures.push({ start: 0, end: meter, meter, pickup: false, notes: [] });
+  }
+  return { events, measures };
 }
 
 /** Denominator of a float that came from exact fractions (safe: small). */
@@ -160,42 +145,29 @@ function denomOf(x) {
 export function documentToMusicXML(doc) {
   const dirs = doc?.directives || {};
   const saValue = dirs.sa || DEFAULT_SA;
-  const { events, meterMatras, total } = flatten(doc);
+  const { events, measures } = flatten(doc);
 
   // divisions per quarter (= per matra) must make every duration an integer
-  let divisions = denomOf(meterMatras);
+  let divisions = 1;
+  for (const m of measures) divisions = lcm(divisions, lcm(denomOf(m.meter), denomOf(m.end - m.start)));
   for (const e of events) if (e.dur) divisions = lcm(divisions, denomOf(e.dur));
   divisions = Math.max(1, Math.min(divisions, 5040));
 
-  const measures = [];
-  const measureCount = Math.max(1, Math.ceil(total / meterMatras));
-  for (let m = 0; m < measureCount; m++) measures.push([]);
-
-  // Place events into measures, splitting + tying anything that crosses.
+  // Place events into the actual cycle measures; split and tie across sam.
+  let measureIndex = 0;
   for (const e of events) {
-    if (e.kind === 'grace') {
-      const mi = Math.min(measures.length - 1, Math.floor(e.at / meterMatras));
-      measures[mi].push({ ...e });
-      continue;
-    }
-    let start = e.at;
-    let left = e.dur;
-    let first = true;
-    while (left > 1e-9) {
-      const mi = Math.min(measures.length - 1, Math.floor(start / meterMatras + 1e-9));
-      const measureEnd = (mi + 1) * meterMatras;
-      const take = Math.min(left, measureEnd - start);
+    while (measureIndex < measures.length - 1 && e.at >= measures[measureIndex].end - 1e-9) measureIndex++;
+    if (e.kind === 'grace') { measures[measureIndex].notes.push({ ...e }); continue; }
+    let start = e.at, left = e.dur, first = true, mi = measureIndex;
+    while (left > 1e-9 && mi < measures.length) {
+      const take = Math.min(left, measures[mi].end - start);
+      if (take <= 1e-9) { mi++; continue; }
       const last = left - take <= 1e-9;
-      measures[mi].push({
-        ...e,
-        at: start,
-        dur: take,
-        tieStart: !last,
-        tieStop: !first,
-      });
+      measures[mi].notes.push({ ...e, at: start, dur: take, tieStart: !last, tieStop: !first });
       start += take;
       left -= take;
       first = false;
+      if (!last) mi++;
     }
   }
 
@@ -225,16 +197,18 @@ export function documentToMusicXML(doc) {
   L.push('  </part-list>');
   L.push('  <part id="P1">');
 
-  measures.forEach((notes, mi) => {
-    L.push(`    <measure number="${mi + 1}">`);
-    if (mi === 0) {
+  measures.forEach((measure, mi) => {
+    const { notes, meter: meterMatras } = measure;
+    const partial = measure.pickup || measure.end - measure.start < meterMatras - 1e-9;
+    L.push(`    <measure number="${mi + 1}"${partial ? ' implicit="yes"' : ''}>`);
+    if (mi === 0 || meterMatras !== measures[mi - 1].meter) {
       L.push('      <attributes>');
       L.push(`        <divisions>${divisions}</divisions>`);
-      L.push('        <key><fifths>0</fifths></key>');
+      if (mi === 0) L.push('        <key><fifths>0</fifths></key>');
       L.push(`        <time><beats>${meterMatras * denomOf(meterMatras)}</beats><beat-type>${4 * denomOf(meterMatras)}</beat-type></time>`);
-      L.push('        <clef><sign>G</sign><line>2</line></clef>');
+      if (mi === 0) L.push('        <clef><sign>G</sign><line>2</line></clef>');
       L.push('      </attributes>');
-      if (dirs.tempo) {
+      if (mi === 0 && dirs.tempo) {
         L.push('      <direction placement="above"><direction-type>');
         L.push(
           `        <metronome><beat-unit>quarter</beat-unit><per-minute>${esc(dirs.tempo)}</per-minute></metronome>`
@@ -266,8 +240,6 @@ export function documentToMusicXML(doc) {
         L.push('        <rest/>');
       } else {
         const p = spellDegree(saValue, e.ch, e.octave);
-        if (e.tieStop) L.push('        <tie type="stop"/>');
-        if (e.tieStart) L.push('        <tie type="start"/>');
         L.push('        <pitch>');
         L.push(`          <step>${p.step}</step>`);
         if (p.alter) L.push(`          <alter>${p.alter}</alter>`);
@@ -275,8 +247,11 @@ export function documentToMusicXML(doc) {
         L.push('        </pitch>');
       }
       L.push(`        <duration>${durDiv}</duration>`);
+      if (e.kind === 'note' && e.tieStop) L.push('        <tie type="stop"/>');
+      if (e.kind === 'note' && e.tieStart) L.push('        <tie type="start"/>');
       const t = noteType(durDiv, divisions);
       if (t) L.push(`        <type>${t}</type>`);
+      if ([3, 1.5, 0.75].some(value => Math.abs(e.dur - value) < 1e-9)) L.push('        <dot/>');
       if (e.kind === 'note' && (e.tieStart || e.tieStop)) {
         L.push('        <notations>');
         if (e.tieStop) L.push('          <tied type="stop"/>');

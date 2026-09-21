@@ -33,6 +33,10 @@ The command must end with every smoke check passing and a successful production 
 
 ## Playback
 
+- Open a local audio recording that the browser cannot decode (for example a confirmed unsupported ALAC M4A). Confirm automatic preparation with Cancel, then audible playback with the original name, markers, loops, and source identity. Confirm native-playable audio does not load the optional decoder.
+- Cancel preparation and switch recordings during preparation; neither may leave Play disabled or allow the old result to replace the new recording. Check error/size/time limits are explained without accepting a partial recording.
+- In browser developer tools, verify preparation downloads only the same-origin decoder software and makes no requests uploading recording data. See `docs/audio-compatibility.md`.
+
 - In Music, load and play a local MP4; replace it with a second MP4, then a local audio file, then the first MP4. Each must play with audible sound without refreshing the page. Check play/pause, seek-before-first-play, speed/pitch, and A–B looping after replacement.
 - Click Play twice quickly while setup is pending, and replace a recording during setup. No old recording or unfinished processing graph may take over the new source.
 - Load an unreadable local recording. Its message must identify a local-file/format problem, not an archive URL problem; a subsequent valid recording must remain playable.
@@ -82,3 +86,21 @@ The command must end with every smoke check passing and a successful production 
 - Export and re-import a `.sargam` project without overwriting the original project.
 
 Record the date, browser, composition, check count, and any failure before release.
+
+## September 20 audit regression acceptance
+
+- Save while continuing to type. New notes must survive, and remain unsaved until
+  a later save includes them. Repeat with two saves, project saving, clip
+  extraction, and switching documents while a write is pending.
+- In a project folder, listen continuously while adding a marker and changing
+  loop/EQ settings. Confirm `workspace.json` changes without pausing. Close and
+  reopen during playback and verify recovery for the same source.
+- Queue a broken/slow URL. Next must preserve the prior queue on failure or
+  timeout. A successful Next must restore saved settings before autoplay.
+- Export Tintal → Rupak → Jhampak → free time, all Gat return forms, and the
+  approved `@3` Jhampak phrase. Verify measure changes and the closing S on sam
+  in a MusicXML reader. Printed Sargam remains covered by the checks above.
+- Enter `tal: Ashta Jhaptaal` and verify the same 8½-beat behavior as `jhampak`.
+- Open short and long M4A/MP3/WAV recordings. Native files should remain playable
+  when a full waveform is skipped. Format failure must start local preparation
+  without waiting indefinitely for native decoding.

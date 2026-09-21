@@ -61,3 +61,9 @@ Listen to two repeated cycles and confirm the final Di–Di–Na spacing and nex
 sam. Confirm the provisional khali on 6 and inspect the ½ labels on screen and
 in a printed composition. Automated structural checks do not replace this ear
 and visual acceptance.
+
+
+As of the September 20 audit repair, `Ashta Jhaptal` and `Ashta Jhaptaal`
+(including spacing/hyphen variants) are accepted aliases for this same approved
+8½-beat definition. Existing `jhampak` documents and the spelling in authored
+headers are preserved. This does not change the provisional khali convention.

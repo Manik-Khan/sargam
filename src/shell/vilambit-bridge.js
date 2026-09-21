@@ -147,6 +147,9 @@ export function sanitizeVilambitState(value) {
 
   return {
     ready: Boolean(value.ready),
+    readyForPlayback: Boolean(value.readyForPlayback),
+    loadRequestId: text(value.loadRequestId),
+    workspaceRequestId: text(value.workspaceRequestId),
     loaded: Boolean(value.loaded) && Boolean(source),
     source,
     duration,

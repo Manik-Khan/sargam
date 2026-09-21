@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
-async function player() {
+export async function player() {
   const root = new URL('../', import.meta.url);
   const [html, core, app] = await Promise.all([
     'public/sargam-player/index.html', 'public/vilambit/vilambit-core.js',
@@ -47,7 +47,7 @@ async function player() {
     stats.plays++; paused = false; this.dispatchEvent(new w.Event('play'));
   };
   w.eval(core);
-  w.eval(app + '\nwindow.testPlayer = { resetSourceState, togglePlay, buildGraph, state, media, setDecoded(value) { state.decoded = value; }, graph() { return {actx, srcNode, stretch}; } };');
+  w.eval(app + '\nwindow.testPlayer = { loadFile, record: () => localRecording, resetSourceState, togglePlay, buildGraph, state, media, setDecoded(value) { state.decoded = value; }, graph() { return {actx, srcNode, stretch}; } };');
   const p = w.testPlayer;
   const load = name => {
     p.resetSourceState({ url: `blob:http://localhost/${name}`, name, archive: false });

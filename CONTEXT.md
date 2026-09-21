@@ -6,6 +6,24 @@
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
 
+## September 20 audit repairs
+
+- Manik authorized fixing the September 20 audit findings on the reviewed, uncommitted audio-work base. That work was preserved; no commit/push/deployment was performed.
+- Saving retains edits made during asynchronous writes; logical saves and folder writes are ordered. Project/clip saves preserve live recording settings and document identity.
+- Recording workspace checkpoints run during playback, with project/base-matched local recovery. Failed older writes cannot overwrite a later successful snapshot.
+- Queue waits for matching playable-source readiness and workspace acknowledgement before committing/autoplay; failures/timeouts preserve the prior session.
+- MusicXML shares performed-cell traversal with playback and preserves meter changes, Gat returns and pickup-to-sam boundaries. Ashta Jhaptal/Jhaptaal aliases resolve to the existing Jhampak definition.
+- Native full-waveform decoding uses bounded local audio-header inspection, a 64 MiB estimated PCM budget and a 15-second deadline; media failure can immediately start the existing on-device fallback. Unknown/oversized layouts remain streamed.
+- **685 checks passed; production build succeeded (124 modules)**. Browser audio, printing/layout, folder shutdown and real archive Queue acceptance remain pending; large-bundle profiling also remains. See `docs/audit-repairs-2026-09-20.md`.
+
+## September 17 on-device audio compatibility
+
+- Manik approved automatic local-audio preparation with progress and Cancel, explicitly requiring that recordings never be uploaded for decoding. No installed user app is required.
+- Local audio format failures can now start a lazy, same-origin FFmpeg WebAssembly worker and produce a temporary FLAC playback copy. The original source identity, file, markers, and loops are preserved. Normal playable files do not start the decoder.
+- Audio-only first scope; real video and archive URLs retain native playback. File, output, duration and time limits prevent unbounded conversion; large local/prepared audio stays streamed rather than fully decoded. See `docs/audio-compatibility.md` for exact limits and hosting requirements.
+- The optional decoder is about 32 MB and is included in both static builds, with license and source references. It runs single-threaded without a server conversion service or isolation headers.
+- **666 checks passed; production build succeeded**, including real ALAC/AAC decoder fixtures and lossless integrity checks. Chrome visual/aural and network-panel acceptance remain pending due to the previous browser-access denial. The original failing M4A is not yet available for direct testing. No commit, push, or deployment performed.
+
 ## September 17 recording playback repair
 
 - Local recording replacement previously closed the AudioContext and discarded its MediaElementAudioSourceNode while retaining the same media element. A later media-engine start attempted to bind that element again and failed. Keep one context/source binding for the mounted player and rebuild only the downstream processing graph.

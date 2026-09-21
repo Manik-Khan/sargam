@@ -80,10 +80,9 @@ export const smokes = [
     async fn() {
       const app = await readFile(new URL('../src/shell/App.jsx', import.meta.url), 'utf8');
       assert.match(app, /sourceAssetIdFromReference\(\{/);
-      assert.match(app, /sendVilambit\('apply-workspace', savedEntry\)/);
+      assert.match(app, /workspaceRequestId !== restoring.requestId/);
       assert.match(app, /SOURCE_WORKSPACE_FILE/);
-      assert.match(app, /window\.setTimeout\(\(\) => \{/);
-      assert.match(app, /\}, 1200\)/);
+      assert.match(app, /workspacePersistence\.schedule\(project, projectWorkspace\)/);
       assert.doesNotMatch(app, /sourceAssetIdFromReference\(\{\s*name:/);
     },
   },
