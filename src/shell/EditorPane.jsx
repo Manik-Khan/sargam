@@ -22,6 +22,7 @@ import { bolCursorSelection } from '../engine/bol-capture.js';
 import { bolCaptureKeymap } from './bol-capture-keymap.js';
 import { editorClickPosition } from './notation-navigation.js';
 import { sourceEditChange } from './notation-authoring.js';
+import { editorSelectionSync } from './editor-selection-sync.js';
 
 class HiddenStructureWidget extends WidgetType {
   toDOM() {
@@ -130,6 +131,7 @@ export default function EditorPane({
   useEffect(() => {
     if (!mount.current) return undefined;
     let facade = null;
+    let selectionSync = null;
     const view = new EditorView({
       parent: mount.current,
       state: EditorState.create({
@@ -172,10 +174,7 @@ export default function EditorPane({
               changeRef.current?.(update.state.doc.toString());
             }
             if (update.selectionSet || update.docChanged || update.focusChanged) {
-              const pos = update.state.selection.main.head;
-              posRef.current?.(pos);
-              selectionRef.current?.({ start: update.state.selection.main.from, end: update.state.selection.main.to });
-              lineRef.current?.(update.state.doc.lineAt(pos).number);
+              selectionSync?.update();
             }
           }),
           EditorView.contentAttributes.of({
@@ -190,11 +189,16 @@ export default function EditorPane({
     facade = makeFacade(view);
     viewRef.current = view;
     if (editorRef) editorRef.current = facade;
-    const pos = view.state.selection.main.head;
-    posRef.current?.(pos);
-    lineRef.current?.(view.state.doc.lineAt(pos).number);
+    selectionSync = editorSelectionSync(view, state => {
+      const pos = state.selection.main.head;
+      posRef.current?.(pos);
+      selectionRef.current?.({ start: state.selection.main.from, end: state.selection.main.to });
+      lineRef.current?.(state.doc.lineAt(pos).number);
+    });
+    selectionSync.update();
     return () => {
       if (editorRef?.current === facade) editorRef.current = null;
+      selectionSync.destroy();
       view.destroy();
       viewRef.current = null;
     };

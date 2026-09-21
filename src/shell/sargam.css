@@ -4123,7 +4123,21 @@
 
 /* Named controls and typed shorthand edit one source. Keep the working panel
    compact enough to leave the score and text visible in the split workspace. */
-.notation-controls { max-height:min(32vh, 280px); overflow:auto; flex-shrink:0; padding: 10px 12px; border-bottom: 1px solid var(--sr-line); background: var(--sr-paper-raised); }
+/* Reserve the same space for empty, short and long selections. A max-height
+   alone lets bol rows push the text away while the user is highlighting it. */
+.notation-controls {
+  box-sizing: border-box;
+  height: clamp(100px, 20vh, 180px);
+  min-height: 0;
+  flex: 0 0 auto;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sr-line);
+  background: var(--sr-paper-raised);
+}
 .notation-selection { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; font-size:13px; }
 .notation-selection > code { overflow-wrap:anywhere; white-space:pre-wrap; }
 .notation-selection > span, .notation-help { color:var(--sr-ink-soft); font-size:12px; }

@@ -1,10 +1,17 @@
 # Sargam — Project Context & Handoff
 
-**Updated:** 2026-09-21, after notation playback/layout repairs and named writing controls. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
+**Updated:** 2026-09-21, after the Selected notes drag-selection stability repair. The July 30 product rulings below remain binding except where a later checkpoint explicitly supersedes them.
 
 **What this is:** the broad project memory for Sargam — Manik Khan's web app for writing, rendering, hearing, printing, transcribing, and practicing Hindustani classical notation. Read this with [the September 21 handoff](SARGAM_NEXT_SESSION_CONTEXT_2026-09-21_NOTATION_CHECKPOINT.md) and the historical July 30 print checkpoint, then inspect the actual clone at `/Users/khansolo/Documents/GitHub/sargam`.
 
 Manik is the musical and product authority. Never invent raga, tala, bol, ornament, notation, or AACM archival semantics.
+
+## September 21 selection stability repair
+
+- Manik reported that the Selected notes panel grew while highlighting text, pushing the source away from the pointer. Its earlier maximum height did not prevent growth. It now reserves a fixed, viewport-bounded height (100–180 CSS pixels) and scrolls additional controls internally, including keyboard scrolling when the panel is focused. Writing focus still hides it.
+- CodeMirror selection remains live during pointer drags. Surrounding controls and score-line synchronization wait until release, including release outside the editor; keyboard selection remains immediate. Cancellation, window blur and editor teardown cannot leave pending selection updates behind. Direct typing and musical spacing are unchanged.
+- **712 checks passed, 0 failed; production build passed (128 modules)**. Gesture regressions use DOM events and real CodeMirror selection state, including final mouseup changes and rapid consecutive drags. Browser geometry and audio acceptance remain pending; tests do not establish actual pointer/scroll behavior in Chrome or Safari.
+- Implementation base: canonical clone, clean matching `main` at `face6d601d62`. This repair is local and uncommitted at handoff; no push or deployment. Manually repeat short/long/backward selections in the supplied Jhampak phrase, release outside the source, scroll the control panel, and test a small window plus Writing focus.
 
 ## September 21 current checkpoint — writing, playback and layout
 

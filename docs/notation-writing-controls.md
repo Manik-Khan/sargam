@@ -26,6 +26,15 @@ redefined. Grid Write retains its editable cells and existing per-note bol
 menus. The new selection panel lives in Text Write; Writing focus hides it
 alongside the other secondary controls.
 
+September 21 selection regression repair (base `face6d601d62`): the panel now
+reserves the same compact height for empty, short and long selections, with
+internal scrolling and a keyboard-focusable scroll region. Extra bol rows and
+shorthand cannot move the editor. During a pointer drag the source selection
+remains live, while control and score-line updates wait for release. Releasing
+outside the editor, cancelling, switching to keyboard selection, and unmounting
+all finish or cancel pending work. The existing workspace divider can still
+resize the score/source split.
+
 Controls parse and validate candidate edits before writing them. They preserve
 notes, octaves, cell count and each cell's duration, including Jhampak's inferred
 half-beat. A partial selection that would change those boundaries is disabled;
@@ -49,14 +58,17 @@ Ornament and bol control edits use one isolated CodeMirror history transaction.
 Undo restores the notes, bol lanes and selection together. Direct source typing
 keeps ordinary CodeMirror undo behavior.
 
-Completed verification: `npm run verify` — **708 checks passed, 0 failed;
-production build passed (127 modules)**. Regressions exercise direct-typed/control
+Completed verification: `npm run verify` — **712 checks passed, 0 failed;
+production build passed (128 modules)**. Regressions exercise direct-typed/control
 parity, replacing/removing wrappers, per-pass bol remapping, surviving diri
 endpoints, Jhampak duration, invalid partial selections, gap-chikari protection,
-atomic undo/redo, and real React button/select interactions in jsdom.
+atomic undo/redo, real React button/select interactions in jsdom, and pointer
+gesture completion/cancellation with CodeMirror selection state.
 
 Live acceptance still required: open a real composition in Chrome/Safari, type
 and select notation, apply each ornament, change bols, undo, switch Text/Grid
 Write, and check that the bounded panel leaves both score and source usable at
-small window sizes. Browser visual/audio acceptance is not established by jsdom.
+small window sizes. Drag forward and backward across multiple notes/lines,
+release outside the editor, and confirm that the source stays under the pointer
+while bol controls scroll independently. Browser visual/audio acceptance is not established by jsdom.
 No commit, push, or deployment is part of this implementation.

@@ -23,7 +23,7 @@ export default function NotationControls({ text, doc, selection, onEdit, onBol, 
   }
   const shorthand = chosen.ok ? [sourceLines[chosen.sourceLine - 1], ...attachedBols].join('\n') : '';
   return (
-    <section className="notation-controls cmdbar-wrap" aria-label="Selected note controls">
+    <section className="notation-controls cmdbar-wrap" aria-label="Selected note controls" tabIndex={0}>
       <div className="notation-selection">
         <strong>Selected notes</strong>
         <code>{chosen.selected || (chosen.attacks?.length ? 'Note at cursor' : 'Select notes in Text Write')}</code>
