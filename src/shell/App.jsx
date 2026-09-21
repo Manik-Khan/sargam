@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { parseDocument } from '../engine/parse.js';
 import { ensureIdentity, createStore, createFileIO, setDirective } from '../engine/files.js';
 import { scheduleDocument, timeFor } from '../engine/schedule.js';
+import { positionFromSource, sourceRangeForPosition, metricOffsetForPosition } from './notation-navigation.js';
 import { documentToMusicXML } from '../engine/western.js';
 import { createPlayer, DRONE_MODES } from './audio.js';
 import {
@@ -786,8 +787,8 @@ export default function App() {
     clearTimeout(jumpTimerRef.current);
   };
 
-  const focusSourceLine = (sourceLine) => {
-    const range = sourceLineRange(text, sourceLine);
+  const focusSourceLine = (sourceLine, selectedRange = null) => {
+    const range = selectedRange || sourceLineRange(text, sourceLine);
     // Set this before requestAnimationFrame so a focus event cannot restore
     // the formerly selected source line while the reveal is pending.
     editorSyncTargetRef.current = range.line;
@@ -834,20 +835,28 @@ export default function App() {
     else setTimeout(reveal, 0);
   };
 
-  const doSeek = (sourceLine, matraIndex) => {
-    setActiveLine(sourceLine);
-    if (writeMode === 'grid') {
-      setGridSelection((current) => ({ ...current, sourceLine, matraIndex }));
-    }
-    focusSourceLine(sourceLine);
-    const t = timeFor(schedule, sourceLine, matraIndex);
+  const seekNotation = (sourceLine, matraIndex, metricTime = null) => {
+    const offset = metricOffsetForPosition(doc, sourceLine, matraIndex, metricTime);
+    const t = timeFor(schedule, sourceLine, matraIndex, offset);
+    const range = loopMode === 'off' ? null : rangeFor(loopMode, sourceLine);
+    player.seek(t, range);
     setPosition(t);
-    if (playing) {
-      player.pause();
-      const range = loopMode === 'off' ? null : rangeFor(loopMode, sourceLine);
-      player.setLoop(range);
-      player.play({ from: t });
+    setPlaying(player.playing);
+    setPlayCursor({ sourceLine, matraIndex });
+    setActiveLine(sourceLine);
+    setGridSelection((current) => ({ ...current, sourceLine, matraIndex }));
+  };
+
+  const doSeek = (sourceLine, matraIndex, metricTime = null) => {
+    seekNotation(sourceLine, matraIndex, metricTime);
+    if (writeMode !== 'grid') {
+      focusSourceLine(sourceLine, sourceRangeForPosition(text, doc, sourceLine, matraIndex, metricTime));
     }
+  };
+
+  const doSourceClick = (position) => {
+    const target = positionFromSource(text, doc, position);
+    if (target) seekNotation(target.sourceLine, target.matraIndex, target.metricTime);
   };
 
   const doTrackMute = (track, value) => {
@@ -2127,9 +2136,7 @@ export default function App() {
     const first = doc.sections.flatMap((section) => section.lines || [])[0];
     if (!first) return;
     const sourceLine = first.sourceLine;
-    setActiveLine(sourceLine);
-    setGridSelection({ sourceLine, matraIndex: 0 });
-    setPosition(timeFor(schedule, sourceLine, 0));
+    seekNotation(sourceLine, 0);
     if (writeMode === 'text') {
       window.requestAnimationFrame(() => focusSourceLine(sourceLine));
     }
@@ -2153,9 +2160,7 @@ export default function App() {
   }, [writeMode]);
 
   const selectGridWriterCell = (sourceLine, matraIndex) => {
-    setActiveLine(sourceLine);
-    setGridSelection({ sourceLine, matraIndex });
-    setPosition(timeFor(schedule, sourceLine, matraIndex));
+    seekNotation(sourceLine, matraIndex);
   };
 
   return (
@@ -2460,6 +2465,7 @@ export default function App() {
                 onChange={setText}
                 onCursorLine={syncSourceLineFromEditor}
                 onCursorPos={setCursorPos}
+                onNotationClick={doSourceClick}
                 onBeforeEdit={doEditorBeforeEdit}
                 bolCapture={bolCapture}
                 bolMessage={bolMessage}

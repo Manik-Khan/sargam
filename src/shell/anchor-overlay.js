@@ -288,12 +288,35 @@ function meterGlyph(mark, segment, selected, onSelect, onHandleStart) {
   lane.appendChild(el);
 }
 
+/** Align cross-cell bols after final layout. Cell widths vary in clean and
+ * matra views, so equal-matra percentages are only a static-render fallback. */
+export function alignBolSpans(root) {
+  for (const span of root.querySelectorAll('.sr-bol-cross-span')) {
+    const block = span.closest('.sr-line-block');
+    const width = span.getBoundingClientRect().width;
+    if (!block || !(width > 0)) continue;
+    const attacks = [...block.querySelectorAll('[data-anchor-kind="attack"]')];
+    const find = name => attacks.find(node => node.getAttribute('data-anchor-ordinal') === span.getAttribute(name));
+    const start = find('data-from-attack-ordinal');
+    const end = find('data-to-attack-ordinal');
+    const path = span.querySelector('path');
+    if (!start || !end || !path) continue;
+    const from = attackCenterX(span, start) * 100 / width;
+    const to = attackCenterX(span, end) * 100 / width;
+    if (!Number.isFinite(from) || !Number.isFinite(to)) continue;
+    const middle = (from + to) / 2;
+    const half = Math.min(8, Math.max(6, (to - from) * 0.15));
+    path.setAttribute('d', `M${from},19 L${to},19 M${middle - half},2 L${middle},17 L${middle + half},2`);
+  }
+}
+
 export function stampAnchorTargets(root, sourceText) {
   // render.js now stamps exact attacks, slot edges, and boundaries directly
   // from the parsed model. Keep this public seam for Preview/Export callers and
   // for static marker alignment; sourceText is intentionally no longer parsed.
   void sourceText;
   alignTalaMarkers(root);
+  alignBolSpans(root);
 }
 
 export function mountAnchorOverlays(root, marks = [], options = {}) {

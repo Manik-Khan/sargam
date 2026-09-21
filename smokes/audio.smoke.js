@@ -13,6 +13,7 @@ const close = (a, b, msg) =>
 /** A minimal AudioContext recording every scheduled start. */
 function mockCtx() {
   const started = [];
+  const stopped = [];
   const mkParam = () => ({
     value: 1,
     setValueAtTime() {},
@@ -38,7 +39,7 @@ function mockCtx() {
         start(at) {
           started.push({ at, kind: 'buffer' });
         },
-        stop() {},
+        stop(at) { stopped.push(at); },
       };
       return src;
     },
@@ -50,7 +51,7 @@ function mockCtx() {
         start(at) {
           started.push({ at, freq: osc._freq, oscillatorType: osc.type });
         },
-        stop() {},
+        stop(at) { stopped.push(at); },
       };
       osc.frequency.setValueAtTime = (f) => {
         osc._freq = f;
@@ -58,6 +59,7 @@ function mockCtx() {
       return osc;
     },
     _started: started,
+    _stopped: stopped,
   };
   return ctx;
 }
@@ -124,6 +126,39 @@ function make(src) {
 const SRC = 'tal: tintal\ntempo: 60\n\nS R g m\n';
 
 export const smokes = [
+  {
+    name: 'audio: seeking a stopped player changes position without opening audio',
+    fn() {
+      let opened = 0;
+      const player = createPlayer({ createContext() { opened++; return mockCtx(); } });
+      player.load(scheduleDocument(parseDocument(SRC).doc));
+      assert.equal(player.seek(2.5), true);
+      close(player.position, 2.5);
+      assert.equal(player.playing, false);
+      assert.equal(opened, 0);
+    },
+  },
+  {
+    name: 'audio: seek preserves running state, moves audio and cancels stale cursor callbacks',
+    fn() {
+      const { ctx, timers, player } = make(SRC);
+      player.play();
+      const cancelledBeforeSeek = ctx._stopped.filter(at => at === undefined).length;
+      player.seek(2);
+      assert.ok(ctx._stopped.filter(at => at === undefined).length > cancelledBeforeSeek, 'old native voices are cancelled');
+      assert.equal(player.playing, true);
+      close(player.position, 2);
+      ctx.currentTime += 0.1;
+      close(player.position, 2.1);
+      player.pause();
+      player.seek(1);
+      close(player.position, 1);
+      assert.equal(player.playing, false);
+      player.play();
+      close(player.position, 1);
+      player.pause();
+    },
+  },
   {
     name: 'audio: play() schedules the first lookahead window synchronously',
     fn() {

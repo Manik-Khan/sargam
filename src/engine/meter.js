@@ -248,6 +248,7 @@ function inlineKrintanAttacks(token, baseIndex, matraStart, scale) {
       attacks.push({
         index: atom.index,
         ch: atom.ch,
+        ...(atom.grace ? { grace: true } : {}),
         time: addRational(matraStart, mulRational(scale, cursor)),
       });
     }

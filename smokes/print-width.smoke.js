@@ -157,7 +157,7 @@ export const smokes = [
       assert.match(css, /\.app-export-grid \.sr-ornament-graces,[\s\S]*?position:\s*absolute;/s);
       assert.match(css, /\.app-rhythm-grid \.sr-ornament-graces,[\s\S]*?right:\s*calc\(50% \+ 0\.14em\);[\s\S]*?bottom:\s*0\.76em;/s);
       assert.match(css, /\.app-export-graph-paper \.app-export-paper\s*\{[^}]*min-height:\s*1056px;[^}]*background:\s*var\(--sr-export-paper, #fff\);/s);
-      assert.match(css, /\.app-export-graph-paper\s*\{[^}]*--sr-graph-cell-width:\s*2\.65em;[^}]*--sr-graph-cell-height:\s*5\.3em;/s);
+      assert.match(css, /\.app-export-graph-paper\s*\{[^}]*--sr-graph-cell-width:\s*2\.65em;[^}]*--sr-graph-base-cell-height:\s*5\.3em;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-graph-row\s*\{[^}]*grid-template-rows:\s*var\(--sr-graph-cell-height\) !important;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-graph-empty-cell,[\s\S]*?width:\s*var\(--sr-graph-cell-width\);/s);
       assert.match(css, /\.app-export-graph-paper \.sr-line-repeat-marker\s*\{[^}]*font-size:\s*0\.82em;[^}]*font-weight:\s*700;/s);
@@ -170,7 +170,7 @@ export const smokes = [
       assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-graph-vibhag-end,[\s\S]*?inset -2px 0/s);
       assert.doesNotMatch(css, /\.app-export-graph-paper \.sr-timed-slots\[data-written-slots="4"\]\s*\{\s*font-size:\s*0\.68em;/s);
       assert.match(css, /\.sr-graph-structure-label\s*\{[^}]*background:\s*var\(--sr-graph-label-bg\);[^}]*box-shadow:/s);
-      assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-has-bol-lane[\s\S]*?padding-bottom:\s*calc\(0\.08em \+ \(1\.08em \* var\(--sr-bol-pass-count, 1\)\)\);/s);
+      assert.match(css, /\.app-export-graph-paper \.sr-cell\.sr-has-bol-lane[\s\S]*?padding-bottom:\s*calc\(0\.08em \+ \(1\.08em \* var\(--sr-bol-pass-count, 1\)\) \+ var\(--sr-graph-lyric-height, 0em\)\);/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol\s*\{[^}]*width:\s*var\(--sr-graph-cell-width\);[^}]*border-top:\s*1px dashed/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol-slots\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--sr-bol-written-slots\), minmax\(0, 1fr\)\) !important;/s);
       assert.match(css, /\.app-export-graph-paper \.sr-bol\s*\{[^}]*font-size:\s*1em;/s);

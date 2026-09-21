@@ -87,6 +87,7 @@ export default function GridEditor({
   const [phraseRepeatStart, setPhraseRepeatStart] = useState(null);
   const [endingPickerLine, setEndingPickerLine] = useState(null);
   const scrollRef = useRef(null);
+  const syncingFocusRef = useRef(false);
 
   useEffect(() => {
     const sourceLine = Number(activeSelection?.sourceLine);
@@ -110,10 +111,13 @@ export default function GridEditor({
       elementHeight: bounds.height,
     });
     const input = cell.querySelector('input[data-grid-cell="true"]');
+    syncingFocusRef.current = true;
     try {
       input?.focus({ preventScroll: true });
     } catch {
       input?.focus();
+    } finally {
+      syncingFocusRef.current = false;
     }
     setBolMenu(null);
   }, [activeSelection?.sourceLine, activeSelection?.matraIndex]);
@@ -536,8 +540,13 @@ export default function GridEditor({
                           aria-label={`Line ${row.sourceLine}, written matra ${cell.matraIndex + 1}, cycle position ${cell.cycleLabel ?? cell.matraIndex + 1}`}
                           aria-invalid={error ? 'true' : 'false'}
                           data-grid-cell="true"
+                          onPointerDown={(event) => {
+                            if (event.button === 0 && event.currentTarget === document.activeElement) {
+                              onCellFocus?.(row.sourceLine, cell.matraIndex);
+                            }
+                          }}
                           onFocus={() => {
-                            onCellFocus?.(row.sourceLine, cell.matraIndex);
+                            if (!syncingFocusRef.current) onCellFocus?.(row.sourceLine, cell.matraIndex);
                           }}
                           onChange={(event) => editCell(row, cell, event.target.value)}
                           onBlur={() => finishCell(row, cell, key)}

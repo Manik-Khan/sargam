@@ -21,13 +21,16 @@ import {
   stampAnchorTargets,
 } from './anchor-overlay.js';
 import { decorateRhythmGrid, rhythmGridIdentity } from './rhythm-grid.js';
+import { positionFromScore } from './notation-navigation.js';
 
 function widthInEm(el) {
   if (!el || !el.clientWidth) return 56;
-  const fontSize = Number.parseFloat(getComputedStyle(el).fontSize) || 16;
+  const style = getComputedStyle(el);
+  const fontSize = Number.parseFloat(getComputedStyle(el.querySelector('.sargam-render') || el).fontSize) || 16;
+  const padding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
   // SARGAM_REPEAT_GUTTER_WIDTH_2026_07_20 — the semantic planner receives
   // only the shared inner notation width; repeat punctuation lives outside it.
-  return Math.max(18, Math.floor(el.clientWidth / fontSize) - 6);
+  return Math.max(1, (el.clientWidth - padding) / fontSize - 6);
 }
 
 export default function PreviewPane({
@@ -100,7 +103,7 @@ export default function PreviewPane({
     // has no outside gutters: the real cells themselves should reach the
     // writing surface's right edge.
     const graphColumns = graphPaper
-      ? Math.max(4, Math.floor((maxSystemEm + 5.5) / 3.15))
+      ? Math.max(1, Math.floor((maxSystemEm + 6) / 3.15))
       : undefined;
     const el = renderDocument(doc, {
       activeLine,
@@ -208,12 +211,10 @@ export default function PreviewPane({
     if (marked) return;
     if (!onSeek) return;
     const cell = event.target.closest('.sr-cell');
-    const blockEl = event.target.closest('[data-source-line]');
-    if (!blockEl) return;
-    const sourceLine = Number(blockEl.getAttribute('data-source-line'));
-    const matraIndex = cell ? Number(cell.getAttribute('data-matra')) : 0;
+    const target = positionFromScore(event.target);
+    if (!target) return;
     if (rhythmGrid && cell) onGridSelection?.(rhythmGridIdentity(cell));
-    onSeek(sourceLine, Number.isFinite(matraIndex) ? matraIndex : 0);
+    onSeek(target.sourceLine, target.matraIndex, target.metricTime);
   };
 
   return (

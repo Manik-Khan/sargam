@@ -20,6 +20,7 @@ import { metadataRanges } from '../engine/anchors.js';
 import { audioLinkMetadataRanges } from '../engine/audio-links.js';
 import { bolCursorSelection } from '../engine/bol-capture.js';
 import { bolCaptureKeymap } from './bol-capture-keymap.js';
+import { editorClickPosition } from './notation-navigation.js';
 
 class HiddenStructureWidget extends WidgetType {
   toDOM() {
@@ -87,6 +88,7 @@ export default function EditorPane({
   onChange,
   onCursorLine,
   onCursorPos,
+  onNotationClick,
   onBeforeEdit,
   bolCapture,
   bolMessage,
@@ -99,6 +101,7 @@ export default function EditorPane({
   const changeRef = useRef(onChange);
   const lineRef = useRef(onCursorLine);
   const posRef = useRef(onCursorPos);
+  const clickRef = useRef(onNotationClick);
   const beforeRef = useRef(onBeforeEdit);
   const bolKeyRef = useRef(onBolCaptureKey);
   const [showStructure, setShowStructure] = useState(false);
@@ -107,6 +110,7 @@ export default function EditorPane({
   changeRef.current = onChange;
   lineRef.current = onCursorLine;
   posRef.current = onCursorPos;
+  clickRef.current = onNotationClick;
   beforeRef.current = onBeforeEdit;
   bolKeyRef.current = onBolCaptureKey;
 
@@ -129,6 +133,11 @@ export default function EditorPane({
           keymap.of([...defaultKeymap, ...historyKeymap]),
           structureCompartment.of(hiddenStructure),
           EditorView.domEventHandlers({
+            click(event, editor) {
+              const position = editorClickPosition(event, editor);
+              if (position !== null) clickRef.current?.(position);
+              return false;
+            },
             beforeinput() {
               if (facade) beforeRef.current?.(facade);
               return false;

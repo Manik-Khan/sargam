@@ -69,7 +69,7 @@ function contentWidthInEm(el) {
     (Number.parseFloat(style.paddingRight) || 0);
   const contentWidth = Math.max(0, el.clientWidth - padding);
 
-  return Math.max(18, contentWidth / fontSize - RIGHT_EDGE_BREATH_EM - SCORE_GUTTER_EM);
+  return Math.max(1, contentWidth / fontSize - RIGHT_EDGE_BREATH_EM - SCORE_GUTTER_EM);
 }
 
 function measureLine(line, group) {
@@ -149,7 +149,7 @@ export default function ExportView({ doc, noteNames, onClose, sourceText, anchor
         const maxSystemEm = contentWidthInEm(mountEl);
         const graphPaper = gridStyle === 'paper';
         const graphColumns = graphPaper
-          ? Math.max(4, Math.floor((maxSystemEm + RIGHT_EDGE_BREATH_EM + SCORE_GUTTER_EM) / 2.65))
+          ? Math.max(1, Math.floor((maxSystemEm + SCORE_GUTTER_EM) / 2.65))
           : undefined;
         mountEl.replaceChildren(renderExport(doc, {
           noteNames,

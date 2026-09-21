@@ -17,7 +17,8 @@ export function xInContainer(container, node, edge = 'center') {
 }
 
 export function attackCenterX(container, slot) {
-  const note = slot?.querySelector?.('.sr-approach-destination, .sr-ch') || slot;
+  const note = slot?.querySelector?.('.sr-approach-destination, .sr-note:not(.sr-grace) > .sr-ch')
+    || slot?.querySelector?.('.sr-ch') || slot;
   return xInContainer(container, note, 'center');
 }
 

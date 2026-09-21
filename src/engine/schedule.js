@@ -250,6 +250,8 @@ export function scheduleDocument(doc, opts = {}) {
         events.push({
           kind: 'cursor',
           t: matraStart,
+          secondsPerMatra: spm,
+          duration: cellSeconds,
           sectionIndex,
           lineIndex,
           matraIndex,
@@ -484,12 +486,15 @@ export function scheduleDocument(doc, opts = {}) {
  * seem to choose from the output file"). Falls back to the line start,
  * then to 0, so a click never lands nowhere.
  */
-export function timeFor(schedule, sourceLine, matraIndex) {
+export function timeFor(schedule, sourceLine, matraIndex, offsetMatras = 0) {
   let lineStart = null;
   for (const ev of schedule.events) {
     if (ev.kind !== 'cursor' || ev.sourceLine !== sourceLine) continue;
     if (lineStart === null) lineStart = ev.t;
-    if (ev.matraIndex === matraIndex) return ev.t;
+    if (ev.matraIndex === matraIndex) {
+      const offset = Math.max(0, Number(offsetMatras) || 0) * (ev.secondsPerMatra || 0);
+      return ev.t + Math.min(offset, ev.duration || 0);
+    }
   }
   if (lineStart !== null) return lineStart;
   return 0;

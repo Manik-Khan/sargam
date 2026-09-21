@@ -101,6 +101,18 @@ export function createPlayer(env) {
   let onCursor = noop;
   let onStop = noop;
   const cursorTimers = new Set();
+  const activeSources = new Set();
+  function trackSource(source) {
+    activeSources.add(source);
+    source.onended = () => activeSources.delete(source);
+    return source;
+  }
+  function silenceSources() {
+    for (const source of activeSources) {
+      try { source.stop(); } catch { /* The voice may already have ended. */ }
+    }
+    activeSources.clear();
+  }
   let masterGains = null;
   let mixBus = null;
   let melodyFilter = null;
@@ -370,7 +382,7 @@ export function createPlayer(env) {
     if (!ctx.createBufferSource) return false;
     const g = ctx.createGain();
     g.connect(masterGains.melody);
-    const src = ctx.createBufferSource();
+    const src = trackSource(ctx.createBufferSource());
     src.buffer = buffer;
     src.connect(g);
     const dur = Math.max(0.03, ev.dur);
@@ -405,7 +417,7 @@ export function createPlayer(env) {
     const tone = toneByVoice.neutral;
     const g = ctx.createGain();
     g.connect(masterGains.melody);
-    const osc = ctx.createOscillator();
+    const osc = trackSource(ctx.createOscillator());
     osc.type = tone.neutralWaveform === 'triangle' ? 'triangle' : 'sine';
     osc.connect(g);
 
@@ -465,7 +477,7 @@ export function createPlayer(env) {
 
   function playRoundedChikari(ev, at, settings) {
     if (typeof ctx.createOscillator !== 'function') return false;
-    const osc = ctx.createOscillator();
+    const osc = trackSource(ctx.createOscillator());
     const g = ctx.createGain();
     const dur = Math.min(0.22, Math.max(0.045, ev.dur * (0.38 + settings.length * 0.82)));
     const level = 0.055 + settings.intensity * 0.18;
@@ -531,7 +543,7 @@ export function createPlayer(env) {
 
   function playDronePluck(freq, at, variant) {
     if (!ctx.createBuffer || !ctx.createBufferSource) return false;
-    const src = ctx.createBufferSource();
+    const src = trackSource(ctx.createBufferSource());
     const g = ctx.createGain();
     src.buffer = tanpuraBuffer(freq, variant);
     src.connect(g);
@@ -566,7 +578,7 @@ export function createPlayer(env) {
     }
     const g = ctx.createGain();
     g.connect(masterGains.tick);
-    const src = ctx.createBufferSource();
+    const src = trackSource(ctx.createBufferSource());
     src.buffer = buf;
     src.connect(g);
     g.gain.setValueAtTime(1, at);
@@ -578,7 +590,7 @@ export function createPlayer(env) {
     if (!buffer || !ctx.createBufferSource) return false;
     const g = ctx.createGain();
     g.connect(masterGains.tick);
-    const src = ctx.createBufferSource();
+    const src = trackSource(ctx.createBufferSource());
     src.buffer = buffer;
     src.connect(g);
     g.gain.setValueAtTime(clampGain(voice.gain, 0.75), at);
@@ -656,6 +668,7 @@ export function createPlayer(env) {
       timer = null;
     }
     if (soundfont) soundfont.stopAll(true);
+    silenceSources();
     clearCursorTimers();
     offset = 0;
     nextIndex = 0;
@@ -694,6 +707,7 @@ export function createPlayer(env) {
       offset = Math.max(offset, offset + (ctx.currentTime - startedAt));
       playing = false;
       if (soundfont) soundfont.stopAll(true);
+      silenceSources();
       clearCursorTimers();
       nextDroneAt = null;
       droneStep = 0;
@@ -701,6 +715,16 @@ export function createPlayer(env) {
         clearI(timer);
         timer = null;
       }
+    },
+    /** Move the transport without starting a paused player or opening audio. */
+    seek(to, range = loop) {
+      if (!schedule || !Number.isFinite(to)) return false;
+      const resume = playing;
+      this.pause();
+      offset = Math.max(0, Math.min(schedule.duration, to));
+      this.setLoop(range);
+      if (resume) this.play({ from: offset });
+      return true;
     },
     stop() {
       stop();

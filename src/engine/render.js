@@ -749,6 +749,13 @@ function renderLineBlock(line, tal, ctx) {
     : (line._bolLane || line.bols?.length)
       ? [{ pass: 1, bols: line.bols || [] }]
       : [];
+  if (graphPaper) {
+    const lyricHeight = line.lyrics.length ? 1.2 : 0;
+    const extraHeight = Math.max(0, bolPasses.length - 1) * 1.08 + lyricHeight;
+    row.style.setProperty('--sr-graph-cell-height', `calc(var(--sr-graph-base-cell-height) + ${Number(extraHeight.toFixed(2))}em)`);
+    row.style.setProperty('--sr-graph-bol-count', String(bolPasses.length));
+    row.style.setProperty('--sr-graph-lyric-height', `${lyricHeight}em`);
+  }
   const bolMatraGeometry = line.matras.map((matra) => {
     const firstSlotOfEvent = new Map();
     let writtenSlots = 0;
@@ -945,8 +952,13 @@ function renderLineBlock(line, tal, ctx) {
       ) continue;
 
       const matraSpan = toMatra - fromMatra + 1;
-      const fromX = ((fromSlot + 0.5) / fromGeometry.writtenSlots) * (100 / matraSpan);
-      const toX = ((toMatra - fromMatra) + (toSlot + 0.5) / toGeometry.writtenSlots) * (100 / matraSpan);
+      const physicalSpan = colEndOf[toMatra] - fromCol;
+      const fromX = graphPaper
+        ? ((fromSlot + 0.5) / fromGeometry.writtenSlots) * (colEndOf[fromMatra] - fromCol) * 100 / physicalSpan
+        : ((fromSlot + 0.5) / fromGeometry.writtenSlots) * (100 / matraSpan);
+      const toX = graphPaper
+        ? (toCol - fromCol + ((toSlot + 0.5) / toGeometry.writtenSlots) * (colEndOf[toMatra] - toCol)) * 100 / physicalSpan
+        : ((toMatra - fromMatra) + (toSlot + 0.5) / toGeometry.writtenSlots) * (100 / matraSpan);
       const span = h('span', 'sr-bol-cross-span');
       span.setAttribute('data-bol-pass', String(Number(passLane.pass) || 1));
       span.setAttribute('data-from-attack-ordinal', String(bolAttackOffset + (bolPlan.attackByRef.get(`${fromMatra}:${bol.ref.eventIndex}`)?.ordinal ?? 0)));
@@ -954,7 +966,7 @@ function renderLineBlock(line, tal, ctx) {
       span.setAttribute('aria-label', 'Diri across two notes');
       span.title = 'Diri across these two notes';
       span.style.gridRow = '4';
-      span.style.gridColumn = `${fromCol} / ${toCol + 1}`;
+      span.style.gridColumn = `${fromCol} / ${colEndOf[toMatra]}`;
       span.style.setProperty('--sr-bol-pass-after', String(Math.max(0, bolPasses.length - passIndex - 1)));
       span.appendChild(diriCrossSvg(fromX, toX));
       row.appendChild(span);

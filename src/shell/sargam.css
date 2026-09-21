@@ -2940,7 +2940,8 @@
 .sr-paper-tail { display: none; }
 .app-rhythm-grid-paper {
   --sr-graph-cell-width: 3.15em;
-  --sr-graph-cell-height: 5.25em;
+  --sr-graph-base-cell-height: 5.25em;
+  --sr-graph-cell-height: var(--sr-graph-base-cell-height);
   --sr-graph-label-height: 1.85em;
   --sr-graph-line: color-mix(in srgb, var(--sr-accent) 36%, var(--sr-line));
   --sr-graph-label-bg: color-mix(in srgb, var(--sr-accent) 9%, var(--sr-paper-raised));
@@ -2948,7 +2949,8 @@
 }
 .app-export-graph-paper {
   --sr-graph-cell-width: 2.65em;
-  --sr-graph-cell-height: 5.3em;
+  --sr-graph-base-cell-height: 5.3em;
+  --sr-graph-cell-height: var(--sr-graph-base-cell-height);
   --sr-graph-label-height: 1.65em;
   --sr-graph-line: color-mix(in srgb, var(--sr-accent) 30%, #aeb8ae);
   --sr-graph-label-bg: color-mix(in srgb, var(--sr-ink) 7%, var(--sr-export-paper, #fff));
@@ -3054,7 +3056,7 @@
 .app-rhythm-grid-paper .sr-cell.sr-has-bol-lane,
 .app-export-graph-paper .sr-cell.sr-has-bol-lane,
 .app-export-graph-paper .sr-export .sr-cell.sr-has-bol-lane:has(.sr-sustain) {
-  padding-bottom: calc(0.08em + (1.08em * var(--sr-bol-pass-count, 1)));
+  padding-bottom: calc(0.08em + (1.08em * var(--sr-bol-pass-count, 1)) + var(--sr-graph-lyric-height, 0em));
 }
 .app-rhythm-grid-paper .sr-cell.sr-graph-vibhag-end,
 .app-export-graph-paper .sr-cell.sr-graph-vibhag-end,
@@ -3111,7 +3113,15 @@
   pointer-events: none;
 }
 .app-rhythm-grid-paper .sr-lyric,
-.app-export-graph-paper .sr-lyric { padding-bottom: 0.08em; }
+.app-export-graph-paper .sr-lyric {
+  font-size: 1em;
+  padding-bottom: 0.08em;
+  margin-bottom: calc(1.08em * var(--sr-graph-bol-count, 0));
+}
+.app-rhythm-grid-paper .sr-cell:not(.sr-has-bol-lane),
+.app-export-graph-paper .sr-cell:not(.sr-has-bol-lane) {
+  padding-bottom: calc(0.08em + var(--sr-graph-lyric-height, 0em));
+}
 .app-rhythm-grid-paper .sr-bol,
 .app-export-graph-paper .sr-bol {
   width: var(--sr-graph-cell-width);
