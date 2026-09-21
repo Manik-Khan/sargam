@@ -107,7 +107,7 @@ function structuralLane(text, sourceLine, pass = 1) {
   return { musicLine, found, parsed };
 }
 
-function writeBolLane(text, sourceLine, body, { keepEmpty = true, pass = 1 } = {}) {
+export function writeBolLane(text, sourceLine, body, { keepEmpty = true, pass = 1 } = {}) {
   const lane = findBolLane(text, sourceLine, pass);
   if (lane.insertIndex < 0) {
     return { ok: false, text, message: 'The active music line no longer exists.' };

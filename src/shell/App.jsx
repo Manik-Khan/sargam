@@ -106,6 +106,7 @@ import { playClipLoopFile } from './clip-audio.js';
 import Transport from './Transport.jsx';
 import DictateBar from './DictateBar.jsx';
 import CommandBar from './CommandBar.jsx';
+import NotationControls from './NotationControls.jsx';
 import Legend from './Legend.jsx';
 import EditorPane from './EditorPane.jsx';
 import GridEditor from './GridEditor.jsx';
@@ -268,6 +269,11 @@ export default function App() {
   projectWorkspaceRef.current = projectWorkspace;
   queueSessionRef.current = queueSession;
   const editorRef = useRef(null);
+  const [notationSelection, setNotationSelection] = useState({ start: 0, end: 0 });
+  const [notationMessage, setNotationMessage] = useState('');
+  const syncNotationSelection = useCallback(selection => {
+    setNotationSelection(current => current.start === selection.start && current.end === selection.end ? current : selection);
+  }, []);
   const vilambitRef = useRef(null);
   const jumpSelectionRef = useRef(null);
   const jumpTimerRef = useRef(null);
@@ -1481,6 +1487,25 @@ export default function App() {
   // Selection command: transform the editor's live selection through a
   // pure engine function (commands.js), keep the result selected so
   // commands stack (slide, then octave up, then repeat...).
+  const applyNotationEdit = (result, { focus = true } = {}) => {
+    setNotationMessage(result.message || '');
+    if (!result.ok) return;
+    const el = editorRef.current;
+    if (!el) return;
+    clearJumpSelection(el, false);
+    bolCaptureRef.current = null;
+    setBolCapture(null);
+    el.applyEdit(result.text, result.selectionStart, result.selectionEnd);
+    if (focus) el.focus();
+  };
+
+  const doSelectedBol = ({ sourceLine, ordinal, kind, diriMode, pass }) => {
+    const current = textRef.current;
+    const result = kind ? setBolAtAttack(current, sourceLine, ordinal, kind, pass, { diriMode })
+      : removeBolAtAttack(current, sourceLine, ordinal, pass);
+    applyNotationEdit({ ...result, selectionStart: notationSelection.start, selectionEnd: notationSelection.end }, { focus: false });
+  };
+
   const doCommand = (fn) => {
     const el = editorRef.current;
     if (!el) return;
@@ -2434,6 +2459,10 @@ export default function App() {
                 onClick={changeWritingFocus}
               >{writingFocus ? 'Show tools' : 'Writing focus'}</button>
             </div>
+            {writeMode === 'text' && <NotationControls
+              text={text} doc={doc} selection={notationSelection}
+              onEdit={applyNotationEdit} onBol={doSelectedBol} message={notationMessage}
+            />}
             <CommandBar
             onApply={doCommand}
             anchorTool={anchorTool}
@@ -2465,6 +2494,7 @@ export default function App() {
                 onChange={setText}
                 onCursorLine={syncSourceLineFromEditor}
                 onCursorPos={setCursorPos}
+                onSelection={syncNotationSelection}
                 onNotationClick={doSourceClick}
                 onBeforeEdit={doEditorBeforeEdit}
                 bolCapture={bolCapture}

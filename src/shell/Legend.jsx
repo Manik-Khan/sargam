@@ -34,13 +34,16 @@ const SECTIONS = [
   [
     'Ornaments',
     [
-      ['~mg', 'meend/slide within the beat — arc over the cluster'],
+      ['~(Gm)', 'slide over exactly these notes; G and m share one beat'],
+      ['~(G m)', 'slide across two beats; spaces keep their rhythm'],
+      ['~mg', 'older compact spelling: slide within one beat'],
       ['m~ g', 'meend across two beats'],
       ["{'S}n", 'kan: small grace before the note; n owns the beat'],
       ['{dP}m', 'grace run into m'],
       ['{dP} m', 'spaced: graces sound BEFORE the beat, stealing from the previous note'],
       ["'S~n", 'shorthand kan — same as {\u2019S}n'],
       ['[[DP]]', 'krintan — square bracket over the notes'],
+      ['[-[[RS]]-.n]', 'krintan inside a beat: R is ornamental; S is the destination'],
     ],
   ],
   [
@@ -67,7 +70,10 @@ const SECTIONS = [
     'Playing & tools',
     [
       ['Space', 'play / pause (tick marks the tal; sam accented, khali hollow)'],
-      ['click a beat', 'move the playhead there'],
+      ['click a note', 'select and seek; continue only if playback is already running'],
+      ['Selected notes', 'buttons write the same shorthand you can type; select the complete ornament to replace or remove it'],
+      ['> da ra . diri', 'bols follow timed notes; . leaves an attack unmarked; diri strikes one note twice'],
+      ['> di-ri', 'one diri across the next two note attacks'],
       ['Loop line/section', 'practice the passage under your cursor'],
       ['SRG / CDE', 'show Western note names (display only — the text stays sargam)'],
       ['Dictate', 'type or say syllables: sa ga ma pa · 1 2 3 4 · komal re · low ni'],

@@ -4,9 +4,6 @@
 
 import React, { useState } from 'react';
 import {
-  applySlide,
-  applyKan,
-  applyKrintan,
   applyBeat,
   applyRepeat,
   applyLineRepeat,
@@ -14,9 +11,6 @@ import {
 } from '../engine/commands.js';
 
 const COMMANDS = [
-  ['~ slide', 'Slide/meend over the selection', (s) => applySlide(s)],
-  ['{ } kan', 'Grace run — last note owns the beat', (s) => applyKan(s)],
-  ['[[ ]] krintan', 'Krintan over the selection', (s) => applyKrintan(s)],
   ['[ ] beat', 'Selection shares one beat', (s) => applyBeat(s)],
   ['( )×3', 'Repeat the phrase three times (edit the 3 after)', (s) => applyRepeat(s, 3)],
   ['||: :||', 'Repeat the whole passage', (s) => applyLineRepeat(s)],
@@ -55,7 +49,7 @@ export default function CommandBar({
     <div className="cmdbar-wrap">
       <div className="cmdbar">
         {COMMANDS.map(([label, title, fn]) => (
-          <button key={label} type="button" className="cmd-btn" title={title} onClick={() => onApply(fn)}>{label}</button>
+          <button key={label} type="button" className="cmd-btn" title={title} onMouseDown={event => event.preventDefault()} onClick={() => onApply(fn)}>{label}</button>
         ))}
         <div className="cmd-anchor-tools" role="group" aria-label="Score annotations">
           <span className="cmd-anchor-label">Annotate</span>

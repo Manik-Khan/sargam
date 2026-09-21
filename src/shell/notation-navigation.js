@@ -9,7 +9,7 @@ const value = fraction => fraction.num / fraction.den;
 const lineAt = (doc, sourceLine) => doc.sections.flatMap(section => section.lines || [])
   .find(line => line.sourceLine === sourceLine);
 
-function sourceAttacks(text, line) {
+export function sourceAttacks(text, line) {
   const range = sourceLineRange(text, line.sourceLine);
   const raw = text.slice(range.start, range.end);
   // A vibhag hold creates no attack. Keep its character width while allowing

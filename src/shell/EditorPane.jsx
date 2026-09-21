@@ -14,13 +14,14 @@ import {
   keymap,
   lineNumbers,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { metadataRanges } from '../engine/anchors.js';
 import { audioLinkMetadataRanges } from '../engine/audio-links.js';
 import { bolCursorSelection } from '../engine/bol-capture.js';
 import { bolCaptureKeymap } from './bol-capture-keymap.js';
 import { editorClickPosition } from './notation-navigation.js';
+import { sourceEditChange } from './notation-authoring.js';
 
 class HiddenStructureWidget extends WidgetType {
   toDOM() {
@@ -68,6 +69,15 @@ function makeFacade(view) {
       const b = Math.max(0, Math.min(length, Number(end) || 0));
       view.dispatch({ selection: { anchor: a, head: b }, scrollIntoView: true });
     },
+    applyEdit(text, start, end = start) {
+      view.dispatch({
+        changes: sourceEditChange(view.state.doc.toString(), text),
+        selection: { anchor: start, head: end },
+        userEvent: 'input.notation',
+        annotations: isolateHistory.of('full'),
+        scrollIntoView: true,
+      });
+    },
     centerSelection() {
       view.dispatch({
         effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'center' }),
@@ -88,6 +98,7 @@ export default function EditorPane({
   onChange,
   onCursorLine,
   onCursorPos,
+  onSelection,
   onNotationClick,
   onBeforeEdit,
   bolCapture,
@@ -101,6 +112,7 @@ export default function EditorPane({
   const changeRef = useRef(onChange);
   const lineRef = useRef(onCursorLine);
   const posRef = useRef(onCursorPos);
+  const selectionRef = useRef(onSelection);
   const clickRef = useRef(onNotationClick);
   const beforeRef = useRef(onBeforeEdit);
   const bolKeyRef = useRef(onBolCaptureKey);
@@ -110,6 +122,7 @@ export default function EditorPane({
   changeRef.current = onChange;
   lineRef.current = onCursorLine;
   posRef.current = onCursorPos;
+  selectionRef.current = onSelection;
   clickRef.current = onNotationClick;
   beforeRef.current = onBeforeEdit;
   bolKeyRef.current = onBolCaptureKey;
@@ -161,6 +174,7 @@ export default function EditorPane({
             if (update.selectionSet || update.docChanged || update.focusChanged) {
               const pos = update.state.selection.main.head;
               posRef.current?.(pos);
+              selectionRef.current?.({ start: update.state.selection.main.from, end: update.state.selection.main.to });
               lineRef.current?.(update.state.doc.lineAt(pos).number);
             }
           }),

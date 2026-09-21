@@ -4120,3 +4120,25 @@
 
 /* The grid coordinate already includes duration; avoid two labels overlapping. */
 .app-rhythm-grid .sr-half-beat { display: none; }
+
+/* Named controls and typed shorthand edit one source. Keep the working panel
+   compact enough to leave the score and text visible in the split workspace. */
+.notation-controls { max-height:min(32vh, 280px); overflow:auto; flex-shrink:0; padding: 10px 12px; border-bottom: 1px solid var(--sr-line); background: var(--sr-paper-raised); }
+.notation-selection { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; font-size:13px; }
+.notation-selection > code { overflow-wrap:anywhere; white-space:pre-wrap; }
+.notation-selection > span, .notation-help { color:var(--sr-ink-soft); font-size:12px; }
+.notation-ornaments { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.notation-ornaments .cmd-btn { min-height:34px; padding:5px 9px; }
+.notation-ornaments .cmd-btn code { margin-left:6px; font-size:11px; }
+.notation-ornaments [aria-pressed="true"] { background:var(--sr-ink); color:var(--sr-paper-raised); }
+.notation-ornaments button:disabled { opacity:.5; }
+.notation-bol-controls { display:flex; flex-wrap:wrap; gap:8px; border:0; margin:10px 0 0; padding:0; min-width:0; }
+.notation-bol-controls legend { font-size:12px; padding:0; margin-bottom:5px; }
+.notation-bol-controls label { display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-size:14px; }
+.notation-note-number { font-size:11px; color:var(--sr-ink-soft); }
+.notation-bol-controls select { min-width:0; max-width:100%; padding:5px; background:var(--sr-paper-raised); color:var(--sr-ink); border:1px solid var(--sr-line); border-radius:3px; font:inherit; }
+.notation-shorthand { margin-top:8px; font-size:11px; color:var(--sr-ink-soft); }
+.notation-shorthand pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:3px 0 0; color:var(--sr-ink); font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; max-height:5.8em; overflow:auto; }
+.notation-help { margin-top:6px; }
+@media (pointer:coarse) { .notation-ornaments .cmd-btn, .notation-bol-controls select { min-height:44px; } }
+@media (max-width:600px) { .notation-bol-controls select { font-size:16px; } }
